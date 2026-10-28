@@ -20,12 +20,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -35,7 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import java.util.Calendar
 
 // ─── Vazirmatn Font ───────────────────────────────────────────────────────────
 val Vazirmatn = FontFamily(
@@ -45,9 +42,8 @@ val Vazirmatn = FontFamily(
     Font(R.font.vazirmatn_bold, FontWeight.Bold)
 )
 
-// ─── Tinder-like Theme Colors ─────────────────────────────────────────────────
+// ─── Tinder-like Theme ────────────────────────────────────────────────────────
 private val TinderPink = Color(0xFFFF4458)
-private val TinderPinkDark = Color(0xFFE63950)
 private val TinderOrange = Color(0xFFFF7854)
 private val DarkBg = Color(0xFF121212)
 private val DarkSurface = Color(0xFF1E1E1E)
@@ -58,22 +54,25 @@ private val TextMuted = Color(0xFF777777)
 private val SuccessGreen = Color(0xFF2ED573)
 private val GradientTinder = listOf(Color(0xFFFF4458), Color(0xFFFF7854))
 
-// ─── Data Models ──────────────────────────────────────────────────────────────
+// ─── Data ─────────────────────────────────────────────────────────────────────
 enum class Gender { MALE, FEMALE, OTHER }
 enum class Orientation { STRAIGHT, GAY, LESBIAN, BISEXUAL, OTHER }
+enum class MsgType { TEXT, IMAGE, VOICE }
 
 data class UserProfile(
     val name: String = "",
-    val age: Int = 0,
+    val birthYear: Int = 2000,
     val gender: Gender = Gender.OTHER,
     val orientation: Orientation = Orientation.STRAIGHT,
     val job: String = "",
     val city: String = "",
     val about: String = "",
     val interests: List<String> = emptyList(),
-    val photos: List<String> = emptyList(), // local emoji or uri string for demo
+    val photos: List<String> = emptyList(),
     val phone: String = ""
-)
+) {
+    val age: Int get() = Calendar.getInstance().get(Calendar.YEAR) - birthYear
+}
 
 data class Person(
     val id: Int,
@@ -85,12 +84,18 @@ data class Person(
     val city: String,
     val about: String,
     val interests: List<String>,
-    val photoUrl: String,          // real-looking test photo
+    val emoji: String,
+    val tint: Color,
     val distanceKm: Int,
     val likedYou: Boolean = false
 )
 
-data class ChatMessage(val text: String, val isMe: Boolean, val time: String)
+data class ChatMessage(
+    val text: String,
+    val isMe: Boolean,
+    val time: String,
+    val type: MsgType = MsgType.TEXT
+)
 
 data class FilterState(
     val minAge: Int = 18,
@@ -100,38 +105,45 @@ data class FilterState(
     val maxDistance: Int = 50
 )
 
-// ─── Sample People with realistic test photo URLs (pravatar / similar) ────────
+private val iranianCities = listOf(
+    "تهران", "کرج", "مشهد", "اصفهان", "شیراز", "تبریز", "اهواز", "قم",
+    "کرمانشاه", "ارومیه", "رشت", "زاهدان", "همدان", "کرمان", "یزد",
+    "اردبیل", "بندرعباس", "اراک", "اسلام‌شهر", "زنجان", "سنندج", "قزوین",
+    "خرم‌آباد", "گرگان", "ساری", "بوشهر", "بیرجند", "ایلام", "سمنان", "یاسوج",
+    "بجنورد", "شهرکرد", "کیش", "قشم"
+)
+
 private val samplePeople = listOf(
     Person(1, "رها", 26, Gender.FEMALE, Orientation.STRAIGHT, "طراح گرافیک", "تهران",
         "اهل کافه‌گردی و کتاب. دنبال آشنایی واقعی.", listOf("کتاب", "کافه", "سفر", "طراحی"),
-        "https://i.pravatar.cc/600?img=5", 3, likedYou = true),
+        "🌷", Color(0xFFFFE0E6), 3, likedYou = true),
     Person(2, "سارا", 28, Gender.FEMALE, Orientation.STRAIGHT, "مهندس نرم‌افزار", "کرج",
         "طبیعت‌گردی و موسیقی حال من را خوب می‌کند.", listOf("طبیعت", "موسیقی", "عکاسی", "کدنویسی"),
-        "https://i.pravatar.cc/600?img=9", 12, likedYou = false),
+        "🌿", Color(0xFFE0F2E9), 12, likedYou = false),
     Person(3, "نیلوفر", 25, Gender.FEMALE, Orientation.BISEXUAL, "دانشجوی معماری", "تهران",
         "کنجکاوم دنیا را بیشتر بشناسم.", listOf("هنر", "پیاده‌روی", "فیلم", "معماری"),
-        "https://i.pravatar.cc/600?img=10", 5, likedYou = true),
+        "🌼", Color(0xFFFFF0D6), 5, likedYou = true),
     Person(4, "مهسا", 29, Gender.FEMALE, Orientation.STRAIGHT, "معلم زبان", "اصفهان",
         "رابطه‌ای می‌خواهم که در آن هر دو رشد کنیم.", listOf("سفر", "آشپزی", "فیلم", "یوگا"),
-        "https://i.pravatar.cc/600?img=16", 28, likedYou = false),
+        "🪻", Color(0xFFEDE0FF), 28, likedYou = false),
     Person(5, "آتنا", 24, Gender.FEMALE, Orientation.STRAIGHT, "محتواساز", "شیراز",
         "عاشق ساخت ویدیو و داستان‌گویی.", listOf("ویدیو", "خنده", "سفر", "کافه"),
-        "https://i.pravatar.cc/600?img=20", 8, likedYou = true),
+        "✨", Color(0xFFFFE8D6), 8, likedYou = true),
     Person(6, "پریا", 27, Gender.FEMALE, Orientation.LESBIAN, "روانشناس", "مشهد",
         "گوش دادن خوب بلدم و عاشق گفت‌وگوهای عمیقم.", listOf("روانشناسی", "کتاب", "پیاده‌روی"),
-        "https://i.pravatar.cc/600?img=25", 15, likedYou = false),
+        "🌙", Color(0xFFE0E8FF), 15, likedYou = false),
     Person(7, "آرمین", 27, Gender.MALE, Orientation.STRAIGHT, "برنامه‌نویس", "تهران",
         "عاشق کوهنوردی و قهوه.", listOf("کوهنوردی", "کافه", "کدنویسی", "فیلم"),
-        "https://i.pravatar.cc/600?img=12", 4, likedYou = true),
+        "🏔️", Color(0xFFD6EAF8), 4, likedYou = true),
     Person(8, "کاوه", 30, Gender.MALE, Orientation.GAY, "عکاس", "تهران",
         "زندگی را از پشت لنز می‌بینم.", listOf("عکاسی", "سفر", "هنر", "موسیقی"),
-        "https://i.pravatar.cc/600?img=15", 7, likedYou = false),
+        "📷", Color(0xFFF5D6E0), 7, likedYou = false),
     Person(9, "لیلا", 23, Gender.FEMALE, Orientation.BISEXUAL, "دانشجو", "کرج",
         "پر از انرژی و عاشق ماجراجویی.", listOf("رقص", "سفر", "موسیقی", "ورزش"),
-        "https://i.pravatar.cc/600?img=32", 18, likedYou = true),
+        "🔥", Color(0xFFFFE0CC), 18, likedYou = true),
     Person(10, "نوید", 31, Gender.MALE, Orientation.STRAIGHT, "پزشک", "تهران",
         "به دنبال آرامش و ارتباط عمیق.", listOf("کتاب", "یوگا", "سفر", "آشپزی"),
-        "https://i.pravatar.cc/600?img=33", 6, likedYou = false)
+        "🩺", Color(0xFFD5F5E3), 6, likedYou = false)
 )
 
 private val availableInterests = listOf(
@@ -322,12 +334,8 @@ private fun AuthFlow(onSuccess: (String) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(56.dp))
-        // Heart Logo
         Box(
-            Modifier
-                .size(100.dp)
-                .clip(CircleShape)
-                .background(Brush.linearGradient(GradientTinder)),
+            Modifier.size(100.dp).clip(CircleShape).background(Brush.linearGradient(GradientTinder)),
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(52.dp))
@@ -385,195 +393,471 @@ private fun AuthFlow(onSuccess: (String) -> Unit) {
     }
 }
 
-// ─── Profile Setup ────────────────────────────────────────────────────────────
+// ─── Profile Setup (improved UX, multi-step) ──────────────────────────────────
 @Composable
 private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit) {
+    var step by remember { mutableIntStateOf(0) } // 0=basic, 1=identity, 2=photos+interests, 3=about
     var name by remember { mutableStateOf("") }
-    var age by remember { mutableStateOf("") }
+    var birthYear by remember { mutableIntStateOf(2000) }
     var gender by remember { mutableStateOf(Gender.FEMALE) }
     var orientation by remember { mutableStateOf(Orientation.STRAIGHT) }
     var job by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
+    var city by remember { mutableStateOf("تهران") }
     var about by remember { mutableStateOf("") }
     var selectedInterests by remember { mutableStateOf(setOf<String>()) }
     var selectedPhotos by remember { mutableStateOf(listOf<String>()) }
     var error by remember { mutableStateOf("") }
     var showPhotoSheet by remember { mutableStateOf(false) }
+    var showYearPicker by remember { mutableStateOf(false) }
+    var showCityPicker by remember { mutableStateOf(false) }
+    var showJobPicker by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
+    val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+    val age = currentYear - birthYear
 
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(scroll)
             .background(DarkBg)
-            .padding(24.dp)
     ) {
-        Text("ساخت پروفایل", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
-        Text("اطلاعاتت رو کامل کن", color = TextGray, fontSize = 14.sp, fontFamily = Vazirmatn)
-        Spacer(Modifier.height(24.dp))
-
-        // Photos
-        Text("عکس‌ها (حداکثر ۵)", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextWhite, fontFamily = Vazirmatn)
-        Spacer(Modifier.height(10.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(selectedPhotos.size) { i ->
-                Box(
-                    Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(DarkCard),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(selectedPhotos[i], fontSize = 36.sp)
-                    IconButton(
-                        onClick = { selectedPhotos = selectedPhotos.toMutableList().also { it.removeAt(i) } },
-                        modifier = Modifier.align(Alignment.TopEnd).size(28.dp)
-                    ) {
-                        Icon(Icons.Default.Cancel, null, tint = TinderPink, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
-            if (selectedPhotos.size < 5) {
-                item {
+        // Progress header
+        Column(Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
+            Text("ساخت پروفایل", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(4) { i ->
                     Box(
                         Modifier
-                            .size(80.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(DarkCard)
-                            .border(1.dp, TinderPink.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                            .clickable { showPhotoSheet = true },
-                        contentAlignment = Alignment.Center
+                            .weight(1f)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(if (i <= step) TinderPink else DarkCard)
+                    )
+                }
+            }
+            Text(
+                when (step) {
+                    0 -> "اطلاعات پایه"
+                    1 -> "هویت و موقعیت"
+                    2 -> "عکس و علایق"
+                    else -> "درباره تو"
+                },
+                color = TextMuted,
+                fontSize = 13.sp,
+                fontFamily = Vazirmatn,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(scroll)
+                .padding(horizontal = 24.dp)
+        ) {
+            when (step) {
+                0 -> {
+                    // Name
+                    SectionLabel("نام نمایشی")
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("مثلاً سارا", fontFamily = Vazirmatn) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = fieldColors(),
+                        leadingIcon = { Icon(Icons.Default.Person, null, tint = TinderPink) }
+                    )
+                    Spacer(Modifier.height(20.dp))
+
+                    // Birth year
+                    SectionLabel("سال تولد")
+                    Surface(
+                        onClick = { showYearPicker = true },
+                        shape = RoundedCornerShape(14.dp),
+                        color = DarkSurface,
+                        border = BorderStroke(1.dp, DarkCard),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.AddAPhoto, null, tint = TinderPink, modifier = Modifier.size(28.dp))
-                            Text("افزودن", fontSize = 11.sp, color = TinderPink, fontFamily = Vazirmatn)
+                        Row(
+                            Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Cake, null, tint = TinderPink)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("$birthYear", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                                Text("$age ساله", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
+                            }
+                            Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
+                        }
+                    }
+                    if (showYearPicker) {
+                        YearPickerDialog(
+                            selected = birthYear,
+                            minYear = currentYear - 80,
+                            maxYear = currentYear - 18,
+                            onSelect = { birthYear = it; showYearPicker = false },
+                            onDismiss = { showYearPicker = false }
+                        )
+                    }
+                    Spacer(Modifier.height(20.dp))
+
+                    // Gender
+                    SectionLabel("جنسیت")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(Gender.FEMALE to "زن", Gender.MALE to "مرد", Gender.OTHER to "دیگر").forEach { (g, label) ->
+                            val sel = gender == g
+                            FilterChip(
+                                selected = sel,
+                                onClick = { gender = g },
+                                label = { Text(label, fontFamily = Vazirmatn) },
+                                colors = chipColors(sel)
+                            )
+                        }
+                    }
+                }
+                1 -> {
+                    // Orientation
+                    SectionLabel("گرایش جنسی")
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            Orientation.STRAIGHT to "دگرجنس‌گرا",
+                            Orientation.GAY to "همجنس‌گرا (مرد)",
+                            Orientation.LESBIAN to "لزبین",
+                            Orientation.BISEXUAL to "دوجنس‌گرا",
+                            Orientation.OTHER to "دیگر"
+                        ).forEach { (o, label) ->
+                            val sel = orientation == o
+                            Surface(
+                                onClick = { orientation = o },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (sel) TinderPink.copy(alpha = 0.2f) else DarkSurface,
+                                border = BorderStroke(1.dp, if (sel) TinderPink else DarkCard),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(selected = sel, onClick = { orientation = o }, colors = RadioButtonDefaults.colors(selectedColor = TinderPink))
+                                    Text(label, color = TextWhite, fontFamily = Vazirmatn)
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+
+                    // City
+                    SectionLabel("شهر")
+                    Surface(
+                        onClick = { showCityPicker = true },
+                        shape = RoundedCornerShape(14.dp),
+                        color = DarkSurface,
+                        border = BorderStroke(1.dp, DarkCard),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.LocationOn, null, tint = TinderPink)
+                            Spacer(Modifier.width(12.dp))
+                            Text(city, Modifier.weight(1f), color = TextWhite, fontFamily = Vazirmatn)
+                            Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
+                        }
+                    }
+                    if (showCityPicker) {
+                        CityPickerDialog(
+                            cities = iranianCities,
+                            selected = city,
+                            onSelect = { city = it; showCityPicker = false },
+                            onDismiss = { showCityPicker = false }
+                        )
+                    }
+                    Spacer(Modifier.height(20.dp))
+
+                    // Job
+                    SectionLabel("شغل")
+                    Surface(
+                        onClick = { showJobPicker = true },
+                        shape = RoundedCornerShape(14.dp),
+                        color = DarkSurface,
+                        border = BorderStroke(1.dp, DarkCard),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Work, null, tint = TinderPink)
+                            Spacer(Modifier.width(12.dp))
+                            Text(if (job.isBlank()) "انتخاب شغل" else job, Modifier.weight(1f), color = if (job.isBlank()) TextMuted else TextWhite, fontFamily = Vazirmatn)
+                            Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
+                        }
+                    }
+                    if (showJobPicker) {
+                        CityPickerDialog(
+                            cities = availableJobs,
+                            selected = job,
+                            title = "انتخاب شغل",
+                            onSelect = { job = it; showJobPicker = false },
+                            onDismiss = { showJobPicker = false }
+                        )
+                    }
+                }
+                2 -> {
+                    // Photos
+                    SectionLabel("عکس‌ها (حداکثر ۵)")
+                    Text("حداقل یک عکس اضافه کن", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(selectedPhotos.size) { i ->
+                            Box(
+                                Modifier.size(88.dp).clip(RoundedCornerShape(16.dp)).background(DarkCard),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(selectedPhotos[i], fontSize = 40.sp)
+                                IconButton(
+                                    onClick = { selectedPhotos = selectedPhotos.toMutableList().also { it.removeAt(i) } },
+                                    modifier = Modifier.align(Alignment.TopEnd).size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Cancel, null, tint = TinderPink, modifier = Modifier.size(20.dp))
+                                }
+                            }
+                        }
+                        if (selectedPhotos.size < 5) {
+                            item {
+                                Box(
+                                    Modifier
+                                        .size(88.dp)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(DarkCard)
+                                        .border(1.dp, TinderPink.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                        .clickable { showPhotoSheet = true },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.AddAPhoto, null, tint = TinderPink, modifier = Modifier.size(28.dp))
+                                        Text("افزودن", fontSize = 11.sp, color = TinderPink, fontFamily = Vazirmatn)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (showPhotoSheet) {
+                        PhotoSourceSheet(
+                            onGallery = {
+                                if (selectedPhotos.size < 5) selectedPhotos = selectedPhotos + demoPhotoEmojis.random()
+                                showPhotoSheet = false
+                            },
+                            onCamera = {
+                                if (selectedPhotos.size < 5) selectedPhotos = selectedPhotos + "📸"
+                                showPhotoSheet = false
+                            },
+                            onDismiss = { showPhotoSheet = false }
+                        )
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+                    SectionLabel("علایق (حداقل ۳)")
+                    Spacer(Modifier.height(8.dp))
+                    InterestFlow(selectedInterests) { interest ->
+                        selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest
+                    }
+                }
+                3 -> {
+                    SectionLabel("درباره من")
+                    Text("چند خط بنویس تا بقیه بهتر بشناسنت", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = about,
+                        onValueChange = { about = it },
+                        modifier = Modifier.fillMaxWidth().height(140.dp),
+                        placeholder = { Text("اهل کافه و کتابم، عاشق سفرهای کوتاه...", fontFamily = Vazirmatn) },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = fieldColors()
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    // Summary card
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text("خلاصه پروفایل", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                            Spacer(Modifier.height(8.dp))
+                            Text("$name · $age ساله · $city", color = TextGray, fontFamily = Vazirmatn, fontSize = 14.sp)
+                            Text(job, color = TextMuted, fontFamily = Vazirmatn, fontSize = 13.sp)
+                            Text("${selectedPhotos.size} عکس · ${selectedInterests.size} علاقه", color = TextMuted, fontFamily = Vazirmatn, fontSize = 13.sp)
                         }
                     }
                 }
             }
-        }
-        if (showPhotoSheet) {
-            PhotoSourceSheet(
-                onGallery = {
-                    // Demo: add random emoji as "gallery photo"
-                    if (selectedPhotos.size < 5) selectedPhotos = selectedPhotos + demoPhotoEmojis.random()
-                    showPhotoSheet = false
-                },
-                onCamera = {
-                    if (selectedPhotos.size < 5) selectedPhotos = selectedPhotos + "📸"
-                    showPhotoSheet = false
-                },
-                onDismiss = { showPhotoSheet = false }
-            )
-        }
-
-        Spacer(Modifier.height(20.dp))
-        ProfileField("نام", name, { name = it }, Icons.Default.Person)
-        ProfileField("سن", age, { if (it.length <= 2) age = it.filter { c -> c.isDigit() } }, Icons.Default.Cake, KeyboardType.Number)
-
-        // Gender
-        Text("جنسیت", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(bottom = 8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Gender.entries.forEach { g ->
-                val label = when (g) {
-                    Gender.MALE -> "مرد"
-                    Gender.FEMALE -> "زن"
-                    Gender.OTHER -> "دیگر"
-                }
-                val selected = gender == g
-                FilterChip(
-                    selected = selected,
-                    onClick = { gender = g },
-                    label = { Text(label, fontFamily = Vazirmatn, fontSize = 13.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = TinderPink,
-                        selectedLabelColor = TextWhite,
-                        containerColor = DarkCard,
-                        labelColor = TextGray
-                    )
-                )
+            if (error.isNotEmpty()) {
+                Text(error, color = TinderPink, fontSize = 13.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 16.dp))
             }
+            Spacer(Modifier.height(24.dp))
         }
 
-        Spacer(Modifier.height(16.dp))
-        // Orientation
-        Text("گرایش جنسی", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(bottom = 8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            listOf(
-                Orientation.STRAIGHT to "دگرجنس‌گرا",
-                Orientation.GAY to "همجنس‌گرا",
-                Orientation.LESBIAN to "لزبین",
-                Orientation.BISEXUAL to "دوجنس‌گرا",
-                Orientation.OTHER to "دیگر"
-            ).forEach { (o, label) ->
-                val selected = orientation == o
-                FilterChip(
-                    selected = selected,
-                    onClick = { orientation = o },
-                    label = { Text(label, fontFamily = Vazirmatn, fontSize = 12.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = TinderPink,
-                        selectedLabelColor = TextWhite,
-                        containerColor = DarkCard,
-                        labelColor = TextGray
-                    )
-                )
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        ProfileField("شغل", job, { job = it }, Icons.Default.Work)
-        ProfileField("شهر", city, { city = it }, Icons.Default.LocationOn)
-
-        Text("درباره من", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextWhite, fontFamily = Vazirmatn)
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = about,
-            onValueChange = { about = it },
-            modifier = Modifier.fillMaxWidth().height(100.dp),
-            placeholder = { Text("چند خط درباره خودت...", fontFamily = Vazirmatn) },
-            shape = RoundedCornerShape(14.dp),
-            colors = fieldColors()
-        )
-
-        Spacer(Modifier.height(18.dp))
-        Text("علایق (حداقل ۳)", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = TextWhite, fontFamily = Vazirmatn)
-        Spacer(Modifier.height(10.dp))
-        InterestFlow(selectedInterests) { interest ->
-            selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest
-        }
-
-        if (error.isNotEmpty()) Text(error, color = TinderPink, fontSize = 13.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 14.dp))
-
-        Spacer(Modifier.height(24.dp))
-        TinderButton("شروع کن 🚀") {
-            when {
-                name.isBlank() -> error = "نام را وارد کنید"
-                age.toIntOrNull() == null || age.toInt() !in 18..80 -> error = "سن معتبر (۱۸–۸۰)"
-                job.isBlank() -> error = "شغل را وارد کنید"
-                selectedInterests.size < 3 -> error = "حداقل ۳ علاقه انتخاب کنید"
-                selectedPhotos.isEmpty() -> error = "حداقل یک عکس اضافه کنید"
-                else -> {
-                    error = ""
-                    onComplete(
-                        UserProfile(
-                            name = name.trim(),
-                            age = age.toInt(),
-                            gender = gender,
-                            orientation = orientation,
-                            job = job.trim(),
-                            city = city.trim().ifBlank { "تهران" },
-                            about = about.trim().ifBlank { "هنوز چیزی ننوشتم 😊" },
-                            interests = selectedInterests.toList(),
-                            photos = selectedPhotos,
-                            phone = phone
-                        )
-                    )
+        // Bottom navigation buttons
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(DarkSurface)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (step > 0) {
+                OutlinedButton(
+                    onClick = { error = ""; step-- },
+                    modifier = Modifier.weight(1f).height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextGray),
+                    border = BorderStroke(1.dp, DarkCard)
+                ) {
+                    Text("قبلی", fontFamily = Vazirmatn)
                 }
             }
+            Button(
+                onClick = {
+                    when (step) {
+                        0 -> {
+                            when {
+                                name.isBlank() -> error = "نام را وارد کنید"
+                                age !in 18..80 -> error = "سن باید بین ۱۸ تا ۸۰ باشد"
+                                else -> { error = ""; step = 1 }
+                            }
+                        }
+                        1 -> {
+                            when {
+                                job.isBlank() -> error = "شغل را انتخاب کنید"
+                                else -> { error = ""; step = 2 }
+                            }
+                        }
+                        2 -> {
+                            when {
+                                selectedPhotos.isEmpty() -> error = "حداقل یک عکس اضافه کنید"
+                                selectedInterests.size < 3 -> error = "حداقل ۳ علاقه انتخاب کنید"
+                                else -> { error = ""; step = 3 }
+                            }
+                        }
+                        3 -> {
+                            error = ""
+                            onComplete(
+                                UserProfile(
+                                    name = name.trim(),
+                                    birthYear = birthYear,
+                                    gender = gender,
+                                    orientation = orientation,
+                                    job = job,
+                                    city = city,
+                                    about = about.trim().ifBlank { "هنوز چیزی ننوشتم 😊" },
+                                    interests = selectedInterests.toList(),
+                                    photos = selectedPhotos,
+                                    phone = phone
+                                )
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier.weight(if (step > 0) 1.5f else 1f).height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = TinderPink)
+            ) {
+                Text(if (step == 3) "شروع کن 🚀" else "بعدی", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+            }
         }
-        Spacer(Modifier.height(32.dp))
     }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(bottom = 8.dp))
+}
+
+@Composable
+private fun YearPickerDialog(selected: Int, minYear: Int, maxYear: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
+    var temp by remember { mutableIntStateOf(selected) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DarkSurface,
+        title = { Text("انتخاب سال تولد", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("${Calendar.getInstance().get(Calendar.YEAR) - temp} ساله", color = TinderPink, fontFamily = Vazirmatn, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                LazyColumn(Modifier.height(200.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    items((maxYear downTo minYear).toList()) { year ->
+                        val sel = year == temp
+                        Text(
+                            "$year",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { temp = year }
+                                .background(if (sel) TinderPink.copy(alpha = 0.2f) else Color.Transparent, RoundedCornerShape(8.dp))
+                                .padding(vertical = 10.dp),
+                            textAlign = TextAlign.Center,
+                            color = if (sel) TinderPink else TextWhite,
+                            fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                            fontFamily = Vazirmatn,
+                            fontSize = 18.sp
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSelect(temp) }) { Text("تأیید", color = TinderPink, fontFamily = Vazirmatn) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("انصراف", color = TextMuted, fontFamily = Vazirmatn) }
+        }
+    )
+}
+
+@Composable
+private fun CityPickerDialog(
+    cities: List<String>,
+    selected: String,
+    title: String = "انتخاب شهر",
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = cities.filter { it.contains(query, ignoreCase = true) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = DarkSurface,
+        title = { Text(title, color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("جستجو...", fontFamily = Vazirmatn) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors(),
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = TinderPink) }
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.height(240.dp)) {
+                    items(filtered) { item ->
+                        val sel = item == selected
+                        Text(
+                            item,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(item) }
+                                .background(if (sel) TinderPink.copy(alpha = 0.2f) else Color.Transparent, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                            color = if (sel) TinderPink else TextWhite,
+                            fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                            fontFamily = Vazirmatn
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("بستن", color = TextMuted, fontFamily = Vazirmatn) }
+        }
+    )
 }
 
 @Composable
@@ -584,20 +868,14 @@ private fun PhotoSourceSheet(onGallery: () -> Unit, onCamera: () -> Unit, onDism
         title = { Text("افزودن عکس", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Text("در نسخه دمو عکس واقعی ذخیره نمی‌شود. یکی را انتخاب کنید:", color = TextGray, fontFamily = Vazirmatn, fontSize = 13.sp)
-                Spacer(Modifier.height(16.dp))
-                TextButton(
-                    onClick = onGallery,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Text("در نسخه دمو عکس واقعی ذخیره نمی‌شود:", color = TextGray, fontFamily = Vazirmatn, fontSize = 13.sp)
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onGallery, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.PhotoLibrary, null, tint = TinderPink)
                     Spacer(Modifier.width(10.dp))
                     Text("انتخاب از گالری", color = TextWhite, fontFamily = Vazirmatn)
                 }
-                TextButton(
-                    onClick = onCamera,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                TextButton(onClick = onCamera, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.PhotoCamera, null, tint = TinderPink)
                     Spacer(Modifier.width(10.dp))
                     Text("گرفتن با دوربین", color = TextWhite, fontFamily = Vazirmatn)
@@ -610,7 +888,7 @@ private fun PhotoSourceSheet(onGallery: () -> Unit, onCamera: () -> Unit, onDism
     )
 }
 
-// ─── Filter Screen ────────────────────────────────────────────────────────────
+// ─── Filter ───────────────────────────────────────────────────────────────────
 @Composable
 private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, onClose: () -> Unit) {
     var minAge by remember { mutableFloatStateOf(current.minAge.toFloat()) }
@@ -620,19 +898,12 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
     var selectedInterests by remember { mutableStateOf(current.interests) }
     val scroll = rememberScrollState()
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(DarkBg)
-            .verticalScroll(scroll)
-            .padding(20.dp)
-    ) {
+    Column(Modifier.fillMaxSize().background(DarkBg).verticalScroll(scroll).padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = TextWhite) }
             Text("فیلترها", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
         }
         Spacer(Modifier.height(24.dp))
-
         Text("محدوده سن: ${minAge.toInt()} – ${maxAge.toInt()}", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold)
         RangeSlider(
             value = minAge..maxAge,
@@ -640,7 +911,6 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
             valueRange = 18f..60f,
             colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink)
         )
-
         Spacer(Modifier.height(20.dp))
         Text("حداکثر فاصله: ${maxDist.toInt()} کیلومتر", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold)
         Slider(
@@ -649,36 +919,19 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
             valueRange = 1f..100f,
             colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink)
         )
-
         Spacer(Modifier.height(20.dp))
         Text("شغل", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
-        FlowChips(availableJobs, selectedJobs) { j ->
-            selectedJobs = if (j in selectedJobs) selectedJobs - j else selectedJobs + j
-        }
-
+        FlowChips(availableJobs, selectedJobs) { j -> selectedJobs = if (j in selectedJobs) selectedJobs - j else selectedJobs + j }
         Spacer(Modifier.height(20.dp))
         Text("علایق", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
-        FlowChips(availableInterests, selectedInterests) { i ->
-            selectedInterests = if (i in selectedInterests) selectedInterests - i else selectedInterests + i
-        }
-
+        FlowChips(availableInterests, selectedInterests) { i -> selectedInterests = if (i in selectedInterests) selectedInterests - i else selectedInterests + i }
         Spacer(Modifier.height(32.dp))
         TinderButton("اعمال فیلتر") {
-            onApply(
-                FilterState(
-                    minAge = minAge.toInt(),
-                    maxAge = maxAge.toInt(),
-                    jobs = selectedJobs,
-                    interests = selectedInterests,
-                    maxDistance = maxDist.toInt()
-                )
-            )
+            onApply(FilterState(minAge.toInt(), maxAge.toInt(), selectedJobs, selectedInterests, maxDist.toInt()))
         }
-        TextButton(onClick = {
-            onApply(FilterState())
-        }, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = { onApply(FilterState()) }, modifier = Modifier.fillMaxWidth()) {
             Text("پاک کردن فیلترها", color = TextGray, fontFamily = Vazirmatn)
         }
     }
@@ -691,24 +944,14 @@ private fun FlowChips(items: List<String>, selected: Set<String>, onToggle: (Str
             Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { item ->
                     val sel = item in selected
-                    FilterChip(
-                        selected = sel,
-                        onClick = { onToggle(item) },
-                        label = { Text(item, fontFamily = Vazirmatn, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = TinderPink,
-                            selectedLabelColor = TextWhite,
-                            containerColor = DarkCard,
-                            labelColor = TextGray
-                        )
-                    )
+                    FilterChip(selected = sel, onClick = { onToggle(item) }, label = { Text(item, fontFamily = Vazirmatn, fontSize = 12.sp) }, colors = chipColors(sel))
                 }
             }
         }
     }
 }
 
-// ─── Discover (Tinder-style card) ─────────────────────────────────────────────
+// ─── Discover ─────────────────────────────────────────────────────────────────
 @Composable
 private fun DiscoverScreen(
     person: Person?,
@@ -719,99 +962,46 @@ private fun DiscoverScreen(
     onBlock: (Person) -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
-        // Top bar
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Favorite, null, tint = TinderPink, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(8.dp))
             Text("فست لاو", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TinderPink, fontFamily = Vazirmatn)
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = onFilter) {
-                Icon(Icons.Default.Tune, "فیلتر", tint = TextWhite)
-            }
+            IconButton(onClick = onFilter) { Icon(Icons.Default.Tune, "فیلتر", tint = TextWhite) }
         }
 
         if (person == null) {
             EmptyState("دیگه کسی نیست!", "فیلترها رو تغییر بده یا بعداً بیا", "🎉")
         } else {
-            // Full card like Tinder
             Card(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 12.dp)
-                    .clickable { onOpen(person) },
+                Modifier.fillMaxWidth().weight(1f).padding(horizontal = 12.dp).clickable { onOpen(person) },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = DarkCard),
                 elevation = CardDefaults.cardElevation(8.dp)
             ) {
                 Box(Modifier.fillMaxSize()) {
-                    // Photo
-                    AsyncImage(
-                        model = person.photoUrl,
-                        contentDescription = person.name,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                        placeholder = painterResource(android.R.drawable.ic_menu_gallery),
-                        error = painterResource(android.R.drawable.ic_menu_report_image)
-                    )
-                    // Gradient overlay at bottom
+                    // Emoji avatar background (no network image — no crash)
                     Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(0.45f)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
-                                )
-                            )
-                    )
-                    // Info
-                    Column(
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(20.dp)
+                        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(person.tint, DarkCard))),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Text(person.emoji, fontSize = 140.sp)
+                    }
+                    Box(
+                        Modifier.fillMaxWidth().fillMaxHeight(0.4f).align(Alignment.BottomCenter)
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))))
+                    )
+                    Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
                         if (person.likedYou) {
                             Surface(shape = RoundedCornerShape(20.dp), color = TinderPink) {
-                                Text(
-                                    "❤️ تو رو لایک کرده",
-                                    Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
-                                    color = TextWhite,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = Vazirmatn
-                                )
+                                Text("❤️ تو رو لایک کرده", Modifier.padding(horizontal = 12.dp, vertical = 5.dp), color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
                             }
                             Spacer(Modifier.height(8.dp))
                         }
-                        Text(
-                            "${person.name}, ${person.age}",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextWhite,
-                            fontFamily = Vazirmatn
-                        )
-                        Text(
-                            "${person.job} · ${person.distanceKm} کیلومتر",
-                            color = TextGray,
-                            fontSize = 14.sp,
-                            fontFamily = Vazirmatn
-                        )
+                        Text("${person.name}, ${person.age}", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                        Text("${person.job} · ${person.distanceKm} کیلومتر · ${person.city}", color = TextGray, fontSize = 14.sp, fontFamily = Vazirmatn)
                         Spacer(Modifier.height(6.dp))
-                        Text(
-                            person.about,
-                            color = TextWhite.copy(alpha = 0.9f),
-                            fontSize = 14.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            fontFamily = Vazirmatn
-                        )
+                        Text(person.about, color = TextWhite.copy(alpha = 0.9f), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
                         Spacer(Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             person.interests.take(3).forEach { tag ->
@@ -823,37 +1013,18 @@ private fun DiscoverScreen(
                     }
                 }
             }
-
-            // Action buttons (Tinder style)
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp, vertical = 18.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 18.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Pass
-                FilledIconButton(
-                    onClick = onPass,
-                    modifier = Modifier.size(60.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = TextGray)
-                ) {
+                FilledIconButton(onClick = onPass, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = TextGray)) {
                     Icon(Icons.Default.Close, "رد", modifier = Modifier.size(30.dp))
                 }
-                // Block
-                FilledIconButton(
-                    onClick = { onBlock(person) },
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = Color(0xFFFF6B6B))
-                ) {
+                FilledIconButton(onClick = { onBlock(person) }, modifier = Modifier.size(48.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = Color(0xFFFF6B6B))) {
                     Icon(Icons.Default.Block, "بلاک", modifier = Modifier.size(22.dp))
                 }
-                // Like
-                FilledIconButton(
-                    onClick = { onLike(person) },
-                    modifier = Modifier.size(68.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink, contentColor = TextWhite)
-                ) {
+                FilledIconButton(onClick = { onLike(person) }, modifier = Modifier.size(68.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink, contentColor = TextWhite)) {
                     Icon(Icons.Default.Favorite, "لایک", modifier = Modifier.size(34.dp))
                 }
             }
@@ -861,7 +1032,7 @@ private fun DiscoverScreen(
     }
 }
 
-// ─── Liked by me ──────────────────────────────────────────────────────────────
+// ─── Lists ────────────────────────────────────────────────────────────────────
 @Composable
 private fun LikedByMeScreen(liked: List<Person>, onOpen: (Person) -> Unit, onChat: (Person) -> Unit) {
     Column(Modifier.fillMaxSize()) {
@@ -879,14 +1050,10 @@ private fun LikedByMeScreen(liked: List<Person>, onOpen: (Person) -> Unit, onCha
     }
 }
 
-// ─── Liked me ─────────────────────────────────────────────────────────────────
 @Composable
 private fun LikedMeScreen(
-    people: List<Person>,
-    matched: List<Person>,
-    onLikeBack: (Person) -> Unit,
-    onOpen: (Person) -> Unit,
-    onBlock: (Person) -> Unit
+    people: List<Person>, matched: List<Person>,
+    onLikeBack: (Person) -> Unit, onOpen: (Person) -> Unit, onBlock: (Person) -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
         AppHeader("کسانی که تو رو لایک کردن")
@@ -901,12 +1068,9 @@ private fun LikedMeScreen(
                                 Text("مچ 💕", Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = TinderPink, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
                             }
                         } else {
-                            Button(
-                                onClick = { onLikeBack(p) },
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = TinderPink)
-                            ) { Text("لایک", fontSize = 12.sp, fontFamily = Vazirmatn) }
+                            Button(onClick = { onLikeBack(p) }, shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
+                                Text("لایک", fontSize = 12.sp, fontFamily = Vazirmatn)
+                            }
                         }
                         IconButton(onClick = { onBlock(p) }) {
                             Icon(Icons.Default.Block, "بلاک", tint = TextMuted, modifier = Modifier.size(20.dp))
@@ -918,7 +1082,6 @@ private fun LikedMeScreen(
     }
 }
 
-// ─── Matches ──────────────────────────────────────────────────────────────────
 @Composable
 private fun MatchesChatList(matches: List<Person>, onChat: (Person) -> Unit) {
     Column(Modifier.fillMaxSize()) {
@@ -934,7 +1097,7 @@ private fun MatchesChatList(matches: List<Person>, onChat: (Person) -> Unit) {
     }
 }
 
-// ─── Chat ─────────────────────────────────────────────────────────────────────
+// ─── Chat with text + image + voice ───────────────────────────────────────────
 @Composable
 private fun ChatScreen(person: Person, onBack: () -> Unit) {
     var message by remember { mutableStateOf("") }
@@ -944,19 +1107,14 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
             ChatMessage("سلام، منم خوشحالم 👋", true, "۱۰:۳۲")
         )
     }
+    var showAttach by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(DarkBg)) {
-        Row(
-            Modifier.fillMaxWidth().background(DarkSurface).padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
-            AsyncImage(
-                model = person.photoUrl,
-                contentDescription = null,
-                modifier = Modifier.size(44.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+            Box(Modifier.size(44.dp).clip(CircleShape).background(person.tint), contentAlignment = Alignment.Center) {
+                Text(person.emoji, fontSize = 22.sp)
+            }
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(person.name, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = TextWhite, fontFamily = Vazirmatn)
@@ -965,10 +1123,7 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
         }
         HorizontalDivider(color = DarkCard)
 
-        LazyColumn(
-            Modifier.weight(1f).fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(messages) { msg ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (msg.isMe) Arrangement.End else Arrangement.Start) {
                     Surface(
@@ -979,9 +1134,36 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
                         ),
                         color = if (msg.isMe) TinderPink else DarkCard
                     ) {
-                        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                            Text(msg.text, color = TextWhite, fontSize = 15.sp, fontFamily = Vazirmatn)
-                            Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.End))
+                        when (msg.type) {
+                            MsgType.TEXT -> Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                                Text(msg.text, color = TextWhite, fontSize = 15.sp, fontFamily = Vazirmatn)
+                                Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.End))
+                            }
+                            MsgType.IMAGE -> Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Box(
+                                    Modifier.size(160.dp, 120.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(msg.text, fontSize = 48.sp) // emoji as image placeholder
+                                }
+                                Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 4.dp))
+                            }
+                            MsgType.VOICE -> Row(
+                                Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.PlayArrow, null, tint = TextWhite, modifier = Modifier.size(28.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    // Fake waveform
+                                    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        listOf(8, 14, 10, 18, 12, 16, 9, 15, 11).forEach { h ->
+                                            Box(Modifier.width(3.dp).height(h.dp).background(TextWhite.copy(alpha = 0.7f), RoundedCornerShape(2.dp)))
+                                        }
+                                    }
+                                    Text("${msg.text} · ${msg.time}", color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn)
+                                }
+                            }
                         }
                     }
                 }
@@ -989,7 +1171,27 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
         }
         Text("گفت‌وگوی نمایشی — پیام‌ها ذخیره نمی‌شوند", color = TextMuted, fontSize = 11.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontFamily = Vazirmatn)
 
+        if (showAttach) {
+            Row(
+                Modifier.fillMaxWidth().background(DarkCard).padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                AttachOption(Icons.Default.Image, "تصویر") {
+                    messages.add(ChatMessage(demoPhotoEmojis.random(), true, "الان", MsgType.IMAGE))
+                    showAttach = false
+                }
+                AttachOption(Icons.Default.Mic, "صوت") {
+                    messages.add(ChatMessage("۰:۰۸", true, "الان", MsgType.VOICE))
+                    showAttach = false
+                }
+                AttachOption(Icons.Default.Close, "بستن") { showAttach = false }
+            }
+        }
+
         Row(Modifier.fillMaxWidth().background(DarkSurface).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { showAttach = !showAttach }) {
+                Icon(Icons.Default.AttachFile, "ضمیمه", tint = TinderPink)
+            }
             OutlinedTextField(
                 value = message,
                 onValueChange = { message = it },
@@ -1016,17 +1218,28 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
     }
 }
 
+@Composable
+private fun AttachOption(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick).padding(8.dp)) {
+        Box(Modifier.size(48.dp).clip(CircleShape).background(TinderPink.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = TinderPink)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = TextGray, fontSize = 12.sp, fontFamily = Vazirmatn)
+    }
+}
+
 // ─── Detail ───────────────────────────────────────────────────────────────────
 @Composable
 private fun PersonDetailScreen(person: Person, onBack: () -> Unit, onLike: () -> Unit, onBlock: () -> Unit) {
     Column(Modifier.fillMaxSize().background(DarkBg)) {
         Box {
-            AsyncImage(
-                model = person.photoUrl,
-                contentDescription = null,
-                modifier = Modifier.fillMaxWidth().height(360.dp),
-                contentScale = ContentScale.Crop
-            )
+            Box(
+                Modifier.fillMaxWidth().height(320.dp).background(Brush.verticalGradient(listOf(person.tint, DarkBg))),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(person.emoji, fontSize = 120.sp)
+            }
             IconButton(
                 onClick = onBack,
                 modifier = Modifier.padding(12.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape)
@@ -1135,8 +1348,9 @@ private fun MyProfileScreen(user: UserProfile, blockedCount: Int, onLogout: () -
             }
             Spacer(Modifier.height(24.dp))
             InfoRow("شماره موبایل", user.phone)
+            InfoRow("سال تولد", "${user.birthYear}")
             InfoRow("افراد بلاک‌شده", "$blockedCount نفر")
-            InfoRow("نسخه", "فست لاو ۲.۰")
+            InfoRow("نسخه", "فست لاو ۲.۱")
             Spacer(Modifier.height(20.dp))
             OutlinedButton(
                 onClick = onLogout,
@@ -1163,7 +1377,7 @@ private fun InfoRow(title: String, value: String) {
     }
 }
 
-// ─── Shared UI ────────────────────────────────────────────────────────────────
+// ─── Shared ───────────────────────────────────────────────────────────────────
 @Composable
 private fun AppHeader(subtitle: String) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -1184,12 +1398,9 @@ private fun PersonRow(person: Person, onClick: () -> Unit, action: @Composable (
         colors = CardDefaults.cardColors(containerColor = DarkSurface)
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = person.photoUrl,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp).clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+            Box(Modifier.size(56.dp).clip(CircleShape).background(person.tint), contentAlignment = Alignment.Center) {
+                Text(person.emoji, fontSize = 28.sp)
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("${person.name}, ${person.age}", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextWhite, fontFamily = Vazirmatn)
@@ -1266,28 +1477,6 @@ private fun TinderButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProfileField(
-    label: String, value: String, onChange: (String) -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    keyboard: KeyboardType = KeyboardType.Text
-) {
-    Column(Modifier.padding(bottom = 12.dp)) {
-        Text(label, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextWhite, fontFamily = Vazirmatn)
-        Spacer(Modifier.height(6.dp))
-        OutlinedTextField(
-            value = value,
-            onValueChange = onChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(14.dp),
-            keyboardOptions = KeyboardOptions(keyboardType = keyboard),
-            leadingIcon = { Icon(icon, null, tint = TinderPink, modifier = Modifier.size(20.dp)) },
-            colors = fieldColors()
-        )
-    }
-}
-
-@Composable
 private fun InterestFlow(selected: Set<String>, onToggle: (String) -> Unit) {
     Column {
         availableInterests.chunked(4).forEach { row ->
@@ -1312,6 +1501,14 @@ private fun InterestFlow(selected: Set<String>, onToggle: (String) -> Unit) {
         }
     }
 }
+
+@Composable
+private fun chipColors(selected: Boolean) = FilterChipDefaults.filterChipColors(
+    selectedContainerColor = TinderPink,
+    selectedLabelColor = TextWhite,
+    containerColor = DarkCard,
+    labelColor = TextGray
+)
 
 @Composable
 private fun fieldColors() = OutlinedTextFieldDefaults.colors(
