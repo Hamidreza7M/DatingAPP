@@ -372,6 +372,13 @@ private fun FastLoveApp() {
 
 
 // ─── Subscription plans (demo UI; not connected to a payment gateway) ──────────
+private data class SubscriptionPlanOption(
+    val plan: SubscriptionPlan,
+    val title: String,
+    val feature: String,
+    val price: String
+)
+
 @Composable
 private fun SubscriptionScreen(
     currentPlan: SubscriptionPlan,
@@ -398,9 +405,9 @@ private fun SubscriptionScreen(
         }
         Spacer(Modifier.height(12.dp))
         val plans = listOf(
-            Triple(SubscriptionPlan.FREE, "رایگان", "۱۰ سوایپ در روز", "۰ تومان"),
-            Triple(SubscriptionPlan.PRO, "پرو", "۵۰ سوایپ در روز · مشاهده لایک‌ها", "هفتگی ۹۹٬۰۰۰ تومان\nماهانه ۲۹۹٬۰۰۰ تومان"),
-            Triple(SubscriptionPlan.VIP, "وی‌آی‌پی", "سوایپ نامحدود · مشاهده لایک‌ها", "هفتگی ۱۴۹٬۰۰۰ تومان\nماهانه ۴۴۹٬۰۰۰ تومان")
+            SubscriptionPlanOption(SubscriptionPlan.FREE, "رایگان", "۱۰ سوایپ در روز", "۰ تومان"),
+            SubscriptionPlanOption(SubscriptionPlan.PRO, "پرو", "۵۰ سوایپ در روز · مشاهده لایک‌ها", "هفتگی ۹۹٬۰۰۰ تومان\nماهانه ۲۹۹٬۰۰۰ تومان"),
+            SubscriptionPlanOption(SubscriptionPlan.VIP, "وی‌آی‌پی", "سوایپ نامحدود · مشاهده لایک‌ها", "هفتگی ۱۴۹٬۰۰۰ تومان\nماهانه ۴۴۹٬۰۰۰ تومان")
         )
         plans.forEach { (plan, title, feature, price) ->
             Card(
@@ -462,7 +469,8 @@ private fun UpgradeTeaserScreen(onUpgrade: () -> Unit) {
         }
     }
 }
-\n// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 @Composable
 private fun AuthFlow(onSuccess: (String) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
