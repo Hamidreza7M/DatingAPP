@@ -7,6 +7,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -23,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +60,13 @@ private val GradientTinder = listOf(Color(0xFFFF4458), Color(0xFFFF7854))
 enum class Gender { MALE, FEMALE, OTHER }
 enum class Orientation { STRAIGHT, GAY, LESBIAN, BISEXUAL, OTHER }
 enum class MsgType { TEXT, IMAGE, VOICE }
+
+enum class SubscriptionPlan(val title: String, val dailySwipes: Int?) {
+    FREE("رایگان", 10), PRO("پرو", 50), VIP("وی‌آی‌پی", null)
+}
+
+private fun formatToman(amount: Int): String =
+    "%,d".format(amount).replace(',', '٬') + " تومان"
 
 data class UserProfile(
     val name: String = "",
@@ -175,7 +184,25 @@ private fun FastLoveApp() {
     var selectedPerson by remember { mutableStateOf<Person?>(null) }
     var chatPerson by remember { mutableStateOf<Person?>(null) }
     var showFilters by remember { mutableStateOf(false) }
+    var showSubscription by remember { mutableStateOf(false) }
+    var subscriptionPlan by remember { mutableStateOf(SubscriptionPlan.FREE) }
     var filters by remember { mutableStateOf(FilterState()) }
+    fun currentDayKey(): String = Calendar.getInstance().let {
+        "%04d-%02d-%02d".format(it.get(Calendar.YEAR), it.get(Calendar.MONTH) + 1, it.get(Calendar.DAY_OF_MONTH))
+    }
+    var swipeDay by remember { mutableStateOf(currentDayKey()) }
+    var dailySwipes by remember { mutableIntStateOf(0) }
+    fun refreshDailySwipes() {
+        val nowKey = currentDayKey()
+        if (swipeDay != nowKey) { swipeDay = nowKey; dailySwipes = 0 }
+    }
+    fun canSwipe(): Boolean {
+        refreshDailySwipes()
+        val limit = subscriptionPlan.dailySwipes
+        if (limit != null && dailySwipes >= limit) { showSubscription = true; return false }
+        dailySwipes += 1
+        return true
+    }
 
     val filteredPeople = remember(filters, blockedIds) {
         samplePeople.filter { p ->
@@ -231,14 +258,26 @@ private fun FastLoveApp() {
                             hasProfile = true
                         }
                     )
+                    showSubscription -> SubscriptionScreen(
+                        currentPlan = subscriptionPlan,
+                        onBack = { showSubscription = false },
+                        onChoosePlan = { plan ->
+                            // Demo-only selection. Real purchases require a payment gateway and server verification.
+                            subscriptionPlan = plan
+                            showSubscription = false
+                        }
+                    )
                     selectedPerson != null -> PersonDetailScreen(
                         person = selectedPerson!!,
+                        canSeeLikes = subscriptionPlan != SubscriptionPlan.FREE,
                         onBack = { selectedPerson = null },
                         onLike = {
-                            val p = selectedPerson!!
-                            if (p !in likedPeople) likedPeople.add(p)
-                            if (p.likedYou && p !in matchedPeople) matchedPeople.add(p)
-                            selectedPerson = null
+                            if (canSwipe()) {
+                                val p = selectedPerson!!
+                                if (p !in likedPeople) likedPeople.add(p)
+                                if (p.likedYou && p !in matchedPeople) matchedPeople.add(p)
+                                selectedPerson = null
+                            }
                         },
                         onBlock = {
                             blockedIds.add(selectedPerson!!.id)
@@ -261,14 +300,19 @@ private fun FastLoveApp() {
                                         person = filteredPeople.getOrNull(discoverIndex),
                                         onOpen = { selectedPerson = it },
                                         onLike = { p ->
-                                            if (p !in likedPeople) likedPeople.add(p)
-                                            if (p.likedYou && p !in matchedPeople) matchedPeople.add(p)
-                                            discoverIndex = (discoverIndex + 1).coerceAtMost(filteredPeople.size)
+                                            if (canSwipe()) {
+                                                if (p !in likedPeople) likedPeople.add(p)
+                                                if (p.likedYou && p !in matchedPeople) matchedPeople.add(p)
+                                                discoverIndex = (discoverIndex + 1).coerceAtMost(filteredPeople.size)
+                                            }
                                         },
                                         onPass = {
-                                            discoverIndex = (discoverIndex + 1).coerceAtMost(filteredPeople.size)
+                                            if (canSwipe()) discoverIndex = (discoverIndex + 1).coerceAtMost(filteredPeople.size)
                                         },
                                         onFilter = { showFilters = true },
+                                        swipesRemaining = subscriptionPlan.dailySwipes?.let { (it - dailySwipes).coerceAtLeast(0) },
+                                        canSeeLikes = subscriptionPlan != SubscriptionPlan.FREE,
+                                        onUpgrade = { showSubscription = true },
                                         onBlock = { p ->
                                             blockedIds.add(p.id)
                                             discoverIndex = (discoverIndex + 1).coerceAtMost(filteredPeople.size)
@@ -279,7 +323,9 @@ private fun FastLoveApp() {
                                         onOpen = { selectedPerson = it },
                                         onChat = { if (it in matchedPeople) chatPerson = it }
                                     )
-                                    2 -> LikedMeScreen(
+                                    2 -> if (subscriptionPlan == SubscriptionPlan.FREE) {
+                                        UpgradeTeaserScreen(onUpgrade = { showSubscription = true })
+                                    } else LikedMeScreen(
                                         people = samplePeople.filter { it.likedYou && it.id !in blockedIds },
                                         matched = matchedPeople,
                                         onLikeBack = { p ->
@@ -296,10 +342,15 @@ private fun FastLoveApp() {
                                     4 -> MyProfileScreen(
                                         user = currentUser,
                                         blockedCount = blockedIds.size,
+                                        plan = subscriptionPlan,
+                                        onUpgrade = { showSubscription = true },
                                         onLogout = {
                                             isLoggedIn = false
                                             hasProfile = false
                                             currentUser = UserProfile()
+                                            subscriptionPlan = SubscriptionPlan.FREE
+                                            dailySwipes = 0
+                                            swipeDay = currentDayKey()
                                             likedPeople.clear()
                                             matchedPeople.clear()
                                             blockedIds.clear()
@@ -318,7 +369,100 @@ private fun FastLoveApp() {
     }
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+
+// ─── Subscription plans (demo UI; not connected to a payment gateway) ──────────
+@Composable
+private fun SubscriptionScreen(
+    currentPlan: SubscriptionPlan,
+    onBack: () -> Unit,
+    onChoosePlan: (SubscriptionPlan) -> Unit
+) {
+    var billingPeriod by remember { mutableStateOf("ماهانه") }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(DarkBg).padding(20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Text("اشتراک فست لاو", color = TextWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+        }
+        Text("با پلن مناسب، آشنایی‌های بیشتری پیدا کن", color = TextGray, fontSize = 14.sp, fontFamily = Vazirmatn)
+        Spacer(Modifier.height(18.dp))
+        Row(Modifier.fillMaxWidth().background(DarkSurface, RoundedCornerShape(14.dp)).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("هفتگی", "ماهانه").forEach { period ->
+                Button(
+                    onClick = { billingPeriod = period },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(11.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (billingPeriod == period) TinderPink else DarkSurface)
+                ) { Text(period, fontFamily = Vazirmatn) }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        val plans = listOf(
+            Triple(SubscriptionPlan.FREE, "رایگان", "۱۰ سوایپ در روز", "۰ تومان"),
+            Triple(SubscriptionPlan.PRO, "پرو", "۵۰ سوایپ در روز · مشاهده لایک‌ها", "هفتگی ۹۹٬۰۰۰ تومان\nماهانه ۲۹۹٬۰۰۰ تومان"),
+            Triple(SubscriptionPlan.VIP, "وی‌آی‌پی", "سوایپ نامحدود · مشاهده لایک‌ها", "هفتگی ۱۴۹٬۰۰۰ تومان\nماهانه ۴۴۹٬۰۰۰ تومان")
+        )
+        plans.forEach { (plan, title, feature, price) ->
+            Card(
+                Modifier.fillMaxWidth().padding(vertical = 7.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = if (plan == currentPlan) Color(0xFF39232A) else DarkSurface),
+                border = BorderStroke(if (plan == currentPlan) 1.5.dp else 1.dp, if (plan == currentPlan) TinderPink else DarkCard)
+            ) {
+                Column(Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(title, color = TextWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        Spacer(Modifier.weight(1f))
+                        if (plan == currentPlan) Text("پلن فعلی", color = TinderPink, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(feature, color = TextGray, fontSize = 13.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(10.dp))
+                    val shownPrice = when (plan) {
+                        SubscriptionPlan.FREE -> "۰ تومان"
+                        SubscriptionPlan.PRO -> if (billingPeriod == "هفتگی") "۹۹٬۰۰۰ تومان / هفته" else "۲۹۹٬۰۰۰ تومان / ماه"
+                        SubscriptionPlan.VIP -> if (billingPeriod == "هفتگی") "۱۴۹٬۰۰۰ تومان / هفته" else "۴۴۹٬۰۰۰ تومان / ماه"
+                    }
+                    Text(shownPrice, color = TinderOrange, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { onChoosePlan(plan) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (plan == currentPlan) DarkCard else TinderPink)
+                    ) {
+                        Text(if (plan == currentPlan) "انتخاب‌شده" else if (plan == SubscriptionPlan.FREE) "استفاده از رایگان" else "انتخاب ${plan.title} ${if (plan == SubscriptionPlan.FREE) "" else billingPeriod}", fontFamily = Vazirmatn)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "توجه: این نسخه نمایشی است؛ انتخاب پلن به‌تنهایی پرداخت واقعی انجام نمی‌دهد. برای فروش واقعی باید درگاه پرداخت، تأیید تراکنش در سرور و ذخیره امن اشتراک پیاده‌سازی شود.",
+            color = TextMuted, fontSize = 12.sp, lineHeight = 20.sp, fontFamily = Vazirmatn
+        )
+    }
+}
+
+@Composable
+private fun UpgradeTeaserScreen(onUpgrade: () -> Unit) {
+    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Box(Modifier.size(92.dp).clip(CircleShape).background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(44.dp))
+        }
+        Spacer(Modifier.height(18.dp))
+        Text("ببین چه کسانی تو رو لایک کردن", color = TextWhite, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, fontFamily = Vazirmatn)
+        Spacer(Modifier.height(8.dp))
+        Text("این قابلیت برای پلن‌های پرو و وی‌آی‌پی فعال است.", color = TextGray, textAlign = TextAlign.Center, fontSize = 14.sp, fontFamily = Vazirmatn)
+        Spacer(Modifier.height(20.dp))
+        Button(onClick = onUpgrade, shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
+            Icon(Icons.Default.Star, null)
+            Spacer(Modifier.width(8.dp))
+            Text("دیدن پلن‌ها", fontFamily = Vazirmatn)
+        }
+    }
+}
+\n// ─── Auth ─────────────────────────────────────────────────────────────────────
 @Composable
 private fun AuthFlow(onSuccess: (String) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
@@ -959,6 +1103,9 @@ private fun DiscoverScreen(
     onLike: (Person) -> Unit,
     onPass: () -> Unit,
     onFilter: () -> Unit,
+    swipesRemaining: Int?,
+    canSeeLikes: Boolean,
+    onUpgrade: () -> Unit,
     onBlock: (Person) -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -967,6 +1114,10 @@ private fun DiscoverScreen(
             Spacer(Modifier.width(8.dp))
             Text("فست لاو", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TinderPink, fontFamily = Vazirmatn)
             Spacer(Modifier.weight(1f))
+            if (swipesRemaining != null) {
+                Text("سوایپ روزانه: $swipesRemaining", color = if (swipesRemaining <= 2) TinderOrange else TextGray, fontSize = 11.sp, fontFamily = Vazirmatn)
+                IconButton(onClick = onUpgrade) { Icon(Icons.Default.Star, "ارتقا", tint = TinderOrange) }
+            }
             IconButton(onClick = onFilter) { Icon(Icons.Default.Tune, "فیلتر", tint = TextWhite) }
         }
 
@@ -992,7 +1143,7 @@ private fun DiscoverScreen(
                             .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))))
                     )
                     Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
-                        if (person.likedYou) {
+                        if (person.likedYou && canSeeLikes) {
                             Surface(shape = RoundedCornerShape(20.dp), color = TinderPink) {
                                 Text("❤️ تو رو لایک کرده", Modifier.padding(horizontal = 12.dp, vertical = 5.dp), color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
                             }
@@ -1108,11 +1259,17 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
         )
     }
     var showAttach by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val keyboard = LocalSoftwareKeyboardController.current
 
-    Column(Modifier.fillMaxSize().background(DarkBg)) {
-        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+    }
+
+    Column(Modifier.fillMaxSize().background(DarkBg).imePadding()) {
+        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
-            Box(Modifier.size(44.dp).clip(CircleShape).background(person.tint), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(42.dp).clip(CircleShape).background(person.tint), contentAlignment = Alignment.Center) {
                 Text(person.emoji, fontSize = 22.sp)
             }
             Spacer(Modifier.width(12.dp))
@@ -1122,11 +1279,16 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
             }
         }
         HorizontalDivider(color = DarkCard)
-
-        LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             items(messages) { msg ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (msg.isMe) Arrangement.End else Arrangement.Start) {
                     Surface(
+                        modifier = Modifier.widthIn(max = 300.dp),
                         shape = RoundedCornerShape(
                             topStart = 18.dp, topEnd = 18.dp,
                             bottomStart = if (msg.isMe) 18.dp else 4.dp,
@@ -1140,22 +1302,15 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
                                 Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.End))
                             }
                             MsgType.IMAGE -> Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(
-                                    Modifier.size(160.dp, 120.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.15f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(msg.text, fontSize = 48.sp) // emoji as image placeholder
+                                Box(Modifier.size(160.dp, 120.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                                    Text(msg.text, fontSize = 48.sp)
                                 }
                                 Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 4.dp))
                             }
-                            MsgType.VOICE -> Row(
-                                Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            MsgType.VOICE -> Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.PlayArrow, null, tint = TextWhite, modifier = Modifier.size(28.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Column {
-                                    // Fake waveform
                                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                                         listOf(8, 14, 10, 18, 12, 16, 9, 15, 11).forEach { h ->
                                             Box(Modifier.width(3.dp).height(h.dp).background(TextWhite.copy(alpha = 0.7f), RoundedCornerShape(2.dp)))
@@ -1169,13 +1324,9 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
                 }
             }
         }
-        Text("گفت‌وگوی نمایشی — پیام‌ها ذخیره نمی‌شوند", color = TextMuted, fontSize = 11.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center, fontFamily = Vazirmatn)
-
+        Text("گفت‌وگوی نمایشی — پیام‌ها ذخیره نمی‌شوند", color = TextMuted, fontSize = 10.sp, modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp), textAlign = TextAlign.Center, fontFamily = Vazirmatn)
         if (showAttach) {
-            Row(
-                Modifier.fillMaxWidth().background(DarkCard).padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
+            Row(Modifier.fillMaxWidth().background(DarkCard).padding(8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 AttachOption(Icons.Default.Image, "تصویر") {
                     messages.add(ChatMessage(demoPhotoEmojis.random(), true, "الان", MsgType.IMAGE))
                     showAttach = false
@@ -1187,8 +1338,10 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
                 AttachOption(Icons.Default.Close, "بستن") { showAttach = false }
             }
         }
-
-        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth().background(DarkSurface).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
             IconButton(onClick = { showAttach = !showAttach }) {
                 Icon(Icons.Default.AttachFile, "ضمیمه", tint = TinderPink)
             }
@@ -1197,20 +1350,26 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
                 onValueChange = { message = it },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("پیامت را بنویس...", fontFamily = Vazirmatn) },
-                shape = RoundedCornerShape(24.dp),
-                singleLine = true,
+                shape = RoundedCornerShape(22.dp),
+                singleLine = false,
+                minLines = 1,
+                maxLines = 4,
+                keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Text),
                 colors = fieldColors()
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             FilledIconButton(
                 onClick = {
                     if (message.isNotBlank()) {
                         messages.add(ChatMessage(message.trim(), true, "الان"))
                         message = ""
+                        showAttach = false
+                        keyboard?.hide()
                     }
                 },
+                enabled = message.isNotBlank(),
                 shape = CircleShape,
-                colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink)
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink, disabledContainerColor = DarkCard)
             ) {
                 Icon(Icons.Default.Send, null, tint = TextWhite)
             }
@@ -1231,7 +1390,7 @@ private fun AttachOption(icon: androidx.compose.ui.graphics.vector.ImageVector, 
 
 // ─── Detail ───────────────────────────────────────────────────────────────────
 @Composable
-private fun PersonDetailScreen(person: Person, onBack: () -> Unit, onLike: () -> Unit, onBlock: () -> Unit) {
+private fun PersonDetailScreen(person: Person, canSeeLikes: Boolean, onBack: () -> Unit, onLike: () -> Unit, onBlock: () -> Unit) {
     Column(Modifier.fillMaxSize().background(DarkBg)) {
         Box {
             Box(
@@ -1256,7 +1415,7 @@ private fun PersonDetailScreen(person: Person, onBack: () -> Unit, onLike: () ->
                 Gender.OTHER -> "دیگر"
             }
             Text("جنسیت: $genderLabel", color = TextMuted, fontSize = 13.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 4.dp))
-            if (person.likedYou) {
+            if (person.likedYou && canSeeLikes) {
                 Surface(shape = RoundedCornerShape(12.dp), color = TinderPink.copy(alpha = 0.2f), modifier = Modifier.padding(top = 10.dp)) {
                     Text("❤️ این فرد تو را لایک کرده", Modifier.padding(horizontal = 12.dp, vertical = 6.dp), color = TinderPink, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
                 }
@@ -1303,7 +1462,7 @@ private fun PersonDetailScreen(person: Person, onBack: () -> Unit, onLike: () ->
 
 // ─── My Profile ───────────────────────────────────────────────────────────────
 @Composable
-private fun MyProfileScreen(user: UserProfile, blockedCount: Int, onLogout: () -> Unit) {
+private fun MyProfileScreen(user: UserProfile, blockedCount: Int, plan: SubscriptionPlan, onUpgrade: () -> Unit, onLogout: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(DarkBg)) {
         AppHeader("پروفایل من")
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1338,6 +1497,35 @@ private fun MyProfileScreen(user: UserProfile, blockedCount: Int, onLogout: () -
             Text("$gLabel · $oLabel · ${user.city}", color = TextMuted, fontSize = 13.sp, fontFamily = Vazirmatn)
             Spacer(Modifier.height(8.dp))
             Text(user.about, textAlign = TextAlign.Center, color = TextGray, fontSize = 14.sp, fontFamily = Vazirmatn)
+            val completionItems = listOf(
+                (user.name.isNotBlank()) to "نام",
+                (user.job.isNotBlank()) to "شغل",
+                (user.city.isNotBlank()) to "شهر",
+                (user.about.length >= 20) to "معرفی حداقل ۲۰ کاراکتری",
+                (user.interests.size >= 3) to "حداقل ۳ علاقه‌مندی",
+                user.photos.isNotEmpty() to "افزودن عکس"
+            )
+            val completion = completionItems.count { it.first } * 100 / completionItems.size
+            Card(Modifier.fillMaxWidth().padding(top = 12.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("تکمیل پروفایل", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        Spacer(Modifier.weight(1f))
+                        Text("$completion٪", color = TinderPink, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(progress = { completion / 100f }, modifier = Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(8.dp)), color = TinderPink, trackColor = DarkCard)
+                    Spacer(Modifier.height(10.dp))
+                    completionItems.filterNot { it.first }.take(3).forEach { item ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AddCircleOutline, null, tint = TinderOrange, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("برای بهتر دیده‌شدن: ${item.second} را کامل کن", color = TextGray, fontSize = 12.sp, fontFamily = Vazirmatn)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                }
+            }
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 user.interests.forEach { tag ->
@@ -1351,6 +1539,17 @@ private fun MyProfileScreen(user: UserProfile, blockedCount: Int, onLogout: () -
             InfoRow("سال تولد", "${user.birthYear}")
             InfoRow("افراد بلاک‌شده", "$blockedCount نفر")
             InfoRow("نسخه", "فست لاو ۲.۱")
+            Card(Modifier.fillMaxWidth().padding(top = 8.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp)) {
+                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("اشتراک فعلی: ${plan.title}", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        Text(if (plan == SubscriptionPlan.VIP) "لایک نامحدود" else "امکانات بیشتر با اشتراک", color = TextGray, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    }
+                    Button(onClick = onUpgrade, colors = ButtonDefaults.buttonColors(containerColor = TinderPink), shape = RoundedCornerShape(12.dp)) {
+                        Text("ارتقا", fontFamily = Vazirmatn)
+                    }
+                }
+            }
             Spacer(Modifier.height(20.dp))
             OutlinedButton(
                 onClick = onLogout,
