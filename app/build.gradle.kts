@@ -12,8 +12,8 @@ android {
         applicationId = "ir.fastlove.demo"
         minSdk = 24
         targetSdk = 35
-        versionCode = 7
-        versionName = "2.4.0"
+        versionCode = 8
+        versionName = "2.5.0"
     }
 
     compileOptions {
@@ -40,5 +40,6 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.google.code.gson:gson:2.11.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
