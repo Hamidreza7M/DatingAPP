@@ -93,6 +93,12 @@ private val GradientTinder = listOf(Color(0xFFFF4458), Color(0xFFFF7854))
 enum class Gender { MALE, FEMALE, OTHER }
 enum class Orientation { STRAIGHT, GAY, LESBIAN, BISEXUAL, OTHER }
 enum class MsgType { TEXT, IMAGE, VOICE }
+enum class RelationGoal(val title: String) {
+    MARRIAGE("ازدواج"),
+    FRIENDSHIP("دوستی ساده"),
+    CASUAL("قرار عادی"),
+    PARTNER("پارتنر")
+}
 
 enum class SubscriptionPlan(val title: String, val dailySwipes: Int?) {
     FREE("رایگان", 10), PRO("پرو", 50), VIP("وی‌آی‌پی", null)
@@ -101,12 +107,19 @@ enum class SubscriptionPlan(val title: String, val dailySwipes: Int?) {
 private fun formatToman(amount: Int): String =
     "%,d".format(amount).replace(',', '٬') + " تومان"
 
+private fun currentPersianYear(): Int {
+    val g = Calendar.getInstance().get(Calendar.YEAR)
+    val m = Calendar.getInstance().get(Calendar.MONTH) + 1
+    return if (m >= 3) g - 621 else g - 622
+}
+
 data class UserProfile(
     val name: String = "",
-    val birthYear: Int = 2000,
+    val birthYearPersian: Int = 1380,
     val birthMonth: Int = 1,
     val gender: Gender = Gender.OTHER,
     val orientation: Orientation = Orientation.STRAIGHT,
+    val goal: RelationGoal = RelationGoal.FRIENDSHIP,
     val job: String = "",
     val city: String = "",
     val about: String = "",
@@ -115,7 +128,7 @@ data class UserProfile(
     val primaryPhotoIndex: Int = 0,
     val phone: String = ""
 ) {
-    val age: Int get() = Calendar.getInstance().get(Calendar.YEAR) - birthYear
+    val age: Int get() = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
 }
 
 data class Person(
@@ -124,6 +137,7 @@ data class Person(
     val age: Int,
     val gender: Gender,
     val orientation: Orientation,
+    val goal: RelationGoal = RelationGoal.FRIENDSHIP,
     val job: String,
     val city: String,
     val about: String,
@@ -147,7 +161,8 @@ data class FilterState(
     val jobs: Set<String> = emptySet(),
     val interests: Set<String> = emptySet(),
     val maxDistance: Int = 50,
-    val city: String = ""
+    val cities: Set<String> = emptySet(),
+    val goals: Set<RelationGoal> = emptySet()
 )
 
 data class ReportReason(val id: String, val title: String)
@@ -449,9 +464,10 @@ private fun FastLoveApp() {
             p.id !in blockedIds &&
             p.age in filters.minAge..filters.maxAge &&
             p.distanceKm <= filters.maxDistance &&
-            (filters.city.isBlank() || p.city == filters.city) &&
+            (filters.cities.isEmpty() || p.city in filters.cities) &&
             (filters.jobs.isEmpty() || p.job in filters.jobs) &&
-            (filters.interests.isEmpty() || p.interests.any { it in filters.interests })
+            (filters.interests.isEmpty() || p.interests.any { it in filters.interests }) &&
+            (filters.goals.isEmpty() || p.goal in filters.goals)
         }
     }
 
@@ -542,6 +558,25 @@ private fun FastLoveApp() {
                             persist()
                         },
                         onDismiss = { showPayToMessage = null }
+                    )
+                    showBlockedList -> BlockedListScreen(
+                        people = samplePeople.filter { it.id in blockedIds },
+                        onUnblock = { id -> blockedIds.remove(id); persist() },
+                        onBack = { showBlockedList = false }
+                    )
+                    showDeleteRequest -> DeleteAccountDialog(
+                        onConfirm = {
+                            showDeleteRequest = false
+                            clearSession(context)
+                            isLoggedIn = false
+                            hasProfile = false
+                            currentUser = UserProfile()
+                            likedPeople.clear()
+                            matchedPeople.clear()
+                            blockedIds.clear()
+                            paidDirectChatIds.clear()
+                        },
+                        onDismiss = { showDeleteRequest = false }
                     )
                     showReport != null -> ReportDialog(
                         person = showReport!!,
@@ -654,6 +689,8 @@ private fun FastLoveApp() {
                                         likeCount = likedPeople.size,
                                         onUpgrade = { showSubscription = true },
                                         onEdit = { showEditProfile = true },
+                                        onShowBlocked = { showBlockedList = true },
+                                        onDeleteRequest = { showDeleteRequest = true },
                                         onLogout = {
                                             clearSession(context)
                                             isLoggedIn = false
@@ -736,6 +773,64 @@ private fun MatchPopup(person: Person, onChat: () -> Unit, onDismiss: () -> Unit
 }
 
 // ─── Report Dialog ────────────────────────────────────────────────────────────
+@Composable
+private fun BlockedListScreen(people: List<Person>, onUnblock: (Int) -> Unit, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Text("کاربران بلاک‌شده", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+        }
+        if (people.isEmpty()) {
+            EmptyState("کسی بلاک نشده", "از جزئیات پروفایل می‌توانید بلاک کنید", "🚫")
+        } else {
+            LazyColumn(
+                Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(people, key = { it.id }) { p ->
+                    Surface(shape = RoundedCornerShape(14.dp), color = DarkSurface, modifier = Modifier.fillMaxWidth()) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(48.dp).clip(CircleShape).background(p.tint), contentAlignment = Alignment.Center) {
+                                Text(p.emoji, fontSize = 24.sp)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("${p.name}, ${p.age}", fontWeight = FontWeight.SemiBold, color = TextWhite, fontFamily = Vazirmatn)
+                                Text("${p.job} · ${p.city}", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
+                            }
+                            TextButton(onClick = { onUnblock(p.id) }) {
+                                Text("رفع بلاک", color = SuccessGreen, fontFamily = Vazirmatn, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeleteAccountDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("درخواست حذف حساب", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                "با تأیید، درخواست حذف حساب ثبت و داده‌های محلی پاک می‌شود. در نسخه دمو فوری اعمال می‌گردد.",
+                fontFamily = Vazirmatn,
+                color = TextGray
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B6B))) {
+                Text("ثبت درخواست حذف", fontFamily = Vazirmatn)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", fontFamily = Vazirmatn) } },
+        containerColor = DarkSurface
+    )
+}
+
 @Composable
 private fun ReportDialog(person: Person, onSubmit: (ReportReason, String) -> Unit, onDismiss: () -> Unit) {
     var selected by remember { mutableStateOf<ReportReason?>(null) }
@@ -849,6 +944,49 @@ private fun UpgradeTeaserScreen(onUpgrade: () -> Unit) {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 @Composable
+private fun AnimatedAuthBackground() {
+    val infinite = rememberInfiniteTransition(label = "authBg")
+    val t by infinite.animateFloat(
+        0f, 360f,
+        infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Restart),
+        label = "rot"
+    )
+    val pulse by infinite.animateFloat(
+        0.55f, 1f,
+        infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulse"
+    )
+    Box(Modifier.fillMaxSize().background(DarkBg)) {
+        Box(
+            Modifier.size(260.dp)
+                .offset(x = (-30).dp, y = 60.dp)
+                .graphicsLayer { alpha = 0.4f * pulse; translationX = 18f * kotlin.math.sin(Math.toRadians(t.toDouble())).toFloat() }
+                .background(Brush.radialGradient(listOf(TinderPink.copy(alpha = 0.5f), Color.Transparent)), CircleShape)
+        )
+        Box(
+            Modifier.size(200.dp).align(Alignment.TopEnd).offset(x = (-10).dp, y = 30.dp)
+                .graphicsLayer { alpha = 0.35f * pulse; translationY = 12f * kotlin.math.cos(Math.toRadians((t * 1.2).toDouble())).toFloat() }
+                .background(Brush.radialGradient(listOf(TinderOrange.copy(alpha = 0.45f), Color.Transparent)), CircleShape)
+        )
+        Box(
+            Modifier.size(160.dp).align(Alignment.BottomCenter).offset(y = (-20).dp)
+                .graphicsLayer { alpha = 0.28f * pulse }
+                .background(Brush.radialGradient(listOf(Color(0xFFFF6B8A).copy(alpha = 0.35f), Color.Transparent)), CircleShape)
+        )
+        Icon(Icons.Default.Favorite, null, tint = TinderPink.copy(alpha = 0.12f),
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 40.dp, bottom = 120.dp).size(28.dp)
+                .graphicsLayer { rotationZ = t * 0.15f })
+        Icon(Icons.Default.Favorite, null, tint = TinderOrange.copy(alpha = 0.1f),
+            modifier = Modifier.align(Alignment.TopEnd).padding(end = 50.dp, top = 100.dp).size(22.dp)
+                .graphicsLayer { rotationZ = -t * 0.1f })
+        Icon(Icons.Default.Favorite, null, tint = TinderPink.copy(alpha = 0.08f),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 70.dp, bottom = 140.dp).size(18.dp)
+                .graphicsLayer { translationY = 10f * kotlin.math.sin(Math.toRadians((t * 2).toDouble())).toFloat() })
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF1A0A0C).copy(alpha = 0.55f), DarkBg.copy(alpha = 0.9f)))))
+    }
+}
+
+@Composable
 private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
     var phone by remember { mutableStateOf("") }
@@ -862,8 +1000,10 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
             while (secondsLeft > 0) { delay(1000); secondsLeft-- }
         }
     }
+    Box(Modifier.fillMaxSize()) {
+        AnimatedAuthBackground()
     Column(
-        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF1A0A0C), DarkBg))).padding(28.dp),
+        Modifier.fillMaxSize().padding(28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(Modifier.height(20.dp))
@@ -921,14 +1061,17 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
 }
 
 // ─── Profile Setup ────────────────────────────────────────────────────────────
+    }
+
 @Composable
 private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
     var name by remember { mutableStateOf("") }
-    var birthYear by remember { mutableIntStateOf(2000) }
+    var birthYearPersian by remember { mutableIntStateOf(1380) }
     var birthMonth by remember { mutableIntStateOf(1) }
     var gender by remember { mutableStateOf(Gender.FEMALE) }
     var orientation by remember { mutableStateOf(Orientation.STRAIGHT) }
+    var goal by remember { mutableStateOf(RelationGoal.FRIENDSHIP) }
     var job by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("تهران") }
     var about by remember { mutableStateOf("") }
@@ -942,7 +1085,7 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
     var showJobPicker by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-    val age = currentYear - birthYear
+    val age = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
     val context = LocalContext.current
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -1026,15 +1169,15 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                         )
                     }
                     Spacer(Modifier.height(20.dp))
-                    SectionLabel("سال تولد")
+                    SectionLabel("سال تولد (هجری شمسی)")
                     Surface(onClick = { showYearPicker = true }, shape = RoundedCornerShape(14.dp), color = DarkSurface, border = BorderStroke(1.dp, DarkCard), modifier = Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Cake, null, tint = TinderPink); Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) { Text("$birthYear", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold, fontSize = 16.sp); Text("$age ساله", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn) }
+                            Column(Modifier.weight(1f)) { Text("$birthYearPersian هـ.ش", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold, fontSize = 16.sp); Text("$age ساله", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn) }
                             Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
                         }
                     }
-                    if (showYearPicker) YearPickerDialog(selected = birthYear, minYear = currentYear - 80, maxYear = currentYear - 18, onSelect = { birthYear = it; showYearPicker = false }, onDismiss = { showYearPicker = false })
+                    if (showYearPicker) YearPickerDialog(selected = birthYearPersian, minYear = currentPersianYear() - 80, maxYear = currentPersianYear() - 18, onSelect = { birthYearPersian = it; showYearPicker = false }, onDismiss = { showYearPicker = false })
                     Spacer(Modifier.height(20.dp))
                     SectionLabel("جنسیت")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1080,6 +1223,25 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                         }
                     }
                     if (showJobPicker) CityPickerDialog(cities = availableJobs, selected = job, title = "انتخاب شغل", onSelect = { job = it; showJobPicker = false }, onDismiss = { showJobPicker = false })
+                    Spacer(Modifier.height(20.dp))
+                    SectionLabel("هدف از آشنایی")
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RelationGoal.entries.forEach { g ->
+                            val sel = goal == g
+                            Surface(
+                                onClick = { goal = g },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (sel) TinderPink.copy(alpha = 0.2f) else DarkSurface,
+                                border = BorderStroke(1.dp, if (sel) TinderPink else DarkCard),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(selected = sel, onClick = { goal = g }, colors = RadioButtonDefaults.colors(selectedColor = TinderPink))
+                                    Text(g.title, color = TextWhite, fontFamily = Vazirmatn)
+                                }
+                            }
+                        }
+                    }
                 }
                 2 -> {
                     SectionLabel("عکس‌های واقعی (حداکثر ۵)")
@@ -1169,7 +1331,7 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                         selectedInterests.size < 3 -> error = "حداقل ۳ علاقه انتخاب کنید"
                         else -> { error = ""; step = 3 }
                     }
-                    3 -> onComplete(UserProfile(name = name.trim(), birthYear = birthYear, birthMonth = birthMonth, gender = gender, orientation = orientation, job = job, city = city, about = about.trim().ifBlank { "هنوز چیزی ننوشتم 😊" }, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), phone = phone))
+                    3 -> onComplete(UserProfile(name = name.trim(), birthYearPersian = birthYearPersian, birthMonth = birthMonth, gender = gender, orientation = orientation, goal = goal, job = job, city = city, about = about.trim().ifBlank { "هنوز چیزی ننوشتم 😊" }, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), phone = phone))
                 }
             }, modifier = Modifier.weight(if (step > 0) 1.5f else 1f).height(52.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
                 Text(if (step == 3) "شروع کن 🚀" else "بعدی", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
@@ -1357,23 +1519,44 @@ private fun PayToMessageDialog(person: Person, onConfirm: () -> Unit, onDismiss:
 
 @Composable
 private fun InterestFlow(selected: Set<String>, onToggle: (String) -> Unit) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            if (selected.isEmpty()) "حداقل ۳ مورد انتخاب کنید" else "${selected.size} مورد انتخاب شده",
+            color = if (selected.size >= 3) SuccessGreen else TextMuted,
+            fontSize = 12.sp,
+            fontFamily = Vazirmatn
+        )
         availableInterests.chunked(3).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { interest ->
                     val sel = interest in selected
-                    FilterChip(selected = sel, onClick = { onToggle(interest) }, label = { Text(interest, fontFamily = Vazirmatn, fontSize = 13.sp) }, colors = chipColors(sel), modifier = Modifier.weight(1f))
+                    Surface(
+                        onClick = { onToggle(interest) },
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (sel) TinderPink.copy(alpha = 0.25f) else DarkCard,
+                        border = BorderStroke(1.dp, if (sel) TinderPink else DarkCard.copy(alpha = 0.5f)),
+                        modifier = Modifier.weight(1f).height(44.dp)
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                interest,
+                                color = if (sel) TextWhite else TextGray,
+                                fontFamily = Vazirmatn,
+                                fontSize = 13.sp,
+                                fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
+                    }
                 }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
-            Spacer(Modifier.height(6.dp))
         }
     }
 }
 
 @Composable
 private fun YearPickerDialog(selected: Int, minYear: Int, maxYear: Int, onSelect: (Int) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("سال تولد", fontFamily = Vazirmatn) }, text = {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("سال تولد هجری شمسی", fontFamily = Vazirmatn) }, text = {
         Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
             (maxYear downTo minYear).forEach { y -> TextButton(onClick = { onSelect(y) }, modifier = Modifier.fillMaxWidth()) { Text("$y", color = if (y == selected) TinderPink else TextWhite, fontFamily = Vazirmatn) } }
         }
@@ -1400,7 +1583,10 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
     var minAge by remember { mutableIntStateOf(current.minAge) }
     var maxAge by remember { mutableIntStateOf(current.maxAge) }
     var maxDistance by remember { mutableIntStateOf(current.maxDistance) }
-    var city by remember { mutableStateOf(current.city) }
+    var selectedCities by remember { mutableStateOf(current.cities) }
+    var selectedJobs by remember { mutableStateOf(current.jobs) }
+    var selectedInterests by remember { mutableStateOf(current.interests) }
+    var selectedGoals by remember { mutableStateOf(current.goals) }
     Column(Modifier.fillMaxSize().background(DarkBg).verticalScroll(rememberScrollState()).padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = TextWhite) }
@@ -1408,19 +1594,85 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
         }
         Spacer(Modifier.height(16.dp))
         Text("سن: $minAge – $maxAge", color = TextWhite, fontFamily = Vazirmatn)
-        RangeSlider(value = minAge.toFloat()..maxAge.toFloat(), onValueChange = { minAge = it.start.roundToInt(); maxAge = it.endInclusive.roundToInt() }, valueRange = 18f..60f, colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink))
+        RangeSlider(
+            value = minAge.toFloat()..maxAge.toFloat(),
+            onValueChange = { minAge = it.start.roundToInt(); maxAge = it.endInclusive.roundToInt() },
+            valueRange = 18f..60f,
+            colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink)
+        )
         Spacer(Modifier.height(12.dp))
         Text("حداکثر فاصله: $maxDistance کیلومتر", color = TextWhite, fontFamily = Vazirmatn)
-        Slider(value = maxDistance.toFloat(), onValueChange = { maxDistance = it.roundToInt() }, valueRange = 1f..100f, colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink))
-        Spacer(Modifier.height(12.dp))
-        SectionLabel("شهر")
-        OutlinedTextField(value = city, onValueChange = { city = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("همه شهرها", fontFamily = Vazirmatn) }, singleLine = true, colors = fieldColors(), shape = RoundedCornerShape(12.dp))
+        Slider(
+            value = maxDistance.toFloat(),
+            onValueChange = { maxDistance = it.roundToInt() },
+            valueRange = 1f..100f,
+            colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink)
+        )
         Spacer(Modifier.height(16.dp))
-        TinderButton("اعمال فیلتر") { onApply(FilterState(minAge, maxAge, emptySet(), emptySet(), maxDistance, city.trim())) }
+        SectionLabel("شهرهای مورد نظر (چندتایی)")
+        ChipGrid(iranianCities.take(18), selectedCities) { city ->
+            selectedCities = if (city in selectedCities) selectedCities - city else selectedCities + city
+        }
+        Spacer(Modifier.height(12.dp))
+        SectionLabel("شغل")
+        ChipGrid(availableJobs, selectedJobs) { job ->
+            selectedJobs = if (job in selectedJobs) selectedJobs - job else selectedJobs + job
+        }
+        Spacer(Modifier.height(12.dp))
+        SectionLabel("علایق")
+        ChipGrid(availableInterests, selectedInterests) { interest ->
+            selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest
+        }
+        Spacer(Modifier.height(12.dp))
+        SectionLabel("هدف از رابطه")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            RelationGoal.entries.forEach { g ->
+                val sel = g in selectedGoals
+                FilterChip(
+                    selected = sel,
+                    onClick = { selectedGoals = if (sel) selectedGoals - g else selectedGoals + g },
+                    label = { Text(g.title, fontFamily = Vazirmatn, fontSize = 11.sp) },
+                    colors = chipColors(sel),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        TinderButton("اعمال فیلتر") {
+            onApply(FilterState(minAge, maxAge, selectedJobs, selectedInterests, maxDistance, selectedCities, selectedGoals))
+        }
+        TextButton(
+            onClick = {
+                minAge = 18; maxAge = 45; maxDistance = 50
+                selectedCities = emptySet(); selectedJobs = emptySet()
+                selectedInterests = emptySet(); selectedGoals = emptySet()
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("پاک کردن فیلترها", color = TextMuted, fontFamily = Vazirmatn) }
     }
 }
 
-// ─── Discover with drag aligned to buttons (RTL: Like is on LEFT → swipe LEFT = like) ──
+@Composable
+private fun ChipGrid(items: List<String>, selected: Set<String>, onToggle: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        items.chunked(3).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { item ->
+                    val sel = item in selected
+                    FilterChip(
+                        selected = sel,
+                        onClick = { onToggle(item) },
+                        label = { Text(item, fontFamily = Vazirmatn, fontSize = 12.sp) },
+                        colors = chipColors(sel),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
 @Composable
 private fun DiscoverScreen(
     person: Person?,
@@ -1436,12 +1688,11 @@ private fun DiscoverScreen(
     val scope = rememberCoroutineScope()
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
-    // In RTL layout, Like button is on the LEFT (visual), Pass on the RIGHT.
-    // Screen coordinates: negative X = left, positive X = right.
-    // Therefore: swipe LEFT (negative) = LIKE, swipe RIGHT (positive) = PASS
+    // Drag directions reversed per request (buttons stay put):
+    // swipe RIGHT (positive) = LIKE, swipe LEFT (negative) = PASS
     val rotation = (offsetX / 40f).coerceIn(-15f, 15f)
-    val likeAlpha = (-offsetX / 200f).coerceIn(0f, 1f)  // left
-    val passAlpha = (offsetX / 200f).coerceIn(0f, 1f)   // right
+    val likeAlpha = (offsetX / 200f).coerceIn(0f, 1f)   // right = like
+    val passAlpha = (-offsetX / 200f).coerceIn(0f, 1f)  // left = pass
 
     fun resetCard() { offsetX = 0f; offsetY = 0f }
     fun animateOut(toLeft: Boolean, onEnd: () -> Unit) {
@@ -1476,8 +1727,8 @@ private fun DiscoverScreen(
                             detectDragGestures(
                                 onDragEnd = {
                                     when {
-                                        offsetX < -180f -> animateOut(true) { onLike(person) }   // left = like
-                                        offsetX > 180f -> animateOut(false) { onPass() }         // right = pass
+                                        offsetX > 180f -> animateOut(false) { onLike(person) }  // right = like
+                                        offsetX < -180f -> animateOut(true) { onPass() }        // left = pass
                                         else -> scope.launch {
                                             val ax = Animatable(offsetX); val ay = Animatable(offsetY)
                                             launch { ax.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) { offsetX = value } }
@@ -1521,17 +1772,17 @@ private fun DiscoverScreen(
             }
             // Buttons: in RTL visual order is Like | Block | Pass (left to right)
             Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 18.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                FilledIconButton(onClick = { animateOut(true) { onLike(person) } }, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink, contentColor = TextWhite)) {
+                FilledIconButton(onClick = { animateOut(false) { onLike(person) } }, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink, contentColor = TextWhite)) {
                     Icon(Icons.Default.Favorite, "لایک", modifier = Modifier.size(30.dp))
                 }
                 FilledIconButton(onClick = { onBlock(person) }, modifier = Modifier.size(48.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = Color(0xFFFF6B6B))) {
                     Icon(Icons.Default.Block, "بلاک", modifier = Modifier.size(22.dp))
                 }
-                FilledIconButton(onClick = { animateOut(false) { onPass() } }, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = TextGray)) {
+                FilledIconButton(onClick = { animateOut(true) { onPass() } }, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = TextGray)) {
                     Icon(Icons.Default.Close, "رد", modifier = Modifier.size(30.dp))
                 }
             }
-            Text("به سمت دکمه لایک بکشید ←  |  → رد", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp))
+            Text("راست ← لایک  |  چپ → رد", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp))
         }
     }
 }
@@ -1567,7 +1818,7 @@ private fun LikedMeScreen(people: List<Person>, matched: List<Person>, onLikeBac
                 PersonRow(person = p, onClick = { onOpen(p) }) {
                     if (isMatched) Surface(shape = RoundedCornerShape(12.dp), color = TinderPink.copy(alpha = 0.2f)) {
                         Text("مچ 💕", Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = TinderPink, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-                    } else TextButton(onClick = { onLikeBack(p) }) { Text("لایک متقابل", color = SuccessGreen, fontFamily = Vazirmatn, fontSize = 12.sp) }
+                    } else TextButton(onClick = { onLikeBack(p) }) { Text("لایک شدید", color = SuccessGreen, fontFamily = Vazirmatn, fontSize = 12.sp) }
                 }
             }
         }
@@ -1579,7 +1830,7 @@ private fun MatchesChatList(matches: List<Person>, onChat: (Person) -> Unit) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("مچ‌ها و چت‌ها", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
         Spacer(Modifier.height(12.dp))
-        if (matches.isEmpty()) EmptyState("هنوز مچی نداری", "با لایک متقابل مچ شو", "💬")
+        if (matches.isEmpty()) EmptyState("هنوز مچی نداری", "با لایک شدید مچ شو", "💬")
         else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(matches) { p -> PersonRow(person = p, onClick = { onChat(p) }) { Icon(Icons.Default.Chat, null, tint = TinderPink) } }
         }
@@ -1596,6 +1847,7 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
     }
     var input by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(false) }
+    var playingVoiceKey by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val keyboard = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
@@ -1625,12 +1877,39 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
                                 AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(msg.text)).crossfade(true).build(), contentDescription = null, modifier = Modifier.size(180.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
                                 Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 4.dp))
                             }
-                            MsgType.VOICE -> Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.PlayArrow, null, tint = TextWhite, modifier = Modifier.size(28.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Column {
-                                    Box(Modifier.width(100.dp).height(4.dp).background(TextWhite.copy(alpha = 0.5f), RoundedCornerShape(2.dp)))
-                                    Text("۰:۰۳ · ${msg.time}", color = TextWhite.copy(alpha = 0.7f), fontSize = 11.sp, fontFamily = Vazirmatn)
+                            MsgType.VOICE -> {
+                                val key = msg.time + msg.text
+                                val playing = playingVoiceKey == key
+                                Row(
+                                    Modifier.padding(horizontal = 14.dp, vertical = 12.dp).clickable {
+                                        playingVoiceKey = if (playing) null else key
+                                    },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        null,
+                                        tint = TextWhite,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Box(
+                                            Modifier
+                                                .width(100.dp)
+                                                .height(4.dp)
+                                                .background(
+                                                    if (playing) SuccessGreen else TextWhite.copy(alpha = 0.5f),
+                                                    RoundedCornerShape(2.dp)
+                                                )
+                                        )
+                                        Text(
+                                            if (playing) "در حال پخش · ${msg.time}" else "۰:۰۳ · ${msg.time}",
+                                            color = TextWhite.copy(alpha = 0.7f),
+                                            fontSize = 11.sp,
+                                            fontFamily = Vazirmatn
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1734,6 +2013,8 @@ private fun MyProfileScreen(
     likeCount: Int,
     onUpgrade: () -> Unit,
     onEdit: () -> Unit,
+    onShowBlocked: () -> Unit,
+    onDeleteRequest: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -1824,10 +2105,14 @@ private fun MyProfileScreen(
                 HorizontalDivider(color = DarkCard)
                 ProfileActionRow(Icons.Default.Edit, "ویرایش پروفایل", TinderPink, onEdit)
                 HorizontalDivider(color = DarkCard)
-                ProfileActionRow(Icons.Default.Block, "بلاک‌شده‌ها: $blockedCount", TextMuted) {}
+                ProfileActionRow(Icons.Default.Block, "بلاک‌شده‌ها: $blockedCount", TextMuted, onShowBlocked)
             }
         }
         Spacer(Modifier.height(20.dp))
+        TextButton(onClick = onDeleteRequest, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+            Text("درخواست حذف حساب کاربری", color = Color(0xFFFF6B6B), fontFamily = Vazirmatn, fontSize = 13.sp)
+        }
+        Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(50.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, TinderPink)) {
             Icon(Icons.Default.Logout, null, tint = TinderPink); Spacer(Modifier.width(8.dp))
             Text("خروج از حساب کاربری", color = TinderPink, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold)
