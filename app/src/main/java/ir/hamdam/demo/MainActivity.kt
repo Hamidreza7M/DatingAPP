@@ -418,6 +418,8 @@ private fun FastLoveApp() {
     var showPayToMessage by remember { mutableStateOf<Person?>(null) }
     var showMatchPopup by remember { mutableStateOf<Person?>(null) }
     var showReport by remember { mutableStateOf<Person?>(null) }
+    var showBlockedList by remember { mutableStateOf(false) }
+    var showDeleteRequest by remember { mutableStateOf(false) }
     var filters by remember { mutableStateOf(FilterState()) }
 
     fun currentDayKey(): String = Calendar.getInstance().let {
