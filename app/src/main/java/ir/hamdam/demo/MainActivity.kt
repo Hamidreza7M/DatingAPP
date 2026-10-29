@@ -1001,7 +1001,30 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                             Icon(Icons.Default.CalendarMonth, null, tint = TinderPink); Spacer(Modifier.width(12.dp)); Text(persianMonths[birthMonth - 1], color = TextWhite, fontFamily = Vazirmatn); Spacer(Modifier.weight(1f)); Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
                         }
                     }
-                    if (showMonthPicker) AlertDialog(onDismissRequest = { showMonthPicker = false }, title = { Text("ماه تولد", fontFamily = Vazirmatn) }, text = { Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) { persianMonths.forEachIndexed { index, month -> TextButton(onClick = { birthMonth = index + 1; showMonthPicker = false }, modifier = Modifier.fillMaxWidth()) { Text(month, color = if (birthMonth == index + 1) TinderPink else TextWhite, fontFamily = Vazirmatn) } } }, confirmButton = { TextButton(onClick = { showMonthPicker = false }) { Text("بستن", fontFamily = Vazirmatn) } }, containerColor = DarkSurface)
+                    if (showMonthPicker) {
+                        AlertDialog(
+                            onDismissRequest = { showMonthPicker = false },
+                            title = { Text("ماه تولد", fontFamily = Vazirmatn) },
+                            text = {
+                                Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                                    persianMonths.forEachIndexed { index, month ->
+                                        TextButton(
+                                            onClick = { birthMonth = index + 1; showMonthPicker = false },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(month, color = if (birthMonth == index + 1) TinderPink else TextWhite, fontFamily = Vazirmatn)
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showMonthPicker = false }) {
+                                    Text("بستن", fontFamily = Vazirmatn)
+                                }
+                            },
+                            containerColor = DarkSurface
+                        )
+                    }
                     Spacer(Modifier.height(20.dp))
                     SectionLabel("سال تولد")
                     Surface(onClick = { showYearPicker = true }, shape = RoundedCornerShape(14.dp), color = DarkSurface, border = BorderStroke(1.dp, DarkCard), modifier = Modifier.fillMaxWidth()) {
