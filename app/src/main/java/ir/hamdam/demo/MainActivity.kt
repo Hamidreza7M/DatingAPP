@@ -212,7 +212,8 @@ private fun FastLoveApp() {
         samplePeople.filter { p ->
             p.id !in blockedIds &&
             p.age in filters.minAge..filters.maxAge &&
-            p.distanceKm <= filters.maxDistance &&\n            (filters.city.isBlank() || p.city == filters.city) &&
+            p.distanceKm <= filters.maxDistance &&
+            (filters.city.isBlank() || p.city == filters.city) &&
             (filters.jobs.isEmpty() || p.job in filters.jobs) &&
             (filters.interests.isEmpty() || p.interests.any { it in filters.interests })
         }
