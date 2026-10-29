@@ -112,7 +112,8 @@ data class FilterState(
     val maxAge: Int = 45,
     val jobs: Set<String> = emptySet(),
     val interests: Set<String> = emptySet(),
-    val maxDistance: Int = 50
+    val maxDistance: Int = 50,
+    val city: String = ""
 )
 
 private val persianMonths = listOf("فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند")
