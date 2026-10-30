@@ -27,6 +27,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -681,6 +683,8 @@ private fun FastLoveApp() {
 
     var selectedPerson by remember { mutableStateOf<Person?>(null) }
     var selectedDetailFromDiscover by remember { mutableStateOf(false) }
+    var selectedDetailFromMap by remember { mutableStateOf(false) }
+    var mapCameraState by remember { mutableStateOf<MapCameraState?>(null) }
     var chatPerson by remember { mutableStateOf<Person?>(null) }
     var showFilters by remember { mutableStateOf(false) }
     var showSubscription by remember { mutableStateOf(false) }
@@ -1001,25 +1005,35 @@ private fun FastLoveApp() {
                             isMatched = matchedPeople.any { it.id == detailPerson.id },
                             canDirectMessage = detailPerson.id in paidDirectChatIds || matchedPeople.any { it.id == detailPerson.id },
                             isLiked = likedPeople.any { it.id == detailPerson.id },
-                            onBack = { selectedPerson = null; selectedDetailFromDiscover = false },
+                            onBack = {
+                                val cameFromMap = selectedDetailFromMap
+                                selectedPerson = null
+                                selectedDetailFromDiscover = false
+                                selectedDetailFromMap = false
+                                if (cameFromMap) tab = 2
+                            },
                             onLike = {
+                                val cameFromMap = selectedDetailFromMap
+                                val cameFromDiscover = selectedDetailFromDiscover
                                 val alreadyLiked = likedPeople.any { it.id == detailPerson.id }
                                 if (alreadyLiked) {
                                     android.widget.Toast.makeText(context, "این پروفایل قبلاً لایک شده است ❤️", android.widget.Toast.LENGTH_SHORT).show()
+                                    if (cameFromDiscover) {
+                                        discoverIndex = (discoverIndex + 1).coerceAtMost(filteredPeople.size)
+                                    }
                                     selectedPerson = null
-                                    tab = 0
                                     selectedDetailFromDiscover = false
+                                    selectedDetailFromMap = false
+                                    if (cameFromMap) tab = 2 else if (cameFromDiscover) tab = 0
                                 } else if (canSwipe()) {
                                     val canonicalPerson = samplePeople.firstOrNull { it.id == detailPerson.id } ?: detailPerson
                                     doLike(canonicalPerson)
-                                    // Detail-page likes return directly to discovery; match state is still saved,
-                                    // while the full-screen match popup is intentionally skipped here.
+                                    // Keep the origin context: map details return to the same camera;
+                                    // discovery details advance to the next card in the discovery list.
                                     showMatchPopup = null
-                                    if (selectedDetailFromDiscover) {
-                                        // Detail was opened from the current discovery card.
+                                    if (cameFromDiscover) {
                                         discoverIndex = (discoverIndex + 1).coerceAtMost(filteredPeople.size)
-                                    } else {
-                                        // When opened from another tab, resume at the next matching discovery card.
+                                    } else if (!cameFromMap) {
                                         val detailIndex = filteredPeople.indexOfFirst { it.id == detailPerson.id }
                                         if (detailIndex >= discoverIndex) {
                                             discoverIndex = (detailIndex + 1).coerceAtMost(filteredPeople.size)
@@ -1027,7 +1041,8 @@ private fun FastLoveApp() {
                                     }
                                     selectedPerson = null
                                     selectedDetailFromDiscover = false
-                                    tab = 0
+                                    selectedDetailFromMap = false
+                                    if (cameFromMap) tab = 2 else if (cameFromDiscover) tab = 0
                                     android.widget.Toast.makeText(
                                         context,
                                         if (canonicalPerson.likedYou) "لایک ثبت شد و ارتباط شما مچ شد 💕" else "لایک با موفقیت ثبت شد ❤️",
@@ -1038,21 +1053,28 @@ private fun FastLoveApp() {
                                 }
                             },
                             onPass = {
+                                val cameFromMap = selectedDetailFromMap
+                                val cameFromDiscover = selectedDetailFromDiscover
                                 if (canSwipe()) {
                                     doPass(detailPerson)
                                     selectedPerson = null
                                     selectedDetailFromDiscover = false
-                                    if (tab != 0) tab = 0
+                                    selectedDetailFromMap = false
+                                    if (cameFromMap) tab = 2 else if (cameFromDiscover) tab = 0
                                 } else {
                                     android.widget.Toast.makeText(context, "سهمیه روزانه تمام شده است؛ برای ادامه اشتراک را ارتقا بده.", android.widget.Toast.LENGTH_LONG).show()
                                 }
                             },
                             onBlock = {
+                                val cameFromMap = selectedDetailFromMap
+                                val cameFromDiscover = selectedDetailFromDiscover
                                 blockedIds.add(detailPerson.id)
                                 likedPeople.removeAll { it.id == detailPerson.id }
                                 matchedPeople.removeAll { it.id == detailPerson.id }
                                 selectedPerson = null
                                 selectedDetailFromDiscover = false
+                                selectedDetailFromMap = false
+                                if (cameFromMap) tab = 2 else if (cameFromDiscover) tab = 0
                                 persist()
                             },
                             onChat = {
@@ -1060,6 +1082,7 @@ private fun FastLoveApp() {
                                     chatPerson = detailPerson
                                     selectedPerson = null
                                     selectedDetailFromDiscover = false
+                                    selectedDetailFromMap = false
                                 } else showPayToMessage = detailPerson
                             },
                             onReport = { showReport = detailPerson }
@@ -1097,7 +1120,7 @@ private fun FastLoveApp() {
                                     0 -> DiscoverScreen(
                                         viewer = currentUser,
                                         person = filteredPeople.getOrNull(discoverIndex),
-                                        onOpen = { selectedPerson = it; selectedDetailFromDiscover = true },
+                                        onOpen = { selectedPerson = it; selectedDetailFromDiscover = true; selectedDetailFromMap = false },
                                         onLike = { p ->
                                             if (canSwipe()) {
                                                 doLike(p)
@@ -1127,7 +1150,7 @@ private fun FastLoveApp() {
                                         paidIds = paidDirectChatIds,
                                         isFree = subscriptionPlan == SubscriptionPlan.FREE,
                                         onUpgrade = { showSubscription = true },
-                                        onOpen = { selectedPerson = it; selectedDetailFromDiscover = false },
+                                        onOpen = { selectedPerson = it; selectedDetailFromDiscover = false; selectedDetailFromMap = false },
                                         onChat = { p ->
                                             if (p in matchedPeople || p.id in paidDirectChatIds) chatPerson = p
                                             else showPayToMessage = p
@@ -1139,11 +1162,17 @@ private fun FastLoveApp() {
                                         user = currentUser,
                                         people = samplePeople.filter { it.id !in blockedIds && it.id !in unmatchedIds && it.id !in passedIds },
                                         isVisibleOnMap = showOnMap,
+                                        savedCamera = mapCameraState,
                                         onToggleVisibility = { enabled ->
                                             showOnMap = enabled
                                             prefs(context).edit().putBoolean("showOnMap", enabled).apply()
                                         },
-                                        onOpenPerson = { selectedPerson = it; selectedDetailFromDiscover = false }
+                                        onOpenPerson = { person, camera ->
+                                            mapCameraState = camera
+                                            selectedPerson = person
+                                            selectedDetailFromDiscover = false
+                                            selectedDetailFromMap = true
+                                        }
                                     )
                                     3 -> {
                                         val chatMatches = (matchedPeople.filter { it.id !in blockedIds } +
@@ -3779,6 +3808,12 @@ private fun MatchesChatList(matches: List<Person>, pendingReplyIds: Set<Int>, on
 private data class MapCity(val name: String, val county: String, val latitude: Double, val longitude: Double)
 private data class MapProvinceData(val cities: List<MapCity>)
 private data class MapArea(val name: String, val latitude: Double, val longitude: Double)
+private data class MapCameraState(
+    val cityName: String,
+    val latitude: Double,
+    val longitude: Double,
+    val zoom: Double
+)
 
 private fun loadTehranProvinceCities(context: Context): List<MapCity> = runCatching {
     context.assets.open("tehran_province_places.json").bufferedReader(Charsets.UTF_8).use { reader ->
@@ -3792,59 +3827,67 @@ private fun mapAvatarDrawable(
     backgroundColor: Int,
     isOnline: Boolean? = null,
     isCount: Boolean = false,
-    label: String? = null
+    label: String? = null,
+    age: Int? = null
 ): BitmapDrawable {
     val density = context.resources.displayMetrics.density
     val hasLabel = !isCount && !label.isNullOrBlank()
-    val width = ((if (hasLabel) 98 else 54) * density).toInt().coerceAtLeast(54)
-    val height = ((if (hasLabel) 72 else 58) * density).toInt().coerceAtLeast(58)
+    val width = ((if (hasLabel) 116 else 54) * density).toInt().coerceAtLeast(54)
+    val height = ((if (hasLabel) 78 else 58) * density).toInt().coerceAtLeast(58)
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = NativeCanvas(bitmap)
     val paint = NativePaint(NativePaint.ANTI_ALIAS_FLAG)
     val cx = width / 2f
-    val cy = 23 * density
+    val cy = if (hasLabel) 17f * density else 23f * density
+    val avatarRadius = if (hasLabel) 15.5f * density else 17.5f * density
 
-    // A light shadow and outlined avatar keep markers readable without looking like large pins.
+    // Compact avatar above a two-line name/age chip. This keeps labels legible at personal zoom levels.
     paint.color = android.graphics.Color.argb(65, 0, 0, 0)
-    canvas.drawCircle(cx, cy + 2.5f * density, 17.5f * density, paint)
+    canvas.drawCircle(cx, cy + 2.2f * density, avatarRadius, paint)
     paint.color = backgroundColor
-    canvas.drawCircle(cx, cy, 17.5f * density, paint)
+    canvas.drawCircle(cx, cy, avatarRadius, paint)
     paint.color = android.graphics.Color.WHITE
     paint.style = NativePaint.Style.STROKE
-    paint.strokeWidth = 2f * density
-    canvas.drawCircle(cx, cy, 17.5f * density, paint)
+    paint.strokeWidth = 1.8f * density
+    canvas.drawCircle(cx, cy, avatarRadius, paint)
     paint.style = NativePaint.Style.FILL
     paint.textAlign = NativePaint.Align.CENTER
     paint.color = android.graphics.Color.WHITE
-    paint.textSize = if (isCount) 15 * density else 18 * density
-    canvas.drawText(symbol, cx, cy + (if (isCount) 5f else 6.5f) * density, paint)
+    paint.textSize = if (isCount) 15 * density else 16 * density
+    paint.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD)
+    canvas.drawText(symbol, cx, cy + (if (isCount) 5f else 5.7f) * density, paint)
 
     if (isOnline != null) {
-        val statusX = cx + 13 * density
-        val statusY = cy - 13 * density
+        val statusX = cx + 11.5f * density
+        val statusY = cy - 11.5f * density
         paint.color = android.graphics.Color.rgb(18, 24, 39)
-        canvas.drawCircle(statusX, statusY, 6.8f * density, paint)
+        canvas.drawCircle(statusX, statusY, 6.2f * density, paint)
         paint.color = if (isOnline) android.graphics.Color.rgb(67, 225, 166) else android.graphics.Color.rgb(147, 158, 179)
-        canvas.drawCircle(statusX, statusY, 4.6f * density, paint)
+        canvas.drawCircle(statusX, statusY, 4.2f * density, paint)
     }
 
     if (hasLabel) {
-        val left = cx - 44 * density
-        val top = cy + 22 * density
-        val right = cx + 44 * density
-        val bottom = cy + 42 * density
-        paint.color = android.graphics.Color.argb(238, 18, 24, 39)
+        val left = cx - 54f * density
+        val top = cy + 19f * density
+        val right = cx + 54f * density
+        val bottom = top + 35f * density
+        paint.color = android.graphics.Color.argb(242, 18, 24, 39)
         canvas.drawRoundRect(RectF(left, top, right, bottom), 8 * density, 8 * density, paint)
-        paint.color = android.graphics.Color.argb(235, 255, 255, 255)
+        paint.color = android.graphics.Color.argb(225, 255, 255, 255)
         paint.style = NativePaint.Style.STROKE
         paint.strokeWidth = 0.8f * density
         canvas.drawRoundRect(RectF(left, top, right, bottom), 8 * density, 8 * density, paint)
         paint.style = NativePaint.Style.FILL
         paint.color = android.graphics.Color.WHITE
         paint.textAlign = NativePaint.Align.CENTER
-        paint.textSize = 9.5f * density
         paint.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD)
-        canvas.drawText(label!!.take(8), cx, top + 13.5f * density, paint)
+        paint.textSize = 8.5f * density
+        val safeName = label!!.trim().take(13)
+        canvas.drawText(safeName, cx, top + 13f * density, paint)
+        paint.color = android.graphics.Color.rgb(190, 199, 218)
+        paint.textSize = 7.2f * density
+        val ageText = age?.let { "${persianDigits(it.toString())} سال" } ?: "کاربر"
+        canvas.drawText(ageText, cx, top + 27f * density, paint)
     }
     return BitmapDrawable(context.resources, bitmap)
 }
@@ -3871,17 +3914,23 @@ private fun privacyRoundedPoint(point: GeoPoint): GeoPoint = GeoPoint(
 @Composable
 private fun MapScreen(
     user: UserProfile, people: List<Person>, isVisibleOnMap: Boolean,
-    onToggleVisibility: (Boolean) -> Unit, onOpenPerson: (Person) -> Unit
+    savedCamera: MapCameraState?,
+    onToggleVisibility: (Boolean) -> Unit,
+    onOpenPerson: (Person, MapCameraState) -> Unit
 ) {
     val context = LocalContext.current
     val cityList = remember { loadTehranProvinceCities(context) }
     val defaultCity = remember(cityList, user.city) {
         cityList.firstOrNull { normalizeMapCityName(it.name) == normalizeMapCityName(user.city) }?.name ?: "تهران"
     }
-    var selectedCityName by remember { mutableStateOf(defaultCity) }
+    var selectedCityName by remember {
+        mutableStateOf(savedCamera?.cityName?.takeIf { cityName -> cityList.any { it.name == cityName } } ?: defaultCity)
+    }
     val selectedCity = cityList.firstOrNull { it.name == selectedCityName }
         ?: cityList.firstOrNull { normalizeMapCityName(it.name) == normalizeMapCityName("تهران") }
         ?: MapCity("تهران", "تهران", 35.69439, 51.42151)
+    val restoredCamera = savedCamera?.takeIf { normalizeMapCityName(it.cityName) == normalizeMapCityName(selectedCityName) }
+    val defaultZoom = if (normalizeMapCityName(selectedCityName) == normalizeMapCityName("تهران")) 11.35 else 12.0
     var cityMenuOpen by remember { mutableStateOf(false) }
     var locationGranted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
@@ -3890,7 +3939,7 @@ private fun MapScreen(
     var currentLocation by remember { mutableStateOf<GeoPoint?>(null) }
     var locationMessage by remember { mutableStateOf("") }
     var showOnlineOnly by remember { mutableStateOf(false) }
-    val mapZoom = remember { mutableFloatStateOf(11.35f) }
+    val mapZoom = remember { mutableFloatStateOf((restoredCamera?.zoom ?: defaultZoom).toFloat()) }
     val lastInitializedCity = remember { mutableStateOf("") }
     val showAreaSummary = mapZoom.floatValue < 13.3f
 
@@ -4066,12 +4115,17 @@ private fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
-                    Configuration.getInstance().userAgentValue = "FastLove-Android/2.18.0 (ir.fastlove.demo)"
+                    Configuration.getInstance().userAgentValue = "FastLove-Android/2.19.0 (ir.fastlove.demo)"
                     MapView(ctx).apply {
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
-                        controller.setZoom(if (normalizeMapCityName(selectedCityName) == normalizeMapCityName("تهران")) 11.35 else 12.0)
-                        controller.setCenter(GeoPoint(cityCenter.latitude, cityCenter.longitude))
+                        controller.setZoom(restoredCamera?.zoom ?: defaultZoom)
+                        controller.setCenter(
+                            restoredCamera?.let { GeoPoint(it.latitude, it.longitude) }
+                                ?: GeoPoint(cityCenter.latitude, cityCenter.longitude)
+                        )
+                        mapZoom.floatValue = (restoredCamera?.zoom ?: defaultZoom).toFloat()
+                        lastInitializedCity.value = selectedCityName
                         setUseDataConnection(true)
                         val mapReference = this
                         addMapListener(object : MapListener {
@@ -4087,7 +4141,9 @@ private fun MapScreen(
                     val cityKey = selectedCityName
                     if (lastInitializedCity.value != cityKey) {
                         map.controller.setCenter(GeoPoint(cityCenter.latitude, cityCenter.longitude))
-                        map.controller.setZoom(if (normalizeMapCityName(cityKey) == normalizeMapCityName("تهران")) 11.35 else 12.0)
+                        val cityZoom = if (normalizeMapCityName(cityKey) == normalizeMapCityName("تهران")) 11.35 else 12.0
+                        map.controller.setZoom(cityZoom)
+                        mapZoom.floatValue = cityZoom.toFloat()
                         lastInitializedCity.value = cityKey
                     }
                     val zoom = map.zoomLevelDouble
@@ -4119,9 +4175,17 @@ private fun MapScreen(
                                 icon = mapAvatarDrawable(
                                     map.context, person.emoji, person.tint.toArgb(),
                                     if (person.showOnlineStatus) person.isOnline else null,
-                                    label = person.name
+                                    label = person.name,
+                                    age = person.age
                                 )
-                                setOnMarkerClickListener { _, _ -> onOpenPerson(person); true }
+                                setOnMarkerClickListener { _, mapView ->
+                                    val center = mapView.mapCenter
+                                    onOpenPerson(
+                                        person,
+                                        MapCameraState(selectedCityName, center.latitude, center.longitude, mapView.zoomLevelDouble)
+                                    )
+                                    true
+                                }
                             }
                             map.overlays.add(marker)
                         }
@@ -4133,7 +4197,7 @@ private fun MapScreen(
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                             title = "موقعیت تقریبی تو"
                             snippet = "${user.age} سال · ${user.job} · نمایش برای دیگران فعال است"
-                            icon = mapAvatarDrawable(map.context, "من", TinderPink.toArgb(), true)
+                            icon = mapAvatarDrawable(map.context, "من", TinderPink.toArgb(), true, label = user.name, age = user.age)
                         }
                         map.overlays.add(selfMarker)
                     }
@@ -4377,8 +4441,8 @@ private fun DateProposalDialog(
         },
         text = {
             Column(
-                Modifier.fillMaxWidth().heightIn(max = 570.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(11.dp)
+                Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
                     value = place,
@@ -4409,20 +4473,18 @@ private fun DateProposalDialog(
                 }
                 if (selectedLatitude != null && selectedLongitude != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Place, null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(5.dp))
-                        Text(
-                            "${"%.4f".format(Locale.US, selectedLatitude)}، ${"%.4f".format(Locale.US, selectedLongitude)}",
-                            color = SuccessGreen, fontSize = 9.sp, fontFamily = Vazirmatn
-                        )
+                        Text("نقطه روی نقشه به پیشنهاد پیوست شد", color = SuccessGreen, fontSize = 9.sp, fontFamily = Vazirmatn)
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick = {
-                            selectedLatitude = null
-                            selectedLongitude = null
-                            if (place == "موقعیت انتخاب‌شده روی نقشه") place = ""
-                        }) {
-                            Text("حذف موقعیت", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
-                        }
+                        TextButton(
+                            onClick = {
+                                selectedLatitude = null
+                                selectedLongitude = null
+                                if (place == "موقعیت انتخاب‌شده روی نقشه") place = ""
+                            },
+                            contentPadding = PaddingValues(horizontal = 5.dp, vertical = 1.dp)
+                        ) { Text("حذف", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn) }
                     }
                 }
 
@@ -4469,7 +4531,7 @@ private fun DateProposalDialog(
                             Row(Modifier.fillMaxWidth()) {
                                 week.forEach { day ->
                                     if (day == null) {
-                                        Spacer(Modifier.weight(1f).height(38.dp).padding(2.dp))
+                                        Spacer(Modifier.weight(1f).height(34.dp).padding(2.dp))
                                     } else {
                                         val dayMillis = persianDateToMillis(displayedYear, displayedMonth, day)
                                         val dayStart = monthStartDay(dayMillis)
@@ -4478,7 +4540,7 @@ private fun DateProposalDialog(
                                         Surface(
                                             onClick = { selectedDateMillis = dayMillis },
                                             enabled = enabled,
-                                            modifier = Modifier.weight(1f).padding(2.dp).height(36.dp),
+                                            modifier = Modifier.weight(1f).padding(2.dp).height(33.dp),
                                             shape = RoundedCornerShape(11.dp),
                                             color = when {
                                                 selected -> TinderPink
@@ -4500,7 +4562,7 @@ private fun DateProposalDialog(
                                     }
                                 }
                                 repeat((7 - week.size).coerceAtLeast(0)) {
-                                    Spacer(Modifier.weight(1f).height(38.dp).padding(2.dp))
+                                    Spacer(Modifier.weight(1f).height(34.dp).padding(2.dp))
                                 }
                             }
                         }
@@ -4510,11 +4572,11 @@ private fun DateProposalDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("ساعت قرار", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = Vazirmatn)
-                        Text("عقربه را برای ساعت یا دقیقه بچرخان / لمس کن", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                        Text("برای تنظیم، انگشت را روی صفحه ساعت بکش", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
                     }
                     Surface(color = BrandViolet.copy(alpha = 0.14f), shape = RoundedCornerShape(12.dp)) {
                         Text(
-                            persianDigits("%02d:%02d".format(selectedHour, selectedMinute)),
+                            "${persianDigits("%02d:%02d".format(if (selectedHour % 12 == 0) 12 else selectedHour % 12, selectedMinute))} ${if (selectedHour >= 12) "ب.ظ" else "ق.ظ"}",
                             Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = BrandViolet,
                             fontWeight = FontWeight.Bold, fontSize = 15.sp, fontFamily = Vazirmatn
                         )
@@ -4579,53 +4641,84 @@ private fun AnalogTimePicker(
 ) {
     var selectingHour by remember { mutableStateOf(true) }
     val isPm = hour >= 12
+    val displayHour = if (hour % 12 == 0) 12 else hour % 12
+    val latestSelectingHour by rememberUpdatedState(selectingHour)
+    val latestIsPm by rememberUpdatedState(isPm)
+    val latestOnHourChange by rememberUpdatedState(onHourChange)
+    val latestOnMinuteChange by rememberUpdatedState(onMinuteChange)
+
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 onClick = { selectingHour = true },
                 color = if (selectingHour) BrandViolet else DarkCard,
-                shape = RoundedCornerShape(11.dp),
+                shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(1.dp, if (selectingHour) BrandViolet else Color.White.copy(alpha = 0.07f))
             ) {
-                val displayHour = if (hour % 12 == 0) 12 else hour % 12
-                Text(persianDigits("ساعت $displayHour"), Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Text(persianDigits("ساعت %02d".format(displayHour)), Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
             }
             Surface(
                 onClick = { selectingHour = false },
                 color = if (!selectingHour) BrandViolet else DarkCard,
-                shape = RoundedCornerShape(11.dp),
+                shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(1.dp, if (!selectingHour) BrandViolet else Color.White.copy(alpha = 0.07f))
             ) {
-                Text(persianDigits("دقیقه %02d".format(minute)), Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Text(persianDigits("دقیقه %02d".format(minute)), Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+            }
+            Spacer(Modifier.weight(1f))
+            // Explicit segmented AM/PM selection is easier to understand than a single toggle.
+            Surface(
+                onClick = { onHourChange(displayHour % 12) },
+                color = if (!isPm) TinderPink else DarkCard,
+                shape = RoundedCornerShape(9.dp),
+                border = BorderStroke(1.dp, if (!isPm) TinderPink else Color.White.copy(alpha = 0.08f))
+            ) {
+                Text("ق.ظ", Modifier.padding(horizontal = 11.dp, vertical = 7.dp), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
             }
             Surface(
-                onClick = { onHourChange(if (isPm) hour - 12 else hour + 12) },
-                color = TinderPink.copy(alpha = 0.13f), shape = RoundedCornerShape(10.dp)
+                onClick = { onHourChange(displayHour % 12 + 12) },
+                color = if (isPm) TinderPink else DarkCard,
+                shape = RoundedCornerShape(9.dp),
+                border = BorderStroke(1.dp, if (isPm) TinderPink else Color.White.copy(alpha = 0.08f))
             ) {
-                Text(if (isPm) "ب.ظ" else "ق.ظ", Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = TinderPink, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Text("ب.ظ", Modifier.padding(horizontal = 11.dp, vertical = 7.dp), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
             }
         }
-        BoxWithConstraints(Modifier.size(244.dp)) {
+        BoxWithConstraints(Modifier.size(226.dp)) {
             val dialSize = maxWidth
             val center = dialSize / 2
             val labelRadius = dialSize * 0.355f
             Canvas(
-                Modifier.fillMaxSize().pointerInput(selectingHour, hour, minute, isPm) {
-                    detectTapGestures { tap ->
-                        val dx = tap.x - size.width / 2f
-                        val dy = tap.y - size.height / 2f
-                        val rawDegrees = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())) + 90.0
-                        val normalized = (rawDegrees + 360.0) % 360.0
-                        if (selectingHour) {
-                            val index = (kotlin.math.round(normalized / 30.0).toInt() % 12)
-                            val hour12 = if (index == 0) 12 else index
-                            val nextHour = if (isPm) hour12 % 12 + 12 else hour12 % 12
-                            onHourChange(nextHour)
-                            selectingHour = false
-                        } else {
-                            val nextMinute = kotlin.math.round(normalized / 6.0).toInt() % 60
-                            onMinuteChange(nextMinute)
+                Modifier.fillMaxSize().pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val hourModeForGesture = latestSelectingHour
+                        val pmForGesture = latestIsPm
+                        fun updateFromPointer(position: Offset) {
+                            val dx = position.x - size.width / 2f
+                            val dy = position.y - size.height / 2f
+                            val rawDegrees = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())) + 90.0
+                            val normalized = (rawDegrees + 360.0) % 360.0
+                            if (hourModeForGesture) {
+                                val index = kotlin.math.round(normalized / 30.0).toInt() % 12
+                                val hour12 = if (index == 0) 12 else index
+                                val nextHour = if (pmForGesture) hour12 % 12 + 12 else hour12 % 12
+                                latestOnHourChange(nextHour)
+                            } else {
+                                // Minute mode resolves every one-minute increment, not only five-minute labels.
+                                latestOnMinuteChange(kotlin.math.round(normalized / 6.0).toInt() % 60)
+                            }
                         }
+                        updateFromPointer(down.position)
+                        down.consume()
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            updateFromPointer(change.position)
+                            change.consume()
+                        }
+                        if (hourModeForGesture) selectingHour = false
                     }
                 }
             ) {
@@ -4656,6 +4749,10 @@ private fun AnalogTimePicker(
                 drawCircle(BrandViolet, radius = 13.dp.toPx(), center = end)
                 drawCircle(TextWhite, radius = 4.dp.toPx(), center = Offset(cx, cy))
             }
+            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(persianDigits("%02d:%02d".format(displayHour, minute)), color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp, fontFamily = Vazirmatn)
+                Text(if (isPm) "بعدازظهر" else "قبل‌ازظهر", color = TextMuted, fontSize = 8.sp, fontFamily = Vazirmatn)
+            }
             for (index in 0 until 12) {
                 val angle = (index * 30.0 - 90.0) * PI / 180.0
                 val dx = labelRadius * cos(angle).toFloat()
@@ -4670,12 +4767,12 @@ private fun AnalogTimePicker(
                     Modifier.offset(x = center + dx - 14.dp, y = center + dy - 14.dp).size(28.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(labelValue, color = if (selected) TextWhite else TextGray, fontSize = if (selectingHour) 11.sp else 8.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontFamily = Vazirmatn)
+                    Text(labelValue, color = if (selected) TextWhite else TextGray, fontSize = if (selectingHour) 10.sp else 8.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontFamily = Vazirmatn)
                 }
             }
         }
         Text(
-            if (selectingHour) "عدد ساعت را انتخاب کن؛ سپس صفحه دقیقه باز می‌شود." else "برای ثبت دقیقه، هر نقطه از صفحه ساعت را لمس کن.",
+            if (selectingHour) "انگشتت را روی ساعت بکش؛ با رهاکردن وارد انتخاب دقیقه می‌شوی." else "عقربه را روی دقیقه دلخواه بکش؛ دقت انتخاب یک دقیقه است.",
             color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, textAlign = TextAlign.Center
         )
     }
@@ -4710,7 +4807,7 @@ private fun DatePlaceMapPicker(
                         modifier = Modifier.fillMaxSize(),
                         factory = { ctx ->
                             Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
-                            Configuration.getInstance().userAgentValue = "FastLove-Android/2.18.0 (ir.fastlove.demo)"
+                            Configuration.getInstance().userAgentValue = "FastLove-Android/2.19.0 (ir.fastlove.demo)"
                             MapView(ctx).apply {
                                 setTileSource(TileSourceFactory.MAPNIK)
                                 setMultiTouchControls(true)
@@ -4795,6 +4892,7 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, canSeeLikes: Boolean
     var showChatMenu by remember { mutableStateOf(false) }
     var showChatProfile by remember(person.id) { mutableStateOf(false) }
     var showUnmatchConfirm by remember { mutableStateOf(false) }
+    var enlargedChatImage by remember(person.id) { mutableStateOf<String?>(null) }
     var pendingDemoReplies by remember { mutableIntStateOf(0) }
     val chatScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
@@ -4915,6 +5013,41 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, canSeeLikes: Boolean
             if (isRecording) stopRecording()
             else recorder?.let { active -> runCatching { active.stop() }; active.release() }
             player?.release()
+        }
+    }
+
+    if (enlargedChatImage != null) {
+        Dialog(
+            onDismissRequest = { enlargedChatImage = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                Modifier.fillMaxSize().background(Color(0xF9080B14)).clickable { enlargedChatImage = null },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context).data(Uri.parse(enlargedChatImage)).crossfade(true).build(),
+                    contentDescription = "نمایش بزرگ عکس پیام",
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(0.88f),
+                    contentScale = ContentScale.Fit
+                )
+                Surface(
+                    modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(14.dp),
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.62f)
+                ) {
+                    IconButton(onClick = { enlargedChatImage = null }) {
+                        Icon(Icons.Default.Close, contentDescription = "بستن عکس", tint = TextWhite)
+                    }
+                }
+                Text(
+                    "برای بستن تصویر لمس کنید",
+                    modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 18.dp),
+                    color = TextWhite.copy(alpha = 0.82f),
+                    fontSize = 11.sp,
+                    fontFamily = Vazirmatn
+                )
+            }
         }
     }
 
@@ -5105,7 +5238,12 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, canSeeLikes: Boolean
                                 Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.End))
                             }
                             MsgType.IMAGE -> Column(Modifier.padding(8.dp)) {
-                                AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(msg.text)).crossfade(true).build(), contentDescription = null, modifier = Modifier.size(180.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(Uri.parse(msg.text)).crossfade(true).build(),
+                                    contentDescription = "برای مشاهده بزرگ‌تر لمس کنید",
+                                    modifier = Modifier.size(180.dp).clip(RoundedCornerShape(12.dp)).clickable { enlargedChatImage = msg.text },
+                                    contentScale = ContentScale.Crop
+                                )
                                 Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 4.dp))
                             }
                             MsgType.VOICE -> {
@@ -5755,8 +5893,22 @@ private fun PrivacySwitchRow(
 
 @Composable
 private fun ScheduledDatesScreen(upcomingDates: List<Pair<Person, DateProposal>>, onBack: () -> Unit) {
-    BackHandler(onBack = onBack)
+    var selectedDate by remember { mutableStateOf<Pair<Person, DateProposal>?>(null) }
+    BackHandler {
+        if (selectedDate != null) selectedDate = null else onBack()
+    }
+
     val sortedDates = remember(upcomingDates) { upcomingDates.sortedBy { it.second.scheduledAtMillis } }
+    val selected = selectedDate
+    if (selected != null) {
+        ScheduledDateDetailsScreen(
+            person = selected.first,
+            proposal = selected.second,
+            onBack = { selectedDate = null }
+        )
+        return
+    }
+
     Column(Modifier.fillMaxSize().background(DarkBg)) {
         Row(Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
@@ -5772,14 +5924,14 @@ private fun ScheduledDatesScreen(upcomingDates: List<Pair<Person, DateProposal>>
             LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(sortedDates, key = { "${it.first.id}_${it.second.id}" }) { (datePerson, dateProposal) ->
                     Card(
-                        Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().clickable { selectedDate = datePerson to dateProposal },
                         colors = CardDefaults.cardColors(containerColor = DarkSurface),
                         shape = RoundedCornerShape(18.dp),
                         border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.22f))
                     ) {
                         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(SuccessGreen.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.EventAvailable, null, tint = SuccessGreen, modifier = Modifier.size(22.dp))
+                                Text(datePerson.emoji, fontSize = 23.sp)
                             }
                             Spacer(Modifier.width(11.dp))
                             Column(Modifier.weight(1f)) {
@@ -5787,10 +5939,122 @@ private fun ScheduledDatesScreen(upcomingDates: List<Pair<Person, DateProposal>>
                                 Text(dateProposal.place, color = TextGray, fontSize = 10.sp, fontFamily = Vazirmatn, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(formatDateTimePersian(dateProposal.scheduledAtMillis), color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
                             }
-                            Icon(Icons.Default.PushPin, null, tint = SuccessGreen, modifier = Modifier.size(17.dp))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.PushPin, null, tint = SuccessGreen, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.height(3.dp))
+                                Icon(Icons.Default.ChevronLeft, null, tint = TextMuted, modifier = Modifier.size(17.dp))
+                            }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduledDateDetailsScreen(person: Person, proposal: DateProposal, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(
+            Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Column(Modifier.weight(1f)) {
+                Text("جزئیات دیت", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Text("اطلاعات قرار برنامه‌ریزی‌شده", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            }
+            Icon(Icons.Default.EventNote, null, tint = SuccessGreen, modifier = Modifier.padding(end = 12.dp).size(22.dp))
+        }
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(13.dp)
+        ) {
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF17352F)),
+                shape = RoundedCornerShape(22.dp),
+                border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.48f))
+            ) {
+                Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(66.dp).clip(CircleShape).background(SuccessGreen.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                        Text(person.emoji, fontSize = 33.sp)
+                    }
+                    Spacer(Modifier.height(9.dp))
+                    Text("قرار با ${person.name}", color = TextWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Text("دیت اول تأیید و در گفتگو سنجاق شده است", color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
+                }
+            }
+
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(15.dp)) {
+                    Text("زمان قرار", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = Vazirmatn)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CalendarMonth, null, tint = BrandViolet, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(formatDateTimePersian(proposal.scheduledAtMillis), color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                            Text("تاریخ و ساعت محلی قرار", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        }
+                    }
+                    HorizontalDivider(color = DarkCard)
+                    Text("مکان قرار", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = Vazirmatn)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Place, null, tint = TinderOrange, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(proposal.place.ifBlank { "مکان مشخص نشده" }, color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                            if (proposal.locationLatitude != null && proposal.locationLongitude != null) {
+                                Text("موقعیت دقیق روی نقشه پیوست شده است", color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                Text(
+                                    "${String.format(Locale.US, "%.5f", proposal.locationLatitude)}, ${String.format(Locale.US, "%.5f", proposal.locationLongitude)}",
+                                    color = TextMuted, fontSize = 9.sp
+                                )
+                            } else {
+                                Text("موقعیت مکانی روی نقشه انتخاب نشده است", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                    Text("وضعیت و اطلاعات پیشنهاد", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("تأیید شده", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.PersonOutline, null, tint = TextMuted, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("پیشنهاددهنده: ${if (proposal.proposerIsMe) "شما" else person.name}", color = TextGray, fontSize = 11.sp, fontFamily = Vazirmatn)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Schedule, null, tint = TextMuted, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("ثبت پیشنهاد: ${formatDateTimePersian(proposal.createdAtMillis)}", color = TextGray, fontSize = 10.sp, fontFamily = Vazirmatn)
+                    }
+                    if (proposal.isRevision) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.EditCalendar, null, tint = BrandViolet, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("این قرار حاصل تأیید پیشنهاد اصلاح است", color = BrandViolet, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, TextMuted)
+            ) {
+                Icon(Icons.Default.ArrowBack, null, tint = TextWhite, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("بازگشت به فهرست دیت‌ها", color = TextWhite, fontFamily = Vazirmatn)
             }
         }
     }
