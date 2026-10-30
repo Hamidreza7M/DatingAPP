@@ -7,12 +7,12 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.media.MediaPlayer
 import android.media.MediaRecorder
-import android.graphics.Movie
 import android.os.Bundle
 import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -41,8 +41,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -62,6 +60,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import coil.ImageLoader
+import coil.decode.GifDecoder
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.gson.Gson
@@ -451,6 +451,23 @@ private fun loadChatMessages(context: Context, personId: Int): List<ChatMessage>
     } catch (_: Exception) { emptyList() }
 }
 
+private fun deleteChatMessages(context: Context, personId: Int) {
+    val mediaRoot = File(context.filesDir, "media").canonicalFile
+    loadChatMessages(context, personId).forEach { message ->
+        val mediaFile = when (message.type) {
+            MsgType.VOICE -> File(message.text)
+            MsgType.IMAGE -> runCatching { Uri.parse(message.text).path?.let(::File) }.getOrNull()
+            MsgType.TEXT -> null
+        }
+        runCatching {
+            if (mediaFile != null && mediaFile.exists() && mediaFile.canonicalPath.startsWith(mediaRoot.canonicalPath + File.separator)) {
+                mediaFile.delete()
+            }
+        }
+    }
+    prefs(context).edit().remove("chat_$personId").apply()
+}
+
 private fun clearSession(ctx: Context) {
     prefs(ctx).edit().clear().apply()
 }
@@ -492,6 +509,9 @@ private fun FastLoveApp() {
     val blockedIds = remember {
         mutableStateListOf<Int>().also { it.addAll(loadIntList(context, "blockedIds")) }
     }
+    val unmatchedIds = remember {
+        mutableStateListOf<Int>().also { it.addAll(loadIntList(context, "unmatchedIds")) }
+    }
     val paidDirectChatIds = remember {
         mutableStateListOf<Int>().also { it.addAll(loadIntList(context, "paidIds")) }
     }
@@ -501,7 +521,9 @@ private fun FastLoveApp() {
     var showFilters by remember { mutableStateOf(false) }
     var showSubscription by remember { mutableStateOf(false) }
     var purchaseInitialSection by remember { mutableIntStateOf(0) }
-    var showTutorial by remember { mutableStateOf(isLoggedIn && hasProfile && !prefs(context).getBoolean("tutorialSeen", true)) }
+    var showTutorial by remember { mutableStateOf(isLoggedIn && hasProfile && prefs(context).getInt("tutorialVersion", 0) < 210) }
+    var tutorialStep by remember { mutableIntStateOf(0) }
+    var chatRefreshVersion by remember { mutableIntStateOf(0) }
     var showEditProfile by remember { mutableStateOf(false) }
     var showPayToMessage by remember { mutableStateOf<Person?>(null) }
     var showMatchPopup by remember { mutableStateOf<Person?>(null) }
@@ -549,9 +571,9 @@ private fun FastLoveApp() {
 
     val orientationFiltered = remember(currentUser) { compatiblePeople(currentUser) }
 
-    val filteredPeople = remember(filters, blockedIds, orientationFiltered) {
+    val filteredPeople = remember(filters, blockedIds, unmatchedIds, orientationFiltered) {
         orientationFiltered.filter { p ->
-            p.id !in blockedIds &&
+            p.id !in blockedIds && p.id !in unmatchedIds &&
             p.age in filters.minAge..filters.maxAge &&
             p.distanceKm <= filters.maxDistance &&
             (filters.cities.isEmpty() || p.city in filters.cities) &&
@@ -622,18 +644,20 @@ private fun FastLoveApp() {
                     )
                     !hasProfile -> ProfileSetupScreen(
                         phone = currentUser.phone,
+                        onBack = {
+                            isLoggedIn = false
+                            hasProfile = false
+                            currentUser = UserProfile()
+                            persist()
+                        },
                         onComplete = { profile ->
                             currentUser = profile
                             hasProfile = true
-                            prefs(context).edit().putBoolean("tutorialSeen", false).apply()
+                            prefs(context).edit().putInt("tutorialVersion", 0).apply()
                             showTutorial = true
+                            tutorialStep = 0
+                            tab = 0
                             persist()
-                        }
-                    )
-                    showTutorial -> UsageTutorialScreen(
-                        onFinish = {
-                            prefs(context).edit().putBoolean("tutorialSeen", true).apply()
-                            showTutorial = false
                         }
                     )
                     showSubscription -> SubscriptionScreen(
@@ -695,6 +719,7 @@ private fun FastLoveApp() {
                             likedPeople.clear()
                             matchedPeople.clear()
                             blockedIds.clear()
+                            unmatchedIds.clear()
                             paidDirectChatIds.clear()
                             paidMessageCredits = 0
                         },
@@ -747,16 +772,33 @@ private fun FastLoveApp() {
                         },
                         onReport = { showReport = selectedPerson }
                     )
-                    chatPerson != null -> ChatScreen(person = chatPerson!!, onBack = { chatPerson = null })
+                    chatPerson != null -> ChatScreen(
+                        person = chatPerson!!,
+                        canUnmatch = matchedPeople.any { it.id == chatPerson!!.id },
+                        onBack = { chatPerson = null; chatRefreshVersion++ },
+                        onUnmatch = {
+                            val id = chatPerson!!.id
+                            matchedPeople.removeAll { it.id == id }
+                            likedPeople.removeAll { it.id == id }
+                            paidDirectChatIds.removeAll { it == id }
+                            if (id !in unmatchedIds) unmatchedIds.add(id)
+                            prefs(context).edit().putString("unmatchedIds", gson.toJson(unmatchedIds.toList())).apply()
+                            deleteChatMessages(context, id)
+                            chatPerson = null
+                            chatRefreshVersion++
+                            persist()
+                        }
+                    )
                     showFilters -> FilterScreen(
                         current = filters,
                         onApply = { filters = it; showFilters = false; discoverIndex = 0 },
                         onClose = { showFilters = false }
                     )
                     else -> {
-                        Column(Modifier.fillMaxSize()) {
-                            Box(Modifier.weight(1f)) {
-                                when (tab) {
+                        Box(Modifier.fillMaxSize()) {
+                            Column(Modifier.fillMaxSize()) {
+                                Box(Modifier.weight(1f)) {
+                                    when (tab) {
                                     0 -> DiscoverScreen(
                                         viewer = currentUser,
                                         person = filteredPeople.getOrNull(discoverIndex),
@@ -791,20 +833,30 @@ private fun FastLoveApp() {
                                         }
                                     )
                                     2 -> if (subscriptionPlan == SubscriptionPlan.FREE) {
-                                        val peopleWhoLiked = orientationFiltered.filter { it.likedYou && it.id !in blockedIds }
+                                        val peopleWhoLiked = orientationFiltered.filter { it.likedYou && it.id !in blockedIds && it.id !in unmatchedIds }
                                         FreeLikedMePreviewScreen(people = peopleWhoLiked, onUpgrade = { showSubscription = true })
                                     } else LikedMeScreen(
-                                        people = orientationFiltered.filter { it.likedYou && it.id !in blockedIds },
+                                        people = orientationFiltered.filter { it.likedYou && it.id !in blockedIds && it.id !in unmatchedIds },
                                         matched = matchedPeople,
                                         onLikeBack = { p -> doLike(p) },
                                         onOpen = { selectedPerson = it },
                                         onBlock = { blockedIds.add(it.id); persist() }
                                     )
-                                    3 -> MatchesChatList(
-                                        matches = (matchedPeople.filter { it.id !in blockedIds } +
-                                            samplePeople.filter { it.id in paidDirectChatIds && it !in matchedPeople && it.id !in blockedIds }).distinctBy { it.id },
-                                        onChat = { chatPerson = it }
-                                    )
+                                    3 -> {
+                                        val chatMatches = (matchedPeople.filter { it.id !in blockedIds } +
+                                            samplePeople.filter { it.id in paidDirectChatIds && it !in matchedPeople && it.id !in blockedIds }).distinctBy { it.id }
+                                        val pendingReplies = remember(chatRefreshVersion, chatMatches.map { it.id }) {
+                                            chatMatches.filter { person ->
+                                                val saved = loadChatMessages(context, person.id)
+                                                saved.isEmpty() || saved.lastOrNull()?.isMe == false
+                                            }.map { it.id }.toSet()
+                                        }
+                                        MatchesChatList(
+                                            matches = chatMatches,
+                                            pendingReplyIds = pendingReplies,
+                                            onChat = { chatPerson = it }
+                                        )
+                                    }
                                     4 -> MyProfileScreen(
                                         user = currentUser,
                                         blockedCount = blockedIds.size,
@@ -826,6 +878,7 @@ private fun FastLoveApp() {
                                             likedPeople.clear()
                                             matchedPeople.clear()
                                             blockedIds.clear()
+                                            unmatchedIds.clear()
                                             paidDirectChatIds.clear()
                                             paidMessageCredits = 0
                                             discoverIndex = 0
@@ -833,8 +886,37 @@ private fun FastLoveApp() {
                                         }
                                     )
                                 }
+                                }
+                                BottomNav(
+                                    tab = tab,
+                                    onTab = { selectedTab ->
+                                        tab = selectedTab
+                                        if (showTutorial) {
+                                            val matchingStep = PRODUCT_TOUR_STEPS.indexOfFirst { it.tab == selectedTab }
+                                            if (matchingStep >= 0) tutorialStep = matchingStep
+                                        }
+                                    },
+                                    matchCount = matchedPeople.count { it.id !in blockedIds },
+                                    likedMeCount = orientationFiltered.count { it.likedYou && it.id !in blockedIds && it.id !in unmatchedIds },
+                                    highlightTab = if (showTutorial) tab else null
+                                )
                             }
-                            BottomNav(tab = tab, onTab = { tab = it }, matchCount = matchedPeople.count { it.id !in blockedIds })
+                            if (showTutorial) ProductTourOverlay(
+                                step = tutorialStep,
+                                onNext = {
+                                    if (tutorialStep >= PRODUCT_TOUR_STEPS.lastIndex) {
+                                        prefs(context).edit().putInt("tutorialVersion", 210).apply()
+                                        showTutorial = false
+                                    } else {
+                                        tutorialStep += 1
+                                        tab = PRODUCT_TOUR_STEPS[tutorialStep].tab
+                                    }
+                                },
+                                onSkip = {
+                                    prefs(context).edit().putInt("tutorialVersion", 210).apply()
+                                    showTutorial = false
+                                }
+                            )
                         }
                     }
                 }
@@ -1196,53 +1278,78 @@ private fun UpgradeTeaserScreen(onUpgrade: () -> Unit) {
     }
 }
 
-// ─── First-run product tour ───────────────────────────────────────────────────
+// ─── First-run product tour: coach marks over the real app tabs ────────────────
+private data class ProductTourStep(val tab: Int, val title: String, val body: String, val action: String)
+
+private val PRODUCT_TOUR_STEPS = listOf(
+    ProductTourStep(0, "کشف افراد و فیلترها", "کارت‌ها را بررسی کن؛ برای لایک به راست و برای ردکردن به چپ بکش. با لمس کارت جزئیات را می‌بینی و از آیکن فیلتر بالای صفحه می‌توانی سن، شهر و علایق را تنظیم کنی.", "دیدن لایک‌های من"),
+    ProductTourStep(1, "لایک‌های من", "اینجا افرادی را می‌بینی که تو پسندیده‌ای؛ وضعیت مچ و مسیر شروع گفتگوی مستقیم هم از همین بخش مشخص است.", "دیدن لایک‌های دریافتی"),
+    ProductTourStep(2, "لایک‌های دریافتی", "اینجا افرادی را می‌بینی که تو را پسندیده‌اند. در پلن رایگان، تعداد و پیش‌نمایش ناشناس در دسترس است.", "رفتن به گفتگوها"),
+    ProductTourStep(3, "مچ‌ها و گفتگوها", "وقتی علاقه دوطرفه باشد، مچ می‌شوید. نشان «منتظر پاسخ تو» کمک می‌کند گفتگویی را که نوبت توست پیدا کنی.", "دیدن پروفایل"),
+    ProductTourStep(4, "پروفایل و منوهای حساب", "اطلاعات و عکس‌هایت را ویرایش کن، اشتراک و اعتبار پیام را مدیریت کن و گزینه‌هایی مثل کاربران مسدودشده و درخواست حذف حساب را از همین بخش پیدا کن.", "شروع استفاده")
+)
+
 @Composable
-private fun UsageTutorialScreen(onFinish: () -> Unit) {
-    var step by remember { mutableIntStateOf(0) }
-    val items = listOf(
-        Triple(Icons.Default.Explore, "کشف افراد", "کارت‌ها را ببین؛ برای لایک به سمت راست و برای رد کردن به سمت چپ بکش."),
-        Triple(Icons.Default.Favorite, "لایک‌ها", "افرادی را که لایک کرده‌ای در بخش لایک‌ها دنبال کن و وضعیت مچ‌شدن را ببین."),
-        Triple(Icons.Default.Chat, "مچ و گفتگو", "وقتی علاقه دوطرفه باشد مچ می‌شوید. برای شروع گفتگوی مستقیم هم می‌توانی اعتبار تهیه کنی."),
-        Triple(Icons.Default.Person, "پروفایل و تنظیمات", "اطلاعات و عکس‌هایت را ویرایش کن و از بخش پروفایل، اشتراک و امکانات را مدیریت کن.")
-    )
-    Column(Modifier.fillMaxSize().background(DarkBg).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("راهنمای شروع", color = TextWhite, fontSize = 21.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onFinish) { Text("رد کردن آموزش", color = TextMuted, fontFamily = Vazirmatn) }
-        }
-        Spacer(Modifier.height(26.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            repeat(items.size) { index ->
-                Box(Modifier.weight(1f).height(5.dp).clip(CircleShape).background(if (index <= step) Brush.horizontalGradient(GradientTinder) else Brush.horizontalGradient(listOf(DarkCard, DarkCard))))
+private fun ProductTourOverlay(step: Int, onNext: () -> Unit, onSkip: () -> Unit) {
+    val page = PRODUCT_TOUR_STEPS[step.coerceIn(PRODUCT_TOUR_STEPS.indices)]
+    Box(Modifier.fillMaxSize()) {
+        Canvas(
+            Modifier.fillMaxSize().graphicsLayer {
+                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
             }
-        }
-        Spacer(Modifier.weight(1f))
-        AnimatedContent(targetState = step, label = "tutorial-step") { index ->
-            val page = items[index]
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(150.dp).clip(RoundedCornerShape(42.dp)).background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
-                    Icon(page.first, null, tint = TextWhite, modifier = Modifier.size(72.dp))
-                }
-                Spacer(Modifier.height(30.dp))
-                Text("${index + 1} از ${items.size}", color = TinderOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-                Spacer(Modifier.height(8.dp))
-                Text(page.second, color = TextWhite, fontSize = 23.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(14.dp))
-                Text(page.third, color = TextGray, fontSize = 14.sp, lineHeight = 25.sp, fontFamily = Vazirmatn, textAlign = TextAlign.Center)
-            }
-        }
-        Spacer(Modifier.weight(1f))
-        Button(
-            onClick = { if (step == items.lastIndex) onFinish() else step++ },
-            modifier = Modifier.fillMaxWidth().height(54.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = TinderPink)
         ) {
-            Text(if (step == items.lastIndex) "شروع استفاده از فست‌لاو" else "مرحله بعد", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+            drawRect(Color.Black.copy(alpha = 0.72f))
+            val navHeight = 86.dp.toPx()
+            drawRoundRect(
+                color = Color.Transparent,
+                topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - navHeight),
+                size = androidx.compose.ui.geometry.Size(size.width, navHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(24.dp.toPx(), 24.dp.toPx()),
+                blendMode = androidx.compose.ui.graphics.BlendMode.Clear
+            )
         }
-        TextButton(onClick = onFinish) { Text("بعداً خودم بررسی می‌کنم", color = TextMuted, fontFamily = Vazirmatn) }
+        Card(
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 94.dp),
+            shape = RoundedCornerShape(22.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2439)),
+            border = BorderStroke(1.dp, TinderPink.copy(alpha = 0.35f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+        ) {
+            Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(shape = RoundedCornerShape(20.dp), color = TinderPink.copy(alpha = 0.16f)) {
+                        Text("راهنمای سریع", color = TinderPink, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text("${step + 1} از ${PRODUCT_TOUR_STEPS.size}", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
+                    TextButton(onClick = onSkip, contentPadding = PaddingValues(start = 8.dp, end = 0.dp)) {
+                        Text("رد کردن", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    PRODUCT_TOUR_STEPS.indices.forEach { i ->
+                        Box(Modifier.weight(1f).height(4.dp).clip(CircleShape).background(if (i <= step) Brush.horizontalGradient(GradientTinder) else Brush.horizontalGradient(listOf(DarkCard, DarkCard))))
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(page.title, color = TextWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Spacer(Modifier.height(6.dp))
+                Text(page.body, color = TextGray, fontSize = 12.sp, lineHeight = 22.sp, fontFamily = Vazirmatn)
+                Spacer(Modifier.height(15.dp))
+                Button(
+                    onClick = onNext,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = TinderPink)
+                ) {
+                    Text(if (step == PRODUCT_TOUR_STEPS.lastIndex) "شروع استفاده از اپ" else page.action, color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Default.ArrowBack, null, tint = TextWhite, modifier = Modifier.size(17.dp))
+                }
+                Text("برای آشنایی با هر بخش، تب پایین صفحه را هم ببین.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp))
+            }
+        }
     }
 }
 
@@ -1250,59 +1357,50 @@ private fun UsageTutorialScreen(onFinish: () -> Unit) {
 @Composable
 private fun AnimatedGifAuthBackground() {
     val context = LocalContext.current
-    val movie = remember(context) {
-        runCatching {
-            context.resources.openRawResource(R.raw.login_background).use { Movie.decodeStream(it) }
-        }.getOrNull()
+    val imageLoader = remember(context) {
+        ImageLoader.Builder(context)
+            .components { add(GifDecoder.Factory()) }
+            .build()
     }
-    var frameTime by remember { mutableIntStateOf(0) }
     val motion = rememberInfiniteTransition(label = "authGifMotion")
     val zoom by motion.animateFloat(
         initialValue = 1.02f,
-        targetValue = 1.10f,
-        animationSpec = infiniteRepeatable(tween(14000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        targetValue = 1.075f,
+        animationSpec = infiniteRepeatable(tween(16000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "authBackgroundZoom"
     )
     val driftX by motion.animateFloat(
-        initialValue = -14f,
-        targetValue = 14f,
-        animationSpec = infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Reverse),
+        initialValue = -9f,
+        targetValue = 9f,
+        animationSpec = infiniteRepeatable(tween(21000, easing = LinearEasing), RepeatMode.Reverse),
         label = "authBackgroundDrift"
     )
 
-    LaunchedEffect(movie) {
-        if (movie != null) {
-            val duration = movie.duration().coerceAtLeast(1000)
-            var startNanos = 0L
-            while (true) {
-                withFrameNanos { frameNanos ->
-                    if (startNanos == 0L) startNanos = frameNanos
-                    frameTime = ((frameNanos - startNanos) / 1_000_000L % duration).toInt()
-                }
-            }
-        }
-    }
-
     Box(Modifier.fillMaxSize()) {
-        if (movie != null && movie.width() > 0 && movie.height() > 0) {
-            Canvas(Modifier.fillMaxSize()) {
-                movie.setTime(frameTime)
-                val scale = maxOf(size.width / movie.width().toFloat(), size.height / movie.height().toFloat()) * zoom
-                val drawnWidth = movie.width() * scale
-                val drawnHeight = movie.height() * scale
-                drawIntoCanvas { canvas ->
-                    val native = canvas.nativeCanvas
-                    val saveCount = native.save()
-                    native.translate((size.width - drawnWidth) / 2f + driftX, (size.height - drawnHeight) / 2f)
-                    native.scale(scale, scale)
-                    movie.draw(native, 0f, 0f)
-                    native.restoreToCount(saveCount)
-                }
-            }
-        } else {
-            AnimatedAuthBackground()
-        }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF080D1A).copy(alpha = 0.48f), Color(0xFF0B1020).copy(alpha = 0.72f)))))
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(R.raw.login_background)
+                .crossfade(false)
+                .build(),
+            imageLoader = imageLoader,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                scaleX = zoom
+                scaleY = zoom
+                translationX = driftX
+            },
+            contentScale = ContentScale.Crop
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF080D1A).copy(alpha = 0.36f),
+                        Color(0xFF0B1020).copy(alpha = 0.68f)
+                    )
+                )
+            )
+        )
     }
 }
 
@@ -1440,6 +1538,10 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
     var registerMode by remember { mutableStateOf(true) }
     var secondsLeft by remember { mutableIntStateOf(120) }
     var resendToken by remember { mutableIntStateOf(0) }
+    BackHandler(enabled = step > 0) {
+        step = if (step == 2) 1 else 0
+        error = ""
+    }
     val logoTransition = rememberInfiniteTransition(label = "authLogo")
     val logoScale by logoTransition.animateFloat(
         0.97f, 1.035f,
@@ -1455,7 +1557,7 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
     }
 
     Box(Modifier.fillMaxSize()) {
-        if (step == 0) AnimatedGifAuthBackground() else AnimatedAuthBackground()
+        AnimatedGifAuthBackground()
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1484,6 +1586,18 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                 elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
             ) {
                 Column(Modifier.padding(horizontal = 21.dp, vertical = 23.dp)) {
+                    if (step > 0) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = {
+                                step = if (step == 2) 1 else 0
+                                error = ""
+                            }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) {
+                                Icon(Icons.Default.ArrowForward, null, tint = TextGray, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("بازگشت", color = TextGray, fontSize = 12.sp, fontFamily = Vazirmatn)
+                            }
+                        }
+                    }
                     AuthStepIndicator(step)
                     Spacer(Modifier.height(23.dp))
                     Crossfade(targetState = step, label = "auth-step-content") { activeStep ->
@@ -1536,9 +1650,6 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                                     TinderButton(if (registerMode) "ادامه ثبت‌نام" else "ادامه ورود") {
                                         if (phone.length >= 10) { error = ""; step = 2 } else error = "لطفاً یک شماره موبایل معتبر وارد کن"
                                     }
-                                    TextButton(onClick = { step = 0; error = "" }) {
-                                        Text("بازگشت به انتخاب", color = TextGray, fontFamily = Vazirmatn)
-                                    }
                                 }
                                 else -> {
                                     Text("تأیید شماره موبایل", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite, fontFamily = Vazirmatn)
@@ -1583,9 +1694,6 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                                     TextButton(onClick = { if (secondsLeft <= 0) { otp = ""; secondsLeft = 120; resendToken++ } }) {
                                         Text("درخواست مجدد کد", color = if (secondsLeft <= 0) TinderPink else TextMuted, fontFamily = Vazirmatn)
                                     }
-                                    TextButton(onClick = { step = 1; otp = ""; error = "" }) {
-                                        Text("تغییر شماره موبایل", color = TextGray, fontFamily = Vazirmatn)
-                                    }
                                 }
                             }
                         }
@@ -1601,7 +1709,7 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
 
 // ─── Profile Setup ────────────────────────────────────────────────────────────
 @Composable
-private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit) {
+private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (UserProfile) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
     var name by remember { mutableStateOf("") }
     var birthYearPersian by remember { mutableIntStateOf(1380) }
@@ -1626,6 +1734,15 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
     val age = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
     val context = LocalContext.current
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
+    var showInterestPicker by remember { mutableStateOf(false) }
+    BackHandler {
+        if (step > 0) {
+            step = (step - 1).coerceAtLeast(0)
+            error = ""
+        } else {
+            onBack()
+        }
+    }
 
     fun createImageUri(ctx: Context): Uri {
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -1666,9 +1783,23 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
     }
 
     Column(Modifier.fillMaxSize().background(DarkBg)) {
-        Column(Modifier.padding(horizontal = 24.dp, vertical = 16.dp)) {
-            Text("ساخت پروفایل", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
-            Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = {
+                if (step > 0) { step = (step - 1).coerceAtLeast(0); error = "" }
+                else onBack()
+            }) {
+                Icon(Icons.Default.ArrowForward, if (step > 0) "بازگشت به مرحله قبل" else "بازگشت به ورود", tint = TextWhite)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("ساخت پروفایل", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                Text("مرحله ${step + 1} از ۴", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
+            }
+            Surface(shape = RoundedCornerShape(18.dp), color = TinderPink.copy(alpha = 0.13f)) {
+                Text("${(step + 1) * 25}٪", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = TinderOrange, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 11.sp)
+            }
+        }
+        Column(Modifier.padding(horizontal = 24.dp)) {
+            Spacer(Modifier.height(2.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 repeat(4) { i -> Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (i <= step) TinderPink else DarkCard)) }
             }
@@ -1744,126 +1875,165 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                     if (showYearPicker) YearPickerDialog(selected = birthYearPersian, minYear = currentPersianYear() - 80, maxYear = currentPersianYear() - 18, onSelect = { birthYearPersian = it; showYearPicker = false }, onDismiss = { showYearPicker = false })
                 }
                 1 -> {
+                    Text("چند انتخاب ساده برای پیشنهادهای بهتر", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(14.dp))
                     SectionLabel("گرایش جنسی")
-                    Text("بر اساس جنسیت شما پیشنهاد شده", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(bottom = 8.dp))
+                    Text("فقط برای شخصی‌سازی پیشنهادها؛ قابل ویرایش در پروفایل", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(bottom = 9.dp))
                     val suggestedOrientations = when (gender) {
-                        Gender.MALE -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.GAY to "همجنس‌گرا", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "دیگر")
-                        Gender.FEMALE -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.LESBIAN to "لزبین", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "دیگر")
-                        Gender.OTHER -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.GAY to "همجنس‌گرا", Orientation.LESBIAN to "لزبین", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "دیگر")
+                        Gender.MALE -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.GAY to "همجنس‌گرا", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "سایر")
+                        Gender.FEMALE -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.LESBIAN to "همجنس‌گرا", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "سایر")
+                        Gender.OTHER -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.GAY to "همجنس‌گرا", Orientation.LESBIAN to "لزبین", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "سایر")
                     }
                     LaunchedEffect(gender) { if (suggestedOrientations.none { it.first == orientation }) orientation = suggestedOrientations.first().first }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        suggestedOrientations.forEach { (o, label) ->
-                            val sel = orientation == o
-                            Surface(onClick = { orientation = o }, shape = RoundedCornerShape(12.dp), color = if (sel) TinderPink.copy(alpha = 0.2f) else DarkSurface, border = BorderStroke(1.dp, if (sel) TinderPink else DarkCard), modifier = Modifier.fillMaxWidth()) {
-                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = sel, onClick = { orientation = o }, colors = RadioButtonDefaults.colors(selectedColor = TinderPink))
-                                    Text(label, color = TextWhite, fontFamily = Vazirmatn)
+                        suggestedOrientations.chunked(2).forEach { pair ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                pair.forEach { (option, label) ->
+                                    val selected = orientation == option
+                                    Surface(
+                                        onClick = { orientation = option },
+                                        modifier = Modifier.weight(1f).height(52.dp),
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (selected) TinderPink.copy(alpha = 0.18f) else DarkSurface,
+                                        border = BorderStroke(if (selected) 1.8.dp else 1.dp, if (selected) TinderPink else DarkCard)
+                                    ) {
+                                        Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            RadioButton(selected = selected, onClick = { orientation = option }, modifier = Modifier.size(28.dp), colors = RadioButtonDefaults.colors(selectedColor = TinderPink))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text(label, color = if (selected) TextWhite else TextGray, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontFamily = Vazirmatn)
+                                        }
+                                    }
                                 }
+                                if (pair.size == 1) Spacer(Modifier.weight(1f))
                             }
                         }
                     }
-                    Spacer(Modifier.height(20.dp))
-                    SectionLabel("شهر")
-                    Surface(onClick = { showCityPicker = true }, shape = RoundedCornerShape(14.dp), color = DarkSurface, border = BorderStroke(1.dp, DarkCard), modifier = Modifier.fillMaxWidth()) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocationOn, null, tint = TinderPink); Spacer(Modifier.width(12.dp)); Text(city, Modifier.weight(1f), color = TextWhite, fontFamily = Vazirmatn); Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
+                    Spacer(Modifier.height(18.dp))
+                    SectionLabel("موقعیت و شغل")
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Surface(onClick = { showCityPicker = true }, modifier = Modifier.weight(1f).height(76.dp), shape = RoundedCornerShape(15.dp), color = DarkSurface, border = BorderStroke(1.dp, DarkCard)) {
+                            Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.Center) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.LocationOn, null, tint = TinderPink, modifier = Modifier.size(17.dp))
+                                    Spacer(Modifier.width(5.dp))
+                                    Text("شهر", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.weight(1f))
+                                    Icon(Icons.Default.ExpandMore, null, tint = TextMuted, modifier = Modifier.size(16.dp))
+                                }
+                                Spacer(Modifier.height(5.dp))
+                                Text(city, color = TextWhite, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                        Surface(onClick = { showJobPicker = true }, modifier = Modifier.weight(1f).height(76.dp), shape = RoundedCornerShape(15.dp), color = DarkSurface, border = BorderStroke(1.dp, DarkCard)) {
+                            Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.Center) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Work, null, tint = BrandViolet, modifier = Modifier.size(17.dp))
+                                    Spacer(Modifier.width(5.dp))
+                                    Text("شغل", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.weight(1f))
+                                    Icon(Icons.Default.ExpandMore, null, tint = TextMuted, modifier = Modifier.size(16.dp))
+                                }
+                                Spacer(Modifier.height(5.dp))
+                                Text(if (job.isBlank()) "انتخاب شغل" else job, color = if (job.isBlank()) TextMuted else TextWhite, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                     if (showCityPicker) CityPickerDialog(cities = iranianCities, selected = city, onSelect = { city = it; showCityPicker = false }, onDismiss = { showCityPicker = false })
-                    Spacer(Modifier.height(20.dp))
-                    SectionLabel("شغل")
-                    Surface(onClick = { showJobPicker = true }, shape = RoundedCornerShape(14.dp), color = DarkSurface, border = BorderStroke(1.dp, DarkCard), modifier = Modifier.fillMaxWidth()) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Work, null, tint = TinderPink); Spacer(Modifier.width(12.dp)); Text(if (job.isBlank()) "انتخاب شغل" else job, Modifier.weight(1f), color = if (job.isBlank()) TextMuted else TextWhite, fontFamily = Vazirmatn); Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
-                        }
-                    }
                     if (showJobPicker) CityPickerDialog(cities = availableJobs, selected = job, title = "انتخاب شغل", onSelect = { job = it; showJobPicker = false }, onDismiss = { showJobPicker = false })
-                    Spacer(Modifier.height(20.dp))
-                    SectionLabel("هدف از آشنایی")
+                    Spacer(Modifier.height(18.dp))
+                    SectionLabel("هدفت از آشنایی")
+                    Text("نزدیک‌ترین گزینه به چیزی که دنبالش هستی را انتخاب کن", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(bottom = 9.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RelationGoal.entries.forEach { g ->
-                            val sel = goal == g
-                            Surface(
-                                onClick = { goal = g },
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (sel) TinderPink.copy(alpha = 0.2f) else DarkSurface,
-                                border = BorderStroke(1.dp, if (sel) TinderPink else DarkCard),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(selected = sel, onClick = { goal = g }, colors = RadioButtonDefaults.colors(selectedColor = TinderPink))
-                                    Text(g.title, color = TextWhite, fontFamily = Vazirmatn)
+                        RelationGoal.entries.chunked(2).forEach { pair ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                pair.forEach { goalOption ->
+                                    val selected = goal == goalOption
+                                    Surface(
+                                        onClick = { goal = goalOption },
+                                        modifier = Modifier.weight(1f).height(56.dp),
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (selected) TinderPink.copy(alpha = 0.18f) else DarkSurface,
+                                        border = BorderStroke(if (selected) 1.8.dp else 1.dp, if (selected) TinderPink else DarkCard)
+                                    ) {
+                                        Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            RadioButton(selected = selected, onClick = { goal = goalOption }, modifier = Modifier.size(28.dp), colors = RadioButtonDefaults.colors(selectedColor = TinderPink))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text(goalOption.title, color = if (selected) TextWhite else TextGray, fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontFamily = Vazirmatn)
+                                        }
+                                    }
                                 }
+                                if (pair.size == 1) Spacer(Modifier.weight(1f))
                             }
                         }
                     }
                 }
                 2 -> {
-                    SectionLabel("عکس‌های واقعی (حداکثر ۵)")
-                    Text("حداقل یک عکس • روی عکس بزن تا اصلی شود", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
-                    Spacer(Modifier.height(12.dp))
-                    // Photo carousel: the add action is pinned to the first position.
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth().height(154.dp),
-                        horizontalArrangement = Arrangement.spacedBy(11.dp),
-                        contentPadding = PaddingValues(end = 2.dp)
-                    ) {
-                        if (selectedPhotos.size < 5) {
-                            item(key = "add-photo-first") {
-                                Box(
-                                    Modifier.size(width = 116.dp, height = 146.dp)
-                                        .clip(RoundedCornerShape(18.dp))
-                                        .background(Brush.linearGradient(listOf(Color(0xFF30223E), Color(0xFF1D263B))))
-                                        .border(1.5.dp, TinderPink.copy(alpha = 0.75f), RoundedCornerShape(18.dp))
-                                        .clickable { showPhotoSheet = true },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Box(Modifier.size(43.dp).clip(CircleShape).background(TinderPink.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.AddAPhoto, null, tint = TinderPink, modifier = Modifier.size(23.dp))
-                                        }
-                                        Spacer(Modifier.height(9.dp))
-                                        Text("افزودن عکس", fontSize = 12.sp, color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
-                                        Text("${selectedPhotos.size}/۵", fontSize = 10.sp, color = TextMuted, fontFamily = Vazirmatn)
-                                    }
-                                }
-                            }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            SectionLabel("عکس‌های پروفایل")
+                            Text("تا ۵ عکس؛ همه را یک‌جا ببین و عکس اصلی را انتخاب کن", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
                         }
-                        itemsIndexed(selectedPhotos, key = { _, uri -> uri }) { i, uriStr ->
-                            val isPrimary = i == primaryPhotoIndex
-                            Box(
-                                Modifier.size(width = 116.dp, height = 146.dp)
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .border(if (isPrimary) 2.5.dp else 1.dp, if (isPrimary) TinderPink else Color.White.copy(alpha = 0.10f), RoundedCornerShape(18.dp))
-                                    .clickable { primaryPhotoIndex = i }
-                            ) {
-                                AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(uriStr)).crossfade(true).build(), contentDescription = "عکس شماره ${i + 1}", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                Box(Modifier.align(Alignment.TopStart).padding(7.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.62f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                    Text(persianDigits((i + 1).toString()), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-                                }
-                                IconButton(
-                                    onClick = {
-                                        val updated = selectedPhotos.toMutableList().also { it.removeAt(i) }
-                                        selectedPhotos = updated
-                                        primaryPhotoIndex = when {
-                                            updated.isEmpty() -> 0
-                                            primaryPhotoIndex > i -> primaryPhotoIndex - 1
-                                            primaryPhotoIndex == i -> i.coerceAtMost(updated.lastIndex)
-                                            else -> primaryPhotoIndex
+                        Surface(shape = RoundedCornerShape(20.dp), color = TinderPink.copy(alpha = 0.14f)) {
+                            Text("${selectedPhotos.size} از ۵", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = TinderPink, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    val photoTiles: List<String?> = if (selectedPhotos.size < 5) listOf(null) + selectedPhotos else selectedPhotos.map { it }
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        photoTiles.chunked(3).forEach { rowItems ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                rowItems.forEachIndexed { slotIndex, uriValue ->
+                                    if (uriValue == null) {
+                                        Box(
+                                            Modifier.weight(1f).aspectRatio(0.82f)
+                                                .clip(RoundedCornerShape(15.dp))
+                                                .background(Brush.linearGradient(listOf(Color(0xFF30223E), Color(0xFF1D263B))))
+                                                .border(1.5.dp, TinderPink.copy(alpha = 0.75f), RoundedCornerShape(15.dp))
+                                                .clickable { showPhotoSheet = true },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Icon(Icons.Default.AddAPhoto, null, tint = TinderPink, modifier = Modifier.size(25.dp))
+                                                Spacer(Modifier.height(6.dp))
+                                                Text("افزودن عکس", fontSize = 11.sp, color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+                                                Text("${selectedPhotos.size}/۵", fontSize = 9.sp, color = TextMuted, fontFamily = Vazirmatn)
+                                            }
                                         }
-                                    },
-                                    modifier = Modifier.align(Alignment.TopEnd).padding(5.dp).size(27.dp).background(Color.Black.copy(alpha = 0.62f), CircleShape)
-                                ) { Icon(Icons.Default.Close, null, tint = TextWhite, modifier = Modifier.size(15.dp)) }
-                                if (isPrimary) {
-                                    Surface(shape = RoundedCornerShape(topStart = 10.dp, bottomEnd = 10.dp), color = TinderPink, modifier = Modifier.align(Alignment.BottomStart)) {
-                                        Row(Modifier.padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Default.Check, null, tint = TextWhite, modifier = Modifier.size(12.dp))
-                                            Spacer(Modifier.width(3.dp))
-                                            Text("عکس اصلی", color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                    } else {
+                                        val imageIndex = selectedPhotos.indexOf(uriValue)
+                                        val isPrimary = imageIndex == primaryPhotoIndex
+                                        Box(
+                                            Modifier.weight(1f).aspectRatio(0.82f)
+                                                .clip(RoundedCornerShape(15.dp))
+                                                .border(if (isPrimary) 2.3.dp else 1.dp, if (isPrimary) TinderPink else Color.White.copy(alpha = 0.10f), RoundedCornerShape(15.dp))
+                                                .clickable { primaryPhotoIndex = imageIndex }
+                                        ) {
+                                            AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(uriValue)).crossfade(true).build(), contentDescription = "عکس شماره ${imageIndex + 1}", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                            Box(Modifier.align(Alignment.TopStart).padding(5.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.62f)).padding(horizontal = 7.dp, vertical = 3.dp)) {
+                                                Text(persianDigits((imageIndex + 1).toString()), color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    val updated = selectedPhotos.toMutableList().also { it.removeAt(imageIndex) }
+                                                    selectedPhotos = updated
+                                                    primaryPhotoIndex = when {
+                                                        updated.isEmpty() -> 0
+                                                        primaryPhotoIndex > imageIndex -> primaryPhotoIndex - 1
+                                                        primaryPhotoIndex == imageIndex -> imageIndex.coerceAtMost(updated.lastIndex)
+                                                        else -> primaryPhotoIndex
+                                                    }
+                                                },
+                                                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(25.dp).background(Color.Black.copy(alpha = 0.65f), CircleShape)
+                                            ) { Icon(Icons.Default.Close, null, tint = TextWhite, modifier = Modifier.size(14.dp)) }
+                                            if (isPrimary) {
+                                                Surface(shape = RoundedCornerShape(topStart = 8.dp, bottomEnd = 8.dp), color = TinderPink, modifier = Modifier.align(Alignment.BottomStart)) {
+                                                    Text("اصلی", modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp), color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                                }
+                                            }
                                         }
                                     }
                                 }
+                                repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
                     }
@@ -1872,10 +2042,50 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                         onCamera = { ensurePermissionsAndPick(true) },
                         onDismiss = { showPhotoSheet = false }
                     )
-                    Spacer(Modifier.height(24.dp))
-                    SectionLabel("علایق (حداقل ۳)")
+                    Spacer(Modifier.height(18.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            SectionLabel("علایق")
+                            Text("حداقل ۳ مورد انتخاب کن تا پیشنهادها دقیق‌تر شوند", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        }
+                        Text("${selectedInterests.size} انتخاب", color = if (selectedInterests.size >= 3) SuccessGreen else TinderOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    }
                     Spacer(Modifier.height(8.dp))
-                    InterestFlow(selectedInterests) { interest -> selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(13.dp)) {
+                            Text(
+                                if (selectedInterests.isEmpty()) "علایقت را اضافه کن" else selectedInterests.joinToString("  •  "),
+                                color = if (selectedInterests.isEmpty()) TextMuted else TextWhite,
+                                fontSize = 12.sp,
+                                lineHeight = 20.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                fontFamily = Vazirmatn
+                            )
+                            Spacer(Modifier.height(9.dp))
+                            OutlinedButton(
+                                onClick = { showInterestPicker = true },
+                                modifier = Modifier.fillMaxWidth().height(42.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, TinderPink.copy(alpha = 0.65f)),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 3.dp)
+                            ) {
+                                Icon(Icons.Default.Tune, null, tint = TinderPink, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(7.dp))
+                                Text(if (selectedInterests.isEmpty()) "انتخاب علایق" else "ویرایش علایق", color = TextWhite, fontFamily = Vazirmatn, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    if (showInterestPicker) InterestPickerDialog(
+                        selected = selectedInterests,
+                        onToggle = { interest -> selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest },
+                        onDismiss = { showInterestPicker = false }
+                    )
                 }
                 3 -> {
                     SectionLabel("درباره من")
@@ -1886,16 +2096,22 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                     Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp)) {
                         Column(Modifier.fillMaxWidth().padding(18.dp)) {
                             if (selectedPhotos.isNotEmpty()) {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().height(110.dp)) {
-                                    itemsIndexed(selectedPhotos) { idx, uriStr ->
-                                        val isMain = idx == primaryPhotoIndex
-                                        Box(Modifier.size(110.dp).clip(RoundedCornerShape(12.dp)).border(if (isMain) 2.dp else 0.dp, TinderPink, RoundedCornerShape(12.dp))) {
-                                            AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(uriStr)).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                            if (isMain) Text("اصلی", Modifier.align(Alignment.BottomCenter).background(TinderPink).padding(horizontal = 6.dp, vertical = 2.dp), color = TextWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    selectedPhotos.chunked(3).forEach { photoRow ->
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            photoRow.forEachIndexed { _, uriStr ->
+                                                val idx = selectedPhotos.indexOf(uriStr)
+                                                val isMain = idx == primaryPhotoIndex
+                                                Box(Modifier.weight(1f).aspectRatio(0.9f).clip(RoundedCornerShape(9.dp)).border(if (isMain) 2.dp else 0.dp, TinderPink, RoundedCornerShape(9.dp))) {
+                                                    AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(uriStr)).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                                    if (isMain) Text("اصلی", Modifier.align(Alignment.BottomCenter).background(TinderPink).padding(horizontal = 5.dp, vertical = 2.dp), color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                                }
+                                            }
+                                            repeat(3 - photoRow.size) { Spacer(Modifier.weight(1f)) }
                                         }
                                     }
                                 }
-                                Spacer(Modifier.height(14.dp))
+                                Spacer(Modifier.height(12.dp))
                             }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Box(Modifier.size(56.dp).clip(CircleShape).background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
@@ -2327,6 +2543,73 @@ private fun chipColors(selected: Boolean) = FilterChipDefaults.filterChipColors(
 )
 
 @Composable
+private fun InterestPickerDialog(
+    selected: Set<String>,
+    onToggle: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = availableInterests.filter { it.contains(query.trim(), ignoreCase = true) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text("علایق تو", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Text("حداقل ۳ مورد انتخاب کن", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
+            }
+        },
+        text = {
+            Column(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("جست‌وجوی علاقه…", fontFamily = Vazirmatn, fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = TextMuted) },
+                    shape = RoundedCornerShape(13.dp),
+                    colors = fieldColors()
+                )
+                Spacer(Modifier.height(9.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${selected.size} مورد انتخاب شده", color = if (selected.size >= 3) SuccessGreen else TinderOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Spacer(Modifier.weight(1f))
+                    if (selected.isNotEmpty()) TextButton(onClick = { selected.toList().forEach(onToggle) }) { Text("پاک کردن", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn) }
+                }
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    filtered.chunked(3).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            row.forEach { interest ->
+                                val isSelected = interest in selected
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { onToggle(interest) },
+                                    label = { Text(interest, fontFamily = Vazirmatn, fontSize = 11.sp, maxLines = 1) },
+                                    leadingIcon = if (isSelected) ({ Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp)) }) else null,
+                                    modifier = Modifier.weight(1f),
+                                    colors = chipColors(isSelected),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                            }
+                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                    if (filtered.isEmpty()) Text("علاقه‌ای با این نام پیدا نشد", color = TextMuted, fontFamily = Vazirmatn, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (selected.size >= 3) "ثبت انتخاب‌ها" else "ادامه (${selected.size}/۳)", color = TinderPink, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+            }
+        },
+        containerColor = DarkSurface,
+        titleContentColor = TextWhite,
+        textContentColor = TextGray
+    )
+}
+
+@Composable
 private fun InterestFlow(selected: Set<String>, onToggle: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
@@ -2605,7 +2888,7 @@ private fun DiscoverScreen(
     var offsetY by remember(person?.id) { mutableFloatStateOf(0f) }
     var isAnimating by remember(person?.id) { mutableStateOf(false) }
     val isAnimatingState = rememberUpdatedState(isAnimating)
-    val rotation = (offsetX / 38f).coerceIn(-16f, 16f)
+    val rotation = (offsetX / 52f).coerceIn(-11f, 11f)
     val likeAlpha = (offsetX / 150f).coerceIn(0f, 1f)
     val passAlpha = (-offsetX / 150f).coerceIn(0f, 1f)
 
@@ -2615,9 +2898,12 @@ private fun DiscoverScreen(
         isAnimating = true
         scope.launch {
             // Like exits to the right; pass/dislike exits to the left.
-            val target = if (like) 1500f else -1500f
+            val target = if (like) 1120f else -1120f
             val anim = Animatable(offsetX)
-            anim.animateTo(target, tween(260, easing = FastOutSlowInEasing)) { offsetX = value }
+            anim.animateTo(
+                target,
+                tween(durationMillis = 520, easing = CubicBezierEasing(0.18f, 0.72f, 0.25f, 1f))
+            ) { offsetX = value }
             if (like) onLike(current) else onPass()
             offsetX = 0f
             offsetY = 0f
@@ -2629,8 +2915,8 @@ private fun DiscoverScreen(
         scope.launch {
             val ax = Animatable(offsetX)
             val ay = Animatable(offsetY)
-            launch { ax.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) { offsetX = value } }
-            launch { ay.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) { offsetY = value } }
+            launch { ax.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 230f)) { offsetX = value } }
+            launch { ay.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 230f)) { offsetY = value } }
         }
     }
 
@@ -2665,7 +2951,13 @@ private fun DiscoverScreen(
                 Card(
                     Modifier.fillMaxSize()
                         .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                        .graphicsLayer { rotationZ = rotation }
+                        .graphicsLayer {
+                            rotationZ = rotation
+                            val travel = (abs(offsetX) / 1120f).coerceIn(0f, 1f)
+                            scaleX = 1f - travel * 0.035f
+                            scaleY = 1f - travel * 0.035f
+                            alpha = 1f - travel * 0.10f
+                        }
                         .pointerInput(person.id) {
                             detectDragGestures(
                                 onDragEnd = {
@@ -2834,19 +3126,38 @@ private fun LikedMeScreen(people: List<Person>, matched: List<Person>, onLikeBac
 }
 
 @Composable
-private fun MatchesChatList(matches: List<Person>, onChat: (Person) -> Unit) {
+private fun MatchesChatList(matches: List<Person>, pendingReplyIds: Set<Int>, onChat: (Person) -> Unit) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("مچ‌ها و چت‌ها", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("مچ‌ها و چت‌ها", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                Text("گفتگوهایی که نوبت پاسخ توست مشخص شده‌اند", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            }
+            if (pendingReplyIds.isNotEmpty()) Surface(shape = RoundedCornerShape(20.dp), color = TinderOrange.copy(alpha = 0.14f)) {
+                Text("${pendingReplyIds.size} پاسخ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = TinderOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+            }
+        }
         Spacer(Modifier.height(12.dp))
         if (matches.isEmpty()) EmptyState("هنوز مچی نداری", "با لایک شدید مچ شو", "💬")
         else LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(matches) { p -> PersonRow(person = p, onClick = { onChat(p) }) { Icon(Icons.Default.Chat, null, tint = TinderPink) } }
+            items(matches, key = { it.id }) { p ->
+                val needsReply = p.id in pendingReplyIds
+                PersonRow(person = p, onClick = { onChat(p) }) {
+                    if (needsReply) Surface(shape = RoundedCornerShape(10.dp), color = TinderOrange.copy(alpha = 0.16f)) {
+                        Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(6.dp).background(TinderOrange, CircleShape))
+                            Spacer(Modifier.width(5.dp))
+                            Text("منتظر پاسخ تو", color = TinderOrange, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        }
+                    } else Icon(Icons.Default.Chat, null, tint = TextMuted)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ChatScreen(person: Person, onBack: () -> Unit) {
+private fun ChatScreen(person: Person, canUnmatch: Boolean, onBack: () -> Unit, onUnmatch: () -> Unit) {
     val context = LocalContext.current
     val storedMessages = remember(person.id) { loadChatMessages(context, person.id) }
     val messages = remember(person.id) {
@@ -2854,7 +3165,6 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
             if (storedMessages.isNotEmpty()) addAll(storedMessages)
             else {
                 add(ChatMessage("سلام! خوشحالم که مچ شدیم 😊", false, "۱۰:۳۰"))
-                add(ChatMessage("سلام، منم خوشحالم!", true, "۱۰:۳۲"))
             }
         }
     }
@@ -2866,6 +3176,8 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var playingVoiceKey by remember { mutableStateOf<String?>(null) }
     var voiceError by remember { mutableStateOf("") }
+    var showChatMenu by remember { mutableStateOf(false) }
+    var showUnmatchConfirm by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -2974,8 +3286,38 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
             Box(Modifier.size(40.dp).clip(CircleShape).background(person.tint), contentAlignment = Alignment.Center) { Text(person.emoji, fontSize = 22.sp) }
             Spacer(Modifier.width(10.dp))
-            Column { Text(person.name, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn); Text("گفتگوی شما", color = SuccessGreen, fontSize = 12.sp, fontFamily = Vazirmatn) }
+            Column(Modifier.weight(1f)) {
+                Text(person.name, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                Text("گفتگوی شما", color = SuccessGreen, fontSize = 12.sp, fontFamily = Vazirmatn)
+            }
+            Box {
+                IconButton(onClick = { showChatMenu = true }) { Icon(Icons.Default.MoreVert, "گزینه‌های گفتگو", tint = TextGray) }
+                DropdownMenu(expanded = showChatMenu, onDismissRequest = { showChatMenu = false }) {
+                    if (canUnmatch) DropdownMenuItem(
+                        text = { Text("لغو مچ و حذف گفتگو", color = Color(0xFFFF7777), fontFamily = Vazirmatn, fontSize = 13.sp) },
+                        leadingIcon = { Icon(Icons.Default.DeleteOutline, null, tint = Color(0xFFFF7777)) },
+                        onClick = { showChatMenu = false; showUnmatchConfirm = true }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("بازگشت به گفتگوها", fontFamily = Vazirmatn, fontSize = 13.sp) },
+                        leadingIcon = { Icon(Icons.Default.ArrowBack, null, tint = TextGray) },
+                        onClick = { showChatMenu = false; onBack() }
+                    )
+                }
+            }
         }
+        if (showUnmatchConfirm) AlertDialog(
+            onDismissRequest = { showUnmatchConfirm = false },
+            title = { Text("لغو مچ با ${person.name}؟", fontFamily = Vazirmatn, color = TextWhite) },
+            text = { Text("این ارتباط از فهرست مچ‌ها حذف می‌شود و تمام پیام‌های این گفتگو نیز از این دستگاه پاک خواهد شد. این کار قابل بازگشت نیست.", fontFamily = Vazirmatn, color = TextGray, lineHeight = 22.sp) },
+            confirmButton = {
+                TextButton(onClick = { showUnmatchConfirm = false; onUnmatch() }) {
+                    Text("لغو مچ و حذف پیام‌ها", color = Color(0xFFFF7777), fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                }
+            },
+            dismissButton = { TextButton(onClick = { showUnmatchConfirm = false }) { Text("انصراف", color = TextGray, fontFamily = Vazirmatn) } },
+            containerColor = DarkSurface
+        )
         LazyColumn(Modifier.weight(1f).padding(horizontal = 12.dp), state = listState, verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
             items(messages) { msg ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (msg.isMe) Arrangement.Start else Arrangement.End) {
@@ -3287,7 +3629,7 @@ private fun EmptyState(title: String, subtitle: String, emoji: String) {
 }
 
 @Composable
-private fun BottomNav(tab: Int, onTab: (Int) -> Unit, matchCount: Int) {
+private fun BottomNav(tab: Int, onTab: (Int) -> Unit, matchCount: Int, likedMeCount: Int, highlightTab: Int? = null) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = DarkSurface,
@@ -3295,25 +3637,45 @@ private fun BottomNav(tab: Int, onTab: (Int) -> Unit, matchCount: Int) {
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
         shadowElevation = 14.dp
     ) {
-    NavigationBar(containerColor = Color.Transparent, contentColor = TextWhite, tonalElevation = 0.dp) {
-        val items = listOf(
-            Triple(0, Icons.Default.Explore, "کشف"),
-            Triple(1, Icons.Default.FavoriteBorder, "لایک‌ها"),
-            Triple(2, Icons.Default.Visibility, "لایک‌شده"),
-            Triple(3, Icons.Default.Chat, "چت"),
-            Triple(4, Icons.Default.Person, "من")
-        )
-        items.forEach { (idx, icon, label) ->
-            NavigationBarItem(
-                selected = tab == idx, onClick = { onTab(idx) },
-                icon = {
-                    if (idx == 3 && matchCount > 0) BadgedBox(badge = { Badge { Text("$matchCount") } }) { Icon(icon, label) }
-                    else Icon(icon, label)
-                },
-                label = { Text(label, fontFamily = Vazirmatn, fontSize = 11.sp) },
-                colors = NavigationBarItemDefaults.colors(selectedIconColor = TinderPink, selectedTextColor = TinderPink, indicatorColor = TinderPink.copy(alpha = 0.15f), unselectedIconColor = TextMuted, unselectedTextColor = TextMuted)
+        NavigationBar(containerColor = Color.Transparent, contentColor = TextWhite, tonalElevation = 0.dp) {
+            val items = listOf(
+                Triple(0, Icons.Default.Explore, "کشف"),
+                Triple(1, Icons.Default.FavoriteBorder, "لایک‌ها"),
+                Triple(2, Icons.Default.Visibility, "لایک‌شده"),
+                Triple(3, Icons.Default.Chat, "چت"),
+                Triple(4, Icons.Default.Person, "من")
             )
+            items.forEach { (idx, icon, label) ->
+                NavigationBarItem(
+                    selected = tab == idx,
+                    onClick = { onTab(idx) },
+                    icon = {
+                        val badgeCount = when (idx) {
+                            2 -> likedMeCount
+                            3 -> matchCount
+                            else -> 0
+                        }
+                        Box(
+                            Modifier.then(
+                                if (highlightTab == idx) Modifier.border(2.dp, TinderOrange, CircleShape).padding(4.dp)
+                                else Modifier
+                            )
+                        ) {
+                            if (badgeCount > 0) BadgedBox(badge = { Badge { Text(persianDigits(badgeCount.toString())) } }) {
+                                Icon(icon, label)
+                            } else Icon(icon, label)
+                        }
+                    },
+                    label = { Text(label, fontFamily = Vazirmatn, fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = TinderPink,
+                        selectedTextColor = TinderPink,
+                        indicatorColor = TinderPink.copy(alpha = 0.15f),
+                        unselectedIconColor = TextMuted,
+                        unselectedTextColor = TextMuted
+                    )
+                )
+            }
         }
-    }
     }
 }
