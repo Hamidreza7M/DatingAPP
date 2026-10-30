@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.media.MediaPlayer
+import android.media.MediaRecorder
 import android.os.Bundle
 import android.os.Environment
 import androidx.activity.ComponentActivity
@@ -61,6 +63,7 @@ import coil.request.ImageRequest
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.File
+import java.util.UUID
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -128,7 +131,8 @@ data class UserProfile(
     val interests: List<String> = emptyList(),
     val photos: List<String> = emptyList(),
     val primaryPhotoIndex: Int = 0,
-    val phone: String = ""
+    val phone: String = "",
+    val voiceIntro: String = ""
 ) {
     val age: Int get() = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
 }
@@ -336,7 +340,8 @@ private fun saveSession(
     blockedIds: List<Int>,
     paidIds: List<Int>,
     dailySwipes: Int,
-    swipeDay: String
+    swipeDay: String,
+    messageCredits: Int
 ) {
     prefs(ctx).edit()
         .putBoolean("isLoggedIn", isLoggedIn)
@@ -349,6 +354,7 @@ private fun saveSession(
         .putString("paidIds", gson.toJson(paidIds))
         .putInt("dailySwipes", dailySwipes)
         .putString("swipeDay", swipeDay)
+        .putInt("messageCredits", messageCredits)
         .apply()
 }
 
@@ -356,7 +362,18 @@ private fun loadIsLoggedIn(ctx: Context) = prefs(ctx).getBoolean("isLoggedIn", f
 private fun loadHasProfile(ctx: Context) = prefs(ctx).getBoolean("hasProfile", false)
 private fun loadUser(ctx: Context): UserProfile {
     val json = prefs(ctx).getString("user", null) ?: return UserProfile()
-    return try { gson.fromJson(json, UserProfile::class.java) } catch (_: Exception) { UserProfile() }
+    return try {
+        val loaded = gson.fromJson(json, UserProfile::class.java) ?: UserProfile()
+        val durablePhotos = loaded.photos.orEmpty().mapNotNull { stored ->
+            val uri = runCatching { Uri.parse(stored) }.getOrNull() ?: return@mapNotNull null
+            if (uri.scheme == "content" || uri.scheme == "file") {
+                storeUriInAppFiles(ctx, uri, "profile_photos") ?: stored
+            } else stored
+        }
+        val normalized = loaded.copy(photos = durablePhotos, voiceIntro = loaded.voiceIntro.orEmpty())
+        prefs(ctx).edit().putString("user", gson.toJson(normalized)).apply()
+        normalized
+    } catch (_: Exception) { UserProfile() }
 }
 private fun loadPlan(ctx: Context): SubscriptionPlan {
     val n = prefs(ctx).getString("plan", "FREE") ?: "FREE"
@@ -368,6 +385,67 @@ private fun loadIntList(ctx: Context, key: String): List<Int> {
         gson.fromJson(json, object : TypeToken<List<Int>>() {}.type) ?: emptyList()
     } catch (_: Exception) { emptyList() }
 }
+private fun storeUriInAppFiles(context: Context, source: Uri, bucket: String): String? {
+    return try {
+        if (source.scheme == "file") {
+            val existing = source.path?.let { File(it) }
+            if (existing != null && existing.exists() && existing.canonicalPath.startsWith(context.filesDir.canonicalPath)) {
+                return source.toString()
+            }
+        }
+        val directory = File(context.filesDir, "media/$bucket").apply { mkdirs() }
+        val mime = context.contentResolver.getType(source).orEmpty()
+        val extension = when {
+            mime.contains("png", true) -> ".png"
+            mime.contains("webp", true) -> ".webp"
+            mime.contains("jpeg", true) || mime.contains("jpg", true) -> ".jpg"
+            mime.startsWith("image/") -> ".img"
+            bucket.contains("photo") || bucket.contains("image") -> ".jpg"
+            else -> ".bin"
+        }
+        val destination = File(directory, "${System.currentTimeMillis()}_${UUID.randomUUID()}$extension")
+        val input = context.contentResolver.openInputStream(source) ?: return null
+        input.use { stream -> destination.outputStream().use { output -> stream.copyTo(output) } }
+        Uri.fromFile(destination).toString()
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun createPrivateAudioFile(context: Context, category: String): File {
+    val directory = File(context.filesDir, "media/$category").apply { mkdirs() }
+    return File(directory, "${System.currentTimeMillis()}_${UUID.randomUUID()}.m4a")
+}
+
+@Suppress("DEPRECATION")
+private fun createAudioRecorder(context: Context, output: File): MediaRecorder {
+    val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        MediaRecorder(context)
+    } else {
+        MediaRecorder()
+    }
+    recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+    recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+    recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+    recorder.setAudioEncodingBitRate(96_000)
+    recorder.setAudioSamplingRate(44_100)
+    recorder.setOutputFile(output.absolutePath)
+    recorder.prepare()
+    recorder.start()
+    return recorder
+}
+
+private fun saveChatMessages(context: Context, personId: Int, messages: List<ChatMessage>) {
+    prefs(context).edit().putString("chat_$personId", gson.toJson(messages)).apply()
+}
+
+private fun loadChatMessages(context: Context, personId: Int): List<ChatMessage> {
+    val json = prefs(context).getString("chat_$personId", null) ?: return emptyList()
+    return try {
+        gson.fromJson(json, object : TypeToken<List<ChatMessage>>() {}.type) ?: emptyList()
+    } catch (_: Exception) { emptyList() }
+}
+
 private fun clearSession(ctx: Context) {
     prefs(ctx).edit().clear().apply()
 }
@@ -388,6 +466,7 @@ private fun FastLoveApp() {
     var hasProfile by remember { mutableStateOf(loadHasProfile(context)) }
     var currentUser by remember { mutableStateOf(loadUser(context)) }
     var subscriptionPlan by remember { mutableStateOf(loadPlan(context)) }
+    var paidMessageCredits by remember { mutableIntStateOf(prefs(context).getInt("messageCredits", 0)) }
 
     var tab by remember { mutableIntStateOf(0) }
     var discoverIndex by remember { mutableIntStateOf(0) }
@@ -435,7 +514,7 @@ private fun FastLoveApp() {
             context, isLoggedIn, hasProfile, currentUser, subscriptionPlan,
             likedPeople.map { it.id }, matchedPeople.map { it.id },
             blockedIds.toList(), paidDirectChatIds.toList(),
-            dailySwipes, swipeDay
+            dailySwipes, swipeDay, paidMessageCredits
         )
     }
 
@@ -544,10 +623,15 @@ private fun FastLoveApp() {
                     )
                     showSubscription -> SubscriptionScreen(
                         currentPlan = subscriptionPlan,
+                        messageCredits = paidMessageCredits,
                         onBack = { showSubscription = false },
                         onChoosePlan = { plan ->
                             subscriptionPlan = plan
                             showSubscription = false
+                            persist()
+                        },
+                        onBuyMessages = { count ->
+                            paidMessageCredits += count
                             persist()
                         }
                     )
@@ -562,12 +646,19 @@ private fun FastLoveApp() {
                     )
                     showPayToMessage != null -> PayToMessageDialog(
                         person = showPayToMessage!!,
+                        availableCredits = paidMessageCredits,
                         onConfirm = {
                             val p = showPayToMessage!!
-                            if (p.id !in paidDirectChatIds) paidDirectChatIds.add(p.id)
-                            chatPerson = p
-                            showPayToMessage = null
-                            persist()
+                            if (paidMessageCredits > 0) {
+                                paidMessageCredits -= 1
+                                if (p.id !in paidDirectChatIds) paidDirectChatIds.add(p.id)
+                                chatPerson = p
+                                showPayToMessage = null
+                                persist()
+                            } else {
+                                showPayToMessage = null
+                                showSubscription = true
+                            }
                         },
                         onDismiss = { showPayToMessage = null }
                     )
@@ -587,6 +678,7 @@ private fun FastLoveApp() {
                             matchedPeople.clear()
                             blockedIds.clear()
                             paidDirectChatIds.clear()
+                            paidMessageCredits = 0
                         },
                         onDismiss = { showDeleteRequest = false }
                     )
@@ -648,6 +740,7 @@ private fun FastLoveApp() {
                             Box(Modifier.weight(1f)) {
                                 when (tab) {
                                     0 -> DiscoverScreen(
+                                        viewer = currentUser,
                                         person = filteredPeople.getOrNull(discoverIndex),
                                         onOpen = { selectedPerson = it },
                                         onLike = { p ->
@@ -715,6 +808,7 @@ private fun FastLoveApp() {
                                             matchedPeople.clear()
                                             blockedIds.clear()
                                             paidDirectChatIds.clear()
+                                            paidMessageCredits = 0
                                             discoverIndex = 0
                                             tab = 0
                                         }
@@ -901,16 +995,76 @@ private fun ReportDialog(person: Person, onSubmit: (ReportReason, String) -> Uni
 
 // ─── Subscription / Upgrade ───────────────────────────────────────────────────
 @Composable
-private fun SubscriptionScreen(currentPlan: SubscriptionPlan, onBack: () -> Unit, onChoosePlan: (SubscriptionPlan) -> Unit) {
+private fun SubscriptionScreen(
+    currentPlan: SubscriptionPlan,
+    messageCredits: Int,
+    onBack: () -> Unit,
+    onChoosePlan: (SubscriptionPlan) -> Unit,
+    onBuyMessages: (Int) -> Unit
+) {
     var periodWeekly by remember { mutableStateOf(true) }
+    val messagePackages = listOf(
+        Triple(1, 1_000_000, 0),
+        Triple(5, 4_500_000, 10),
+        Triple(10, 8_000_000, 20),
+        Triple(20, 14_000_000, 30)
+    )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(DarkBg).padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
-            Text("اشتراک", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+            Text("اشتراک و پیام مستقیم", fontSize = 21.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
         }
-        Spacer(Modifier.height(12.dp))
-        Text("خرید صرفاً نمایشی است.", color = TextMuted, fontSize = 13.sp, fontFamily = Vazirmatn)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
+        Text("خریدها در نسخه دمو شبیه‌سازی می‌شوند و پرداخت واقعی انجام نمی‌شود.", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
+        Spacer(Modifier.height(14.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)) {
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(42.dp).clip(CircleShape).background(TinderPink.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.MarkChatUnread, null, tint = TinderPink)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("اعتبار پیام مستقیم", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Text("هر اعتبار برای شروع گفتگو با یک نفر", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
+                }
+                Text("$messageCredits", color = TinderOrange, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Vazirmatn)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Text("بسته‌های پیام مستقیم", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 17.sp, fontFamily = Vazirmatn)
+        Text("قیمت پایه هر اعتبار ۱٬۰۰۰٬۰۰۰ تومان است؛ بسته‌های بزرگ‌تر تخفیف دارند.", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
+        Spacer(Modifier.height(8.dp))
+        messagePackages.forEach { (count, price, discount) ->
+            Card(
+                onClick = { onBuyMessages(count) },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                border = BorderStroke(if (count == 10) 1.5.dp else 1.dp, if (count == 10) BrandViolet else Color.White.copy(alpha = 0.08f))
+            ) {
+                Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Text("$count اعتبار", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                            if (discount > 0) Surface(color = SuccessGreen.copy(alpha = 0.14f), shape = RoundedCornerShape(20.dp)) {
+                                Text("$discount٪ تخفیف", color = SuccessGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontFamily = Vazirmatn)
+                            }
+                            if (count == 10) Surface(color = BrandViolet.copy(alpha = 0.15f), shape = RoundedCornerShape(20.dp)) {
+                                Text("پیشنهاد ویژه", color = BrandViolet, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontFamily = Vazirmatn)
+                            }
+                        }
+                        Text("هر اعتبار: ${formatToman(price / count)}", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(formatToman(price), color = TinderOrange, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        Text("افزودن اعتبار", color = TinderPink, fontSize = 10.sp, fontFamily = Vazirmatn)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        Text("اشتراک", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 18.sp, fontFamily = Vazirmatn)
+        Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth().background(DarkSurface, RoundedCornerShape(14.dp)).padding(4.dp)) {
             listOf(true to "هفتگی", false to "ماهانه").forEach { (weekly, label) ->
                 val sel = periodWeekly == weekly
@@ -919,19 +1073,19 @@ private fun SubscriptionScreen(currentPlan: SubscriptionPlan, onBack: () -> Unit
                 }
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
         listOf(SubscriptionPlan.PRO to (if (periodWeekly) 99000 else 299000), SubscriptionPlan.VIP to (if (periodWeekly) 149000 else 449000)).forEach { (plan, price) ->
             val isCurrent = currentPlan == plan
-            Card(onClick = { onChoosePlan(plan) }, Modifier.fillMaxWidth().padding(vertical = 6.dp), shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isCurrent) TinderPink.copy(alpha = 0.25f) else DarkSurface),
+            Card(onClick = { onChoosePlan(plan) }, Modifier.fillMaxWidth().padding(vertical = 5.dp), shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = if (isCurrent) TinderPink.copy(alpha = 0.2f) else DarkSurface),
                 border = if (isCurrent) BorderStroke(2.dp, TinderPink) else null) {
-                Column(Modifier.padding(18.dp)) {
+                Column(Modifier.padding(16.dp)) {
                     Row {
-                        Text(plan.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                        Text(plan.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
                         Spacer(Modifier.weight(1f))
                         Text(formatToman(price), color = TinderOrange, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
                     }
-                    Text(if (plan == SubscriptionPlan.PRO) "۵۰ سوایپ روزانه + دیدن لایک‌ها" else "سوایپ نامحدود + همه امکانات", color = TextGray, fontFamily = Vazirmatn, fontSize = 13.sp)
+                    Text(if (plan == SubscriptionPlan.PRO) "۵۰ سوایپ روزانه + دیدن لایک‌ها" else "سوایپ نامحدود + همه امکانات", color = TextGray, fontFamily = Vazirmatn, fontSize = 12.sp)
                 }
             }
         }
@@ -1264,6 +1418,7 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
     var job by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("تهران") }
     var about by remember { mutableStateOf("") }
+    var voiceIntro by remember { mutableStateOf("") }
     var selectedInterests by remember { mutableStateOf(setOf<String>()) }
     var selectedPhotos by remember { mutableStateOf(listOf<String>()) }
     var primaryPhotoIndex by remember { mutableIntStateOf(0) }
@@ -1285,28 +1440,33 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
         return FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
     }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { if (selectedPhotos.size < 5) { selectedPhotos = selectedPhotos + it.toString(); if (selectedPhotos.size == 1) primaryPhotoIndex = 0 } }
+        uri?.let { selected ->
+            val localPhoto = storeUriInAppFiles(context, selected, "profile_photos")
+            if (localPhoto != null && selectedPhotos.size < 5) {
+                selectedPhotos = selectedPhotos + localPhoto
+                if (selectedPhotos.size == 1) primaryPhotoIndex = 0
+            }
+        }
         showPhotoSheet = false
     }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-        if (success) cameraUri?.let { uri -> if (selectedPhotos.size < 5) { selectedPhotos = selectedPhotos + uri.toString(); if (selectedPhotos.size == 1) primaryPhotoIndex = 0 } }
+        if (success) cameraUri?.let { uri ->
+            val localPhoto = storeUriInAppFiles(context, uri, "profile_photos")
+            if (localPhoto != null && selectedPhotos.size < 5) {
+                selectedPhotos = selectedPhotos + localPhoto
+                if (selectedPhotos.size == 1) primaryPhotoIndex = 0
+            }
+        }
         showPhotoSheet = false
     }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
         // after grant user can retry
     }
     fun ensurePermissionsAndPick(fromCamera: Boolean) {
-        val perms = mutableListOf<String>()
-        if (fromCamera) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) perms.add(Manifest.permission.CAMERA)
-        } else {
-            if (android.os.Build.VERSION.SDK_INT >= 33) {
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) perms.add(Manifest.permission.READ_MEDIA_IMAGES)
-            } else {
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) perms.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
+        if (fromCamera && ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+            return
         }
-        if (perms.isNotEmpty()) { permissionLauncher.launch(perms.toTypedArray()); return }
         if (fromCamera) { val uri = createImageUri(context); cameraUri = uri; cameraLauncher.launch(uri) }
         else galleryLauncher.launch("image/*")
     }
@@ -1475,6 +1635,8 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                 3 -> {
                     SectionLabel("درباره من")
                     OutlinedTextField(value = about, onValueChange = { about = it }, modifier = Modifier.fillMaxWidth().height(140.dp), placeholder = { Text("اهل کافه و کتابم...", fontFamily = Vazirmatn) }, shape = RoundedCornerShape(14.dp), colors = fieldColors())
+                    Spacer(Modifier.height(16.dp))
+                    VoiceIntroEditor(path = voiceIntro, onPathChange = { voiceIntro = it })
                     Spacer(Modifier.height(20.dp))
                     Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp)) {
                         Column(Modifier.fillMaxWidth().padding(18.dp)) {
@@ -1520,7 +1682,7 @@ private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit)
                         selectedInterests.size < 3 -> error = "حداقل ۳ علاقه انتخاب کنید"
                         else -> { error = ""; step = 3 }
                     }
-                    3 -> onComplete(UserProfile(name = name.trim(), birthYearPersian = birthYearPersian, birthMonth = birthMonth, gender = gender, orientation = orientation, goal = goal, job = job, city = city, about = about.trim().ifBlank { "هنوز چیزی ننوشتم 😊" }, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), phone = phone))
+                    3 -> onComplete(UserProfile(name = name.trim(), birthYearPersian = birthYearPersian, birthMonth = birthMonth, gender = gender, orientation = orientation, goal = goal, job = job, city = city, about = about.trim().ifBlank { "هنوز چیزی ننوشتم 😊" }, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), phone = phone, voiceIntro = voiceIntro))
                 }
             }, modifier = Modifier.weight(if (step > 0) 1.5f else 1f).height(52.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
                 Text(if (step == 3) "شروع کن 🚀" else "بعدی", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
@@ -1587,6 +1749,7 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
     var job by remember { mutableStateOf(user.job) }
     var city by remember { mutableStateOf(user.city) }
     var about by remember { mutableStateOf(user.about) }
+    var voiceIntro by remember { mutableStateOf(user.voiceIntro.orEmpty()) }
     var orientation by remember { mutableStateOf(user.orientation) }
     var selectedInterests by remember { mutableStateOf(user.interests.toSet()) }
     var selectedPhotos by remember { mutableStateOf(user.photos) }
@@ -1602,18 +1765,22 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
         val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
         return FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
     }
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? -> uri?.let { if (selectedPhotos.size < 5) selectedPhotos = selectedPhotos + it.toString() }; showPhotoSheet = false }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success -> if (success) cameraUri?.let { if (selectedPhotos.size < 5) selectedPhotos = selectedPhotos + it.toString() }; showPhotoSheet = false }
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { selected -> storeUriInAppFiles(context, selected, "profile_photos")?.let { local -> if (selectedPhotos.size < 5) selectedPhotos = selectedPhotos + local } }
+        showPhotoSheet = false
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) cameraUri?.let { captured -> storeUriInAppFiles(context, captured, "profile_photos")?.let { local -> if (selectedPhotos.size < 5) selectedPhotos = selectedPhotos + local } }
+        showPhotoSheet = false
+    }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     fun ensurePermissionsAndPick(fromCamera: Boolean) {
-        val perms = mutableListOf<String>()
-        if (fromCamera) { if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) perms.add(Manifest.permission.CAMERA) }
-        else {
-            if (android.os.Build.VERSION.SDK_INT >= 33) { if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) perms.add(Manifest.permission.READ_MEDIA_IMAGES) }
-            else { if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) perms.add(Manifest.permission.READ_EXTERNAL_STORAGE) }
+        if (fromCamera && ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+            return
         }
-        if (perms.isNotEmpty()) { permissionLauncher.launch(perms.toTypedArray()); return }
-        if (fromCamera) { val uri = createImageUri(context); cameraUri = uri; cameraLauncher.launch(uri) } else galleryLauncher.launch("image/*")
+        if (fromCamera) { val uri = createImageUri(context); cameraUri = uri; cameraLauncher.launch(uri) }
+        else galleryLauncher.launch("image/*")
     }
     val suggestedOrientations = when (user.gender) {
         Gender.MALE -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.GAY to "همجنس‌گرا", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "دیگر")
@@ -1675,13 +1842,15 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
             Spacer(Modifier.height(12.dp))
             SectionLabel("درباره من")
             OutlinedTextField(value = about, onValueChange = { about = it }, modifier = Modifier.fillMaxWidth().height(120.dp), shape = RoundedCornerShape(14.dp), colors = fieldColors())
+            Spacer(Modifier.height(14.dp))
+            VoiceIntroEditor(path = voiceIntro, onPathChange = { voiceIntro = it })
             Spacer(Modifier.height(12.dp))
             SectionLabel("علایق")
             InterestFlow(selectedInterests) { interest -> selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest }
             Spacer(Modifier.height(24.dp))
         }
         Button(onClick = {
-            onSave(user.copy(name = name.trim(), job = job, city = city, about = about.trim(), orientation = orientation, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0))))
+            onSave(user.copy(name = name.trim(), job = job, city = city, about = about.trim(), orientation = orientation, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), voiceIntro = voiceIntro))
         }, modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
             Text("ذخیره تغییرات", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
         }
@@ -1689,15 +1858,156 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
 }
 
 @Composable
-private fun PayToMessageDialog(person: Person, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("پیام مستقیم", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) }, text = {
-        Column {
-            Text("هنوز با ${person.name} مچ نشده‌اید.", fontFamily = Vazirmatn, color = TextGray)
-            Spacer(Modifier.height(8.dp))
-            Text("با پرداخت ۱٬۰۰۰٬۰۰۰ تومان می‌توانید بدون مچ پیام بفرستید.", fontFamily = Vazirmatn, color = TextWhite)
-            Text("پرداخت در نسخه دمو نمایشی است.", fontSize = 12.sp, color = TextMuted, fontFamily = Vazirmatn)
+private fun VoiceIntroEditor(path: String, onPathChange: (String) -> Unit) {
+    val context = LocalContext.current
+    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var recordingFile by remember { mutableStateOf<File?>(null) }
+    var isRecording by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+
+    fun startRecording() {
+        try {
+            val file = createPrivateAudioFile(context, "profile_voice")
+            val active = createAudioRecorder(context, file)
+            recorder = active
+            recordingFile = file
+            isRecording = true
+            message = "در حال ضبط معرفی صوتی..."
+        } catch (_: Exception) {
+            recorder?.release()
+            recorder = null
+            recordingFile?.delete()
+            recordingFile = null
+            isRecording = false
+            message = "ضبط صدا شروع نشد؛ مجوز میکروفون را بررسی کن."
         }
-    }, confirmButton = { Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) { Text("پرداخت ۱ میلیون تومان", fontFamily = Vazirmatn) } }, dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", fontFamily = Vazirmatn) } }, containerColor = DarkSurface)
+    }
+
+    fun stopRecording() {
+        val active = recorder
+        val file = recordingFile
+        try {
+            active?.stop()
+            if (file != null && file.exists() && file.length() > 500) {
+                onPathChange(file.absolutePath)
+                message = "معرفی صوتی ذخیره شد."
+            } else {
+                file?.delete()
+                message = "صدای ضبط‌شده خیلی کوتاه بود؛ دوباره تلاش کن."
+            }
+        } catch (_: Exception) {
+            file?.delete()
+            message = "ذخیره صدا ناموفق بود؛ دوباره ضبط کن."
+        } finally {
+            active?.release()
+            recorder = null
+            recordingFile = null
+            isRecording = false
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startRecording() else message = "برای ضبط معرفی صوتی، دسترسی میکروفون لازم است."
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            recorder?.let { active ->
+                runCatching { active.stop() }
+                active.release()
+                recordingFile?.takeIf { it.exists() && it.length() > 500 }?.let { onPathChange(it.absolutePath) }
+            }
+        }
+    }
+
+    Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(38.dp).clip(CircleShape).background(BrandViolet.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.RecordVoiceOver, null, tint = BrandViolet)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("معرفی صوتی من", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Text("اختیاری · یک معرفی کوتاه صوتی ضبط کن", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    if (isRecording) stopRecording()
+                    else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startRecording()
+                    else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }, colors = ButtonDefaults.buttonColors(containerColor = if (isRecording) TinderOrange else TinderPink), shape = RoundedCornerShape(12.dp)) {
+                    Icon(if (isRecording) Icons.Default.Stop else Icons.Default.Mic, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (isRecording) "پایان ضبط" else if (path.isBlank()) "ضبط صدا" else "ضبط دوباره", fontFamily = Vazirmatn, fontSize = 12.sp)
+                }
+                if (path.isNotBlank() && File(path).exists()) {
+                    VoiceIntroPlayer(path)
+                    TextButton(onClick = { runCatching { File(path).delete() }; onPathChange(""); message = "معرفی صوتی حذف شد." }) {
+                        Icon(Icons.Default.DeleteOutline, null, tint = TinderOrange, modifier = Modifier.size(17.dp))
+                    }
+                }
+            }
+            if (message.isNotBlank()) Text(message, color = if (message.contains("ذخیره")) SuccessGreen else TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 6.dp))
+        }
+    }
+}
+
+@Composable
+private fun VoiceIntroPlayer(path: String) {
+    var isPlaying by remember(path) { mutableStateOf(false) }
+    var player by remember(path) { mutableStateOf<MediaPlayer?>(null) }
+    DisposableEffect(path) { onDispose { player?.release() } }
+    IconButton(onClick = {
+        try {
+            if (isPlaying) {
+                player?.pause()
+                isPlaying = false
+            } else {
+                player?.release()
+                val media = MediaPlayer()
+                media.setDataSource(path)
+                media.setOnCompletionListener {
+                    isPlaying = false
+                    player?.release()
+                    player = null
+                }
+                media.prepare()
+                media.start()
+                player = media
+                isPlaying = true
+            }
+        } catch (_: Exception) {
+            isPlaying = false
+            player?.release()
+            player = null
+        }
+    }) {
+        Icon(if (isPlaying) Icons.Default.PauseCircle else Icons.Default.PlayCircle, if (isPlaying) "توقف" else "پخش", tint = SuccessGreen, modifier = Modifier.size(30.dp))
+    }
+}
+
+@Composable
+private fun PayToMessageDialog(person: Person, availableCredits: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss,
+        title = { Text("پیام مستقیم", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text("هنوز با ${person.name} مچ نشده‌اید.", fontFamily = Vazirmatn, color = TextGray)
+                Spacer(Modifier.height(8.dp))
+                Text("برای شروع گفتگو از یک اعتبار پیام مستقیم استفاده می‌شود.", fontFamily = Vazirmatn, color = TextWhite)
+                Text("اعتبار فعلی: ${persianDigits(availableCredits.toString())}", fontSize = 13.sp, color = TinderOrange, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                if (availableCredits == 0) Text("برای ادامه، از بخش اشتراک یک بسته پیام بخرید.", fontSize = 12.sp, color = TextMuted, fontFamily = Vazirmatn)
+                Text("پرداخت در نسخه دمو نمایشی است.", fontSize = 11.sp, color = TextMuted, fontFamily = Vazirmatn)
+            }
+        },
+        confirmButton = { Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
+            Text(if (availableCredits > 0) "استفاده از یک اعتبار" else "مشاهده بسته‌ها", fontFamily = Vazirmatn)
+        } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", fontFamily = Vazirmatn) } },
+        containerColor = DarkSurface)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1819,68 +2129,124 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
     var selectedJobs by remember { mutableStateOf(current.jobs) }
     var selectedInterests by remember { mutableStateOf(current.interests) }
     var selectedGoals by remember { mutableStateOf(current.goals) }
-    Column(Modifier.fillMaxSize().background(DarkBg).verticalScroll(rememberScrollState()).padding(20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val selectedCount = selectedCities.size + selectedJobs.size + selectedInterests.size + selectedGoals.size +
+        (if (minAge != 18 || maxAge != 45) 1 else 0) + (if (maxDistance != 50) 1 else 0)
+
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = TextWhite) }
-            Text("فیلترها", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+            Column(Modifier.weight(1f)) {
+                Text("تنظیمات کشف", fontSize = 21.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                Text(if (selectedCount == 0) "بدون فیلتر اضافه" else "$selectedCount انتخاب فعال", fontSize = 11.sp, color = TextMuted, fontFamily = Vazirmatn)
+            }
+            TextButton(onClick = {
+                minAge = 18; maxAge = 45; maxDistance = 50
+                selectedCities = emptySet(); selectedJobs = emptySet(); selectedInterests = emptySet(); selectedGoals = emptySet()
+            }) { Text("پاک‌سازی", color = TinderOrange, fontFamily = Vazirmatn) }
         }
-        Spacer(Modifier.height(16.dp))
-        Text("سن: $minAge – $maxAge", color = TextWhite, fontFamily = Vazirmatn)
-        RangeSlider(
-            value = minAge.toFloat()..maxAge.toFloat(),
-            onValueChange = { minAge = it.start.roundToInt(); maxAge = it.endInclusive.roundToInt() },
-            valueRange = 18f..60f,
-            colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink)
-        )
-        Spacer(Modifier.height(12.dp))
-        Text("حداکثر فاصله: $maxDistance کیلومتر", color = TextWhite, fontFamily = Vazirmatn)
-        Slider(
-            value = maxDistance.toFloat(),
-            onValueChange = { maxDistance = it.roundToInt() },
-            valueRange = 1f..100f,
-            colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink)
-        )
-        Spacer(Modifier.height(16.dp))
-        SectionLabel("شهرهای مورد نظر (چندتایی)")
-        ChipGrid(iranianCities.take(18), selectedCities) { city ->
-            selectedCities = if (city in selectedCities) selectedCities - city else selectedCities + city
-        }
-        Spacer(Modifier.height(12.dp))
-        SectionLabel("شغل")
-        ChipGrid(availableJobs, selectedJobs) { job ->
-            selectedJobs = if (job in selectedJobs) selectedJobs - job else selectedJobs + job
-        }
-        Spacer(Modifier.height(12.dp))
-        SectionLabel("علایق")
-        ChipGrid(availableInterests, selectedInterests) { interest ->
-            selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest
-        }
-        Spacer(Modifier.height(12.dp))
-        SectionLabel("هدف از رابطه")
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            RelationGoal.entries.forEach { g ->
-                val sel = g in selectedGoals
-                FilterChip(
-                    selected = sel,
-                    onClick = { selectedGoals = if (sel) selectedGoals - g else selectedGoals + g },
-                    label = { Text(g.title, fontFamily = Vazirmatn, fontSize = 11.sp) },
-                    colors = chipColors(sel),
-                    modifier = Modifier.weight(1f)
-                )
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
+            Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Cake, null, tint = TinderPink)
+                        Spacer(Modifier.width(8.dp))
+                        Text("محدوده سنی", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        Spacer(Modifier.weight(1f))
+                        Text("$minAge تا $maxAge سال", color = TinderOrange, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 12.sp)
+                    }
+                    RangeSlider(
+                        value = minAge.toFloat()..maxAge.toFloat(),
+                        onValueChange = { minAge = it.start.roundToInt(); maxAge = it.endInclusive.roundToInt() },
+                        valueRange = 18f..60f,
+                        colors = SliderDefaults.colors(thumbColor = TinderPink, activeTrackColor = TinderPink)
+                    )
+                    Divider(color = DarkCard)
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.NearMe, null, tint = BrandViolet)
+                        Spacer(Modifier.width(8.dp))
+                        Text("حداکثر فاصله", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        Spacer(Modifier.weight(1f))
+                        Text("$maxDistance کیلومتر", color = TinderOrange, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 12.sp)
+                    }
+                    Slider(value = maxDistance.toFloat(), onValueChange = { maxDistance = it.roundToInt() }, valueRange = 1f..100f,
+                        colors = SliderDefaults.colors(thumbColor = BrandViolet, activeTrackColor = BrandViolet))
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            CompactFilterPicker("شهرهای موردنظر", iranianCities, selectedCities, "شهر را جست‌وجو کن") { city ->
+                selectedCities = if (city in selectedCities) selectedCities - city else selectedCities + city
+            }
+            CompactFilterPicker("علایق", availableInterests, selectedInterests, "مثلاً سفر، موسیقی، کتاب") { interest ->
+                selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest
+            }
+            CompactFilterPicker("شغل", availableJobs, selectedJobs, "شغل را جست‌وجو کن") { job ->
+                selectedJobs = if (job in selectedJobs) selectedJobs - job else selectedJobs + job
+            }
+            Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 18.dp)) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("هدف رابطه", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        RelationGoal.entries.forEach { goal ->
+                            val selected = goal in selectedGoals
+                            FilterChip(selected = selected, onClick = { selectedGoals = if (selected) selectedGoals - goal else selectedGoals + goal },
+                                label = { Text(goal.title, fontFamily = Vazirmatn, fontSize = 11.sp) }, colors = chipColors(selected))
+                        }
+                    }
+                }
             }
         }
-        Spacer(Modifier.height(20.dp))
-        TinderButton("اعمال فیلتر") {
-            onApply(FilterState(minAge, maxAge, selectedJobs, selectedInterests, maxDistance, selectedCities, selectedGoals))
+        Button(onClick = { onApply(FilterState(minAge, maxAge, selectedJobs, selectedInterests, maxDistance, selectedCities, selectedGoals)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp).height(52.dp), shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
+            Text("نمایش افراد مطابق فیلتر", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
         }
-        TextButton(
-            onClick = {
-                minAge = 18; maxAge = 45; maxDistance = 50
-                selectedCities = emptySet(); selectedJobs = emptySet()
-                selectedInterests = emptySet(); selectedGoals = emptySet()
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("پاک کردن فیلترها", color = TextMuted, fontFamily = Vazirmatn) }
+    }
+}
+
+@Composable
+private fun CompactFilterPicker(
+    title: String,
+    options: List<String>,
+    selected: Set<String>,
+    placeholder: String,
+    onToggle: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(selected.isNotEmpty()) }
+    var query by remember { mutableStateOf("") }
+    var showAll by remember { mutableStateOf(false) }
+    val filtered = options.filter { it.contains(query.trim(), ignoreCase = true) }
+    Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+        Column(Modifier.padding(14.dp)) {
+            Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Text(if (selected.isEmpty()) "همه موارد" else selected.take(3).joinToString("، ") + if (selected.size > 3) " و ${selected.size - 3} مورد دیگر" else "",
+                        color = TextMuted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
+                }
+                if (selected.isNotEmpty()) Surface(shape = CircleShape, color = TinderPink.copy(alpha = 0.18f)) {
+                    Text("${selected.size}", color = TinderPink, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp), fontFamily = Vazirmatn)
+                }
+                Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = TextGray)
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(value = query, onValueChange = { query = it; showAll = false }, modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(placeholder, fontSize = 12.sp, fontFamily = Vazirmatn) }, leadingIcon = { Icon(Icons.Default.Search, null, tint = TextMuted) },
+                        singleLine = true, shape = RoundedCornerShape(13.dp), colors = fieldColors())
+                    Spacer(Modifier.height(8.dp))
+                    if (filtered.isEmpty()) Text("موردی پیدا نشد", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    else ChipGrid(if (showAll || query.isNotBlank()) filtered else filtered.take(9), selected, onToggle)
+                    if (query.isBlank() && filtered.size > 9) {
+                        TextButton(onClick = { showAll = !showAll }, modifier = Modifier.align(Alignment.End)) {
+                            Text(if (showAll) "نمایش کمتر" else "نمایش همه ${filtered.size} مورد", color = TinderPink, fontSize = 11.sp, fontFamily = Vazirmatn)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1891,13 +2257,9 @@ private fun ChipGrid(items: List<String>, selected: Set<String>, onToggle: (Stri
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 row.forEach { item ->
                     val sel = item in selected
-                    FilterChip(
-                        selected = sel,
-                        onClick = { onToggle(item) },
-                        label = { Text(item, fontFamily = Vazirmatn, fontSize = 12.sp) },
-                        colors = chipColors(sel),
-                        modifier = Modifier.weight(1f)
-                    )
+                    FilterChip(selected = sel, onClick = { onToggle(item) },
+                        label = { Text(item, fontFamily = Vazirmatn, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        colors = chipColors(sel), modifier = Modifier.weight(1f))
                 }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
@@ -1905,8 +2267,62 @@ private fun ChipGrid(items: List<String>, selected: Set<String>, onToggle: (Stri
     }
 }
 
+private fun compatibilityScore(viewer: UserProfile, person: Person): Float {
+    val sharedInterests = viewer.interests.toSet().intersect(person.interests.toSet()).size
+    val denominator = minOf(3, viewer.interests.size, person.interests.size).coerceAtLeast(1)
+    val interestPoints = if (viewer.interests.isEmpty() || person.interests.isEmpty()) 0f
+        else (sharedInterests.toFloat() / denominator).coerceIn(0f, 1f) * 4f
+
+    val distancePoints = (2f * (1f - person.distanceKm / 80f)).coerceIn(0f, 2f)
+    val ageDifference = abs(viewer.age - person.age)
+    val agePoints = (2f * (1f - ageDifference / 20f)).coerceIn(0f, 2f)
+    val viewerJob = viewer.job.trim()
+    val personJob = person.job.trim()
+    val jobPoints = when {
+        viewerJob.isBlank() || personJob.isBlank() -> 0f
+        viewerJob.equals(personJob, ignoreCase = true) -> 2f
+        else -> {
+            val categories = listOf(
+                listOf("مهندس", "نرم‌افزار", "برنامه‌نویس", "کدنویس", "فناوری"),
+                listOf("طراح", "عکاس", "محتوا", "هنر", "مد"),
+                listOf("پزشک", "پرستار", "روانشناس", "سلامت"),
+                listOf("معلم", "استاد", "دانشجو", "آموزش"),
+                listOf("وکیل", "حقوق", "فروشنده", "فروش", "مدیر")
+            )
+            val sameCategory = categories.any { group -> group.any { viewerJob.contains(it) } && group.any { personJob.contains(it) } }
+            if (sameCategory) 1.2f else 0.4f
+        }
+    }
+    return ((interestPoints + distancePoints + agePoints + jobPoints).coerceIn(0f, 10f) * 10f).roundToInt() / 10f
+}
+
+private fun persianDigits(value: String): String = value.map { c -> if (c in '0'..'9') ('۰'.code + (c - '0')).toChar() else c }.joinToString("")
+
+@Composable
+private fun CompatibilityBadge(score: Float, modifier: Modifier = Modifier) {
+    val scoreColor = when {
+        score >= 8f -> SuccessGreen
+        score >= 6f -> TinderOrange
+        else -> BrandViolet
+    }
+    Surface(modifier = modifier, shape = RoundedCornerShape(15.dp), color = Color(0xD9101525), border = BorderStroke(1.dp, scoreColor.copy(alpha = 0.45f))) {
+        Column(Modifier.padding(horizontal = 11.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.AutoAwesome, null, tint = scoreColor, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("انطباق", color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
+                Spacer(Modifier.width(7.dp))
+                Text("${persianDigits("%.1f".format(Locale.US, score).replace(".", "٫"))}/۱۰", color = scoreColor, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFamily = Vazirmatn)
+            }
+            Spacer(Modifier.height(5.dp))
+            LinearProgressIndicator(progress = (score / 10f).coerceIn(0f, 1f), modifier = Modifier.width(104.dp).height(4.dp).clip(CircleShape), color = scoreColor, trackColor = Color.White.copy(alpha = 0.16f))
+        }
+    }
+}
+
 @Composable
 private fun DiscoverScreen(
+    viewer: UserProfile,
     person: Person?,
     onOpen: (Person) -> Unit,
     onLike: (Person) -> Unit,
@@ -1918,30 +2334,43 @@ private fun DiscoverScreen(
     onBlock: (Person) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-    // Drag directions reversed per request (buttons stay put):
-    // swipe RIGHT (positive) = LIKE, swipe LEFT (negative) = PASS
-    val rotation = (offsetX / 40f).coerceIn(-15f, 15f)
-    val likeAlpha = (offsetX / 200f).coerceIn(0f, 1f)   // right = like
-    val passAlpha = (-offsetX / 200f).coerceIn(0f, 1f)  // left = pass
+    var offsetX by remember(person?.id) { mutableFloatStateOf(0f) }
+    var offsetY by remember(person?.id) { mutableFloatStateOf(0f) }
+    var isAnimating by remember(person?.id) { mutableStateOf(false) }
+    val isAnimatingState = rememberUpdatedState(isAnimating)
+    val rotation = (offsetX / 38f).coerceIn(-16f, 16f)
+    val likeAlpha = (offsetX / 150f).coerceIn(0f, 1f)
+    val passAlpha = (-offsetX / 150f).coerceIn(0f, 1f)
 
-    fun resetCard() { offsetX = 0f; offsetY = 0f }
-    fun animateOut(toLeft: Boolean, onEnd: () -> Unit) {
+    fun animateSwipe(like: Boolean) {
+        val current = person ?: return
+        if (isAnimating) return
+        isAnimating = true
         scope.launch {
-            val target = if (toLeft) -1200f else 1200f
+            val target = if (like) 1500f else -1500f
             val anim = Animatable(offsetX)
-            anim.animateTo(target, tween(280, easing = FastOutSlowInEasing)) { offsetX = value }
-            onEnd(); resetCard()
+            anim.animateTo(target, tween(260, easing = FastOutSlowInEasing)) { offsetX = value }
+            if (like) onLike(current) else onPass()
+            offsetX = 0f
+            offsetY = 0f
+            isAnimating = false
+        }
+    }
+
+    fun returnCard() {
+        scope.launch {
+            val ax = Animatable(offsetX)
+            val ay = Animatable(offsetY)
+            launch { ax.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) { offsetX = value } }
+            launch { ay.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) { offsetY = value } }
         }
     }
 
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(42.dp).clip(RoundedCornerShape(15.dp)).background(Brush.linearGradient(GradientTinder)),
-                contentAlignment = Alignment.Center
-            ) { Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(23.dp)) }
+            Box(Modifier.size(42.dp).clip(RoundedCornerShape(15.dp)).background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(23.dp))
+            }
             Spacer(Modifier.width(10.dp))
             Column {
                 Text("فست لاو", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite, fontFamily = Vazirmatn)
@@ -1973,19 +2402,22 @@ private fun DiscoverScreen(
                             detectDragGestures(
                                 onDragEnd = {
                                     when {
-                                        offsetX > 180f -> animateOut(false) { onLike(person) }  // right = like
-                                        offsetX < -180f -> animateOut(true) { onPass() }        // left = pass
-                                        else -> scope.launch {
-                                            val ax = Animatable(offsetX); val ay = Animatable(offsetY)
-                                            launch { ax.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) { offsetX = value } }
-                                            launch { ay.animateTo(0f, spring(stiffness = Spring.StiffnessMedium)) { offsetY = value } }
-                                        }
+                                        offsetX > 140f -> animateSwipe(true)
+                                        offsetX < -140f -> animateSwipe(false)
+                                        else -> returnCard()
                                     }
                                 },
-                                onDrag = { change, dragAmount -> change.consume(); offsetX += dragAmount.x; offsetY += dragAmount.y * 0.3f }
+                                onDragCancel = { if (!isAnimatingState.value) returnCard() },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    if (!isAnimatingState.value) {
+                                        offsetX += dragAmount.x
+                                        offsetY += dragAmount.y * 0.24f
+                                    }
+                                }
                             )
                         }
-                        .clickable { onOpen(person) },
+                        .clickable(enabled = !isAnimating) { onOpen(person) },
                     shape = RoundedCornerShape(26.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkCard),
                     elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
@@ -2001,7 +2433,8 @@ private fun DiscoverScreen(
                         if (passAlpha > 0.05f) {
                             Text("NOPE", Modifier.align(Alignment.TopEnd).padding(24.dp).rotate(20f).border(3.dp, TinderPink, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp), color = TinderPink.copy(alpha = passAlpha), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                         }
-                        Box(Modifier.fillMaxWidth().fillMaxHeight(0.4f).align(Alignment.BottomCenter).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f)))))
+                        CompatibilityBadge(compatibilityScore(viewer, person), Modifier.align(Alignment.TopCenter).padding(top = 15.dp))
+                        Box(Modifier.fillMaxWidth().fillMaxHeight(0.43f).align(Alignment.BottomCenter).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.92f)))))
                         Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
                             if (person.likedYou && canSeeLikes) {
                                 Surface(shape = RoundedCornerShape(20.dp), color = TinderPink) {
@@ -2009,7 +2442,7 @@ private fun DiscoverScreen(
                                 }
                                 Spacer(Modifier.height(8.dp))
                             }
-                            Text("${person.name}, ${person.age}", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                            Text("${person.name}, ${persianDigits(person.age.toString())}", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
                             Text("${person.job} · ${person.distanceKm} کیلومتر · ${person.city}", color = TextGray, fontSize = 14.sp, fontFamily = Vazirmatn)
                             Spacer(Modifier.height(6.dp))
                             Text(person.about, color = TextWhite.copy(alpha = 0.9f), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
@@ -2017,19 +2450,18 @@ private fun DiscoverScreen(
                     }
                 }
             }
-            // Buttons: in RTL visual order is Like | Block | Pass (left to right)
             Row(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 18.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                FilledIconButton(onClick = { animateOut(false) { onLike(person) } }, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink, contentColor = TextWhite)) {
+                FilledIconButton(onClick = { animateSwipe(true) }, enabled = !isAnimating, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink, contentColor = TextWhite)) {
                     Icon(Icons.Default.Favorite, "لایک", modifier = Modifier.size(30.dp))
                 }
-                FilledIconButton(onClick = { onBlock(person) }, modifier = Modifier.size(48.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = Color(0xFFFF6B6B))) {
+                FilledIconButton(onClick = { if (!isAnimating) onBlock(person) }, enabled = !isAnimating, modifier = Modifier.size(48.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = Color(0xFFFF6B6B))) {
                     Icon(Icons.Default.Block, "بلاک", modifier = Modifier.size(22.dp))
                 }
-                FilledIconButton(onClick = { animateOut(true) { onPass() } }, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = TextGray)) {
-                    Icon(Icons.Default.Close, "رد", modifier = Modifier.size(30.dp))
+                FilledIconButton(onClick = { animateSwipe(false) }, enabled = !isAnimating, modifier = Modifier.size(60.dp), colors = IconButtonDefaults.filledIconButtonColors(containerColor = DarkCard, contentColor = TextGray)) {
+                    Icon(Icons.Default.Close, "دیسلایک", modifier = Modifier.size(30.dp))
                 }
             }
-            Text("راست ← لایک  |  چپ → رد", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp))
+            Text("برای لایک به راست بکش  •  برای دیسلایک به چپ بکش", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp))
         }
     }
 }
@@ -2046,7 +2478,7 @@ private fun LikedByMeScreen(liked: List<Person>, matched: List<Person>, paidIds:
                 val canChat = isMatched || p.id in paidIds
                 PersonRow(person = p, onClick = { onOpen(p) }) {
                     if (canChat) TextButton(onClick = { onChat(p) }) { Text(if (isMatched) "مچ 💕" else "چت", color = TinderPink, fontSize = 12.sp, fontFamily = Vazirmatn) }
-                    else TextButton(onClick = { onChat(p) }) { Text("پیام (۱ میلیون)", color = TinderOrange, fontSize = 11.sp, fontFamily = Vazirmatn) }
+                    else TextButton(onClick = { onChat(p) }) { Text("پیام مستقیم", color = TinderOrange, fontSize = 11.sp, fontFamily = Vazirmatn) }
                 }
             }
         }
@@ -2086,30 +2518,134 @@ private fun MatchesChatList(matches: List<Person>, onChat: (Person) -> Unit) {
 
 @Composable
 private fun ChatScreen(person: Person, onBack: () -> Unit) {
-    val messages = remember {
-        mutableStateListOf(
-            ChatMessage("سلام! خوشحالم که مچ شدیم 😊", false, "۱۰:۳۰"),
-            ChatMessage("سلام، منم خوشحالم!", true, "۱۰:۳۲")
-        )
+    val context = LocalContext.current
+    val storedMessages = remember(person.id) { loadChatMessages(context, person.id) }
+    val messages = remember(person.id) {
+        mutableStateListOf<ChatMessage>().apply {
+            if (storedMessages.isNotEmpty()) addAll(storedMessages)
+            else {
+                add(ChatMessage("سلام! خوشحالم که مچ شدیم 😊", false, "۱۰:۳۰"))
+                add(ChatMessage("سلام، منم خوشحالم!", true, "۱۰:۳۲"))
+            }
+        }
     }
     var input by remember { mutableStateOf("") }
     var isRecording by remember { mutableStateOf(false) }
+    var recordingStartedAt by remember { mutableLongStateOf(0L) }
+    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var recordingFile by remember { mutableStateOf<File?>(null) }
+    var player by remember { mutableStateOf<MediaPlayer?>(null) }
     var playingVoiceKey by remember { mutableStateOf<String?>(null) }
+    var voiceError by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val keyboard = LocalSoftwareKeyboardController.current
-    val context = LocalContext.current
+
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let {
-            messages.add(ChatMessage(it.toString(), true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date()), MsgType.IMAGE))
+        uri?.let { selected ->
+            val local = storeUriInAppFiles(context, selected, "chat_images")
+            if (local != null) {
+                messages.add(ChatMessage(local, true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date()), MsgType.IMAGE))
+                saveChatMessages(context, person.id, messages.toList())
+            }
         }
     }
-    LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex) }
+
+    fun startRecording() {
+        try {
+            val file = createPrivateAudioFile(context, "chat_voice_${person.id}")
+            recorder = createAudioRecorder(context, file)
+            recordingFile = file
+            recordingStartedAt = System.currentTimeMillis()
+            isRecording = true
+            voiceError = "در حال ضبط پیام صوتی..."
+        } catch (_: Exception) {
+            recorder?.release()
+            recorder = null
+            recordingFile?.delete()
+            recordingFile = null
+            isRecording = false
+            voiceError = "ضبط صدا شروع نشد؛ مجوز میکروفون را بررسی کن."
+        }
+    }
+
+    fun stopRecording() {
+        val active = recorder
+        val file = recordingFile
+        try {
+            active?.stop()
+            val duration = System.currentTimeMillis() - recordingStartedAt
+            if (file != null && file.exists() && file.length() > 500 && duration >= 700) {
+                messages.add(ChatMessage(file.absolutePath, true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date()), MsgType.VOICE))
+                saveChatMessages(context, person.id, messages.toList())
+                voiceError = "پیام صوتی ذخیره شد و آماده پخش است."
+            } else {
+                file?.delete()
+                voiceError = "پیام خیلی کوتاه بود؛ برای ضبط دوباره نگه دار."
+            }
+        } catch (_: Exception) {
+            file?.delete()
+            voiceError = "ذخیره پیام صوتی ناموفق بود."
+        } finally {
+            active?.release()
+            recorder = null
+            recordingFile = null
+            isRecording = false
+        }
+    }
+
+    val microphonePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startRecording() else voiceError = "برای ارسال پیام صوتی، دسترسی میکروفون لازم است."
+    }
+
+    fun toggleVoicePlayback(message: ChatMessage) {
+        val key = message.text
+        try {
+            if (playingVoiceKey == key) {
+                player?.pause()
+                playingVoiceKey = null
+            } else {
+                player?.release()
+                val media = MediaPlayer()
+                media.setDataSource(message.text)
+                media.setOnCompletionListener {
+                    playingVoiceKey = null
+                    it.release()
+                    player = null
+                }
+                media.prepare()
+                media.start()
+                player = media
+                playingVoiceKey = key
+                voiceError = ""
+            }
+        } catch (_: Exception) {
+            player?.release()
+            player = null
+            playingVoiceKey = null
+            voiceError = "فایل صوتی در دسترس نیست یا قابل پخش نیست."
+        }
+    }
+
+    LaunchedEffect(person.id, messages.size) {
+        if (messages.isNotEmpty()) {
+            saveChatMessages(context, person.id, messages.toList())
+            listState.animateScrollToItem(messages.lastIndex)
+        }
+    }
+    DisposableEffect(person.id) {
+        onDispose {
+            if (isRecording) stopRecording()
+            else recorder?.let { active -> runCatching { active.stop() }; active.release() }
+            player?.release()
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(DarkBg).imePadding()) {
         Row(Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
             Box(Modifier.size(40.dp).clip(CircleShape).background(person.tint), contentAlignment = Alignment.Center) { Text(person.emoji, fontSize = 22.sp) }
             Spacer(Modifier.width(10.dp))
-            Column { Text(person.name, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn); Text("آنلاین", color = SuccessGreen, fontSize = 12.sp, fontFamily = Vazirmatn) }
+            Column { Text(person.name, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn); Text("گفتگوی شما", color = SuccessGreen, fontSize = 12.sp, fontFamily = Vazirmatn) }
         }
         LazyColumn(Modifier.weight(1f).padding(horizontal = 12.dp), state = listState, verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
             items(messages) { msg ->
@@ -2125,37 +2661,15 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
                                 Text(msg.time, color = TextWhite.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 4.dp))
                             }
                             MsgType.VOICE -> {
-                                val key = msg.time + msg.text
-                                val playing = playingVoiceKey == key
-                                Row(
-                                    Modifier.padding(horizontal = 14.dp, vertical = 12.dp).clickable {
-                                        playingVoiceKey = if (playing) null else key
-                                    },
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        null,
-                                        tint = TextWhite,
-                                        modifier = Modifier.size(28.dp)
-                                    )
+                                val playable = File(msg.text).exists()
+                                val playing = playingVoiceKey == msg.text
+                                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp).clickable(enabled = playable) { toggleVoicePlayback(msg) }, verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = if (playable) TextWhite else TextMuted, modifier = Modifier.size(28.dp))
                                     Spacer(Modifier.width(8.dp))
                                     Column {
-                                        Box(
-                                            Modifier
-                                                .width(100.dp)
-                                                .height(4.dp)
-                                                .background(
-                                                    if (playing) SuccessGreen else TextWhite.copy(alpha = 0.5f),
-                                                    RoundedCornerShape(2.dp)
-                                                )
-                                        )
-                                        Text(
-                                            if (playing) "در حال پخش · ${msg.time}" else "۰:۰۳ · ${msg.time}",
-                                            color = TextWhite.copy(alpha = 0.7f),
-                                            fontSize = 11.sp,
-                                            fontFamily = Vazirmatn
-                                        )
+                                        Text(if (playable) "پیام صوتی" else "فایل صوتی در دسترس نیست", color = TextWhite, fontSize = 12.sp, fontFamily = Vazirmatn)
+                                        Box(Modifier.width(112.dp).height(4.dp).background(if (playing) SuccessGreen else TextWhite.copy(alpha = 0.5f), RoundedCornerShape(2.dp)))
+                                        Text(if (playing) "در حال پخش · ${msg.time}" else msg.time, color = TextWhite.copy(alpha = 0.7f), fontSize = 10.sp, fontFamily = Vazirmatn)
                                     }
                                 }
                             }
@@ -2164,27 +2678,25 @@ private fun ChatScreen(person: Person, onBack: () -> Unit) {
                 }
             }
         }
-        // Input bar with photo + voice
+        if (voiceError.isNotBlank()) Text(voiceError, color = if (voiceError.contains("ذخیره شد")) SuccessGreen else TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
         Row(Modifier.fillMaxWidth().background(DarkSurface).padding(8.dp), verticalAlignment = Alignment.Bottom) {
-            IconButton(onClick = { galleryLauncher.launch("image/*") }) {
-                Icon(Icons.Default.Image, "عکس", tint = TinderPink)
-            }
+            IconButton(onClick = { galleryLauncher.launch("image/*") }) { Icon(Icons.Default.Image, "عکس", tint = TinderPink) }
             IconButton(onClick = {
-                if (isRecording) {
-                    isRecording = false
-                    messages.add(ChatMessage("پیام صوتی", true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date()), MsgType.VOICE))
-                } else isRecording = true
+                if (isRecording) stopRecording()
+                else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) startRecording()
+                else microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }) {
-                Icon(if (isRecording) Icons.Default.Stop else Icons.Default.Mic, "صدا", tint = if (isRecording) TinderPink else TextGray)
+                Icon(if (isRecording) Icons.Default.Stop else Icons.Default.Mic, "ضبط پیام صوتی", tint = if (isRecording) TinderPink else TextGray)
             }
-            OutlinedTextField(value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f), placeholder = { Text(if (isRecording) "در حال ضبط..." else "پیام بنویس...", fontFamily = Vazirmatn) }, shape = RoundedCornerShape(24.dp), colors = fieldColors(), maxLines = 4, enabled = !isRecording)
+            OutlinedTextField(value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f), placeholder = { Text(if (isRecording) "در حال ضبط... برای پایان، توقف را بزن" else "پیام بنویس...", fontFamily = Vazirmatn) }, shape = RoundedCornerShape(24.dp), colors = fieldColors(), maxLines = 4, enabled = !isRecording)
             Spacer(Modifier.width(8.dp))
             FilledIconButton(onClick = {
-                if (input.isNotBlank()) {
+                if (input.isNotBlank() && !isRecording) {
                     messages.add(ChatMessage(input.trim(), true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date())))
+                    saveChatMessages(context, person.id, messages.toList())
                     input = ""; keyboard?.hide()
                 }
-            }, colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink)) {
+            }, enabled = !isRecording, colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink)) {
                 Icon(Icons.Default.Send, null)
             }
         }
@@ -2235,7 +2747,7 @@ private fun PersonDetailScreen(
             }
             Spacer(Modifier.height(10.dp))
             Button(onClick = onChat, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = if (canDirectMessage) SuccessGreen else TinderOrange), shape = RoundedCornerShape(14.dp)) {
-                Text(when { isMatched -> "چت"; canDirectMessage -> "چت (پرداخت‌شده)"; else -> "پیام (۱ میلیون)" }, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+                Text(when { isMatched -> "چت"; canDirectMessage -> "چت (پرداخت‌شده)"; else -> "پیام مستقیم" }, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(10.dp))
             OutlinedButton(onClick = onBlock, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFFFF6B6B))) {
@@ -2322,6 +2834,13 @@ private fun MyProfileScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(user.about, color = TextGray, fontFamily = Vazirmatn, lineHeight = 22.sp, fontSize = 14.sp)
+                if (user.voiceIntro.isNotBlank() && File(user.voiceIntro).exists()) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("معرفی صوتی", color = BrandViolet, fontFamily = Vazirmatn, fontSize = 12.sp)
+                        VoiceIntroPlayer(user.voiceIntro)
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     InfoChip(Icons.Default.Work, user.job)
