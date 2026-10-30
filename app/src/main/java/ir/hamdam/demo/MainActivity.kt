@@ -19,11 +19,15 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -137,7 +141,8 @@ data class UserProfile(
     val phone: String = "",
     val voiceIntro: String = "",
     val instagram: String = "",
-    val spotify: String = ""
+    val spotify: String = "",
+    val showOnlineStatus: Boolean = true
 ) {
     val age: Int get() = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
 }
@@ -158,7 +163,8 @@ data class Person(
     val distanceKm: Int,
     val likedYou: Boolean = false,
     val instagram: String = "",
-    val spotify: String = ""
+    val spotify: String = "",
+    val isOnline: Boolean = ((id * 37) % 10) < 4
 )
 
 data class ChatMessage(
@@ -394,11 +400,15 @@ private fun loadUser(ctx: Context): UserProfile {
                 storeUriInAppFiles(ctx, uri, "profile_photos") ?: stored
             } else stored
         }
+        val hasOnlinePreference = runCatching {
+            com.google.gson.JsonParser.parseString(json).asJsonObject.has("showOnlineStatus")
+        }.getOrDefault(false)
         val normalized = loaded.copy(
             photos = durablePhotos,
             voiceIntro = loaded.voiceIntro.orEmpty(),
             instagram = loaded.instagram.orEmpty(),
-            spotify = loaded.spotify.orEmpty()
+            spotify = loaded.spotify.orEmpty(),
+            showOnlineStatus = if (hasOnlinePreference) loaded.showOnlineStatus else true
         )
         prefs(ctx).edit().putString("user", gson.toJson(normalized)).apply()
         normalized
@@ -568,6 +578,8 @@ private fun FastLoveApp() {
     var tutorialStep by remember { mutableIntStateOf(0) }
     var chatRefreshVersion by remember { mutableIntStateOf(0) }
     var showEditProfile by remember { mutableStateOf(false) }
+    var showPaymentHistoryPage by remember { mutableStateOf(false) }
+    var showPublicProfilePreview by remember { mutableStateOf(false) }
     var showPayToMessage by remember { mutableStateOf<Person?>(null) }
     var showMatchPopup by remember { mutableStateOf<Person?>(null) }
     var showReport by remember { mutableStateOf<Person?>(null) }
@@ -703,6 +715,15 @@ private fun FastLoveApp() {
                             tab = 0
                             persist()
                         }
+                    )
+                    showPaymentHistoryPage -> PaymentHistoryScreen(
+                        records = paymentHistory.toList(),
+                        onBack = { showPaymentHistoryPage = false }
+                    )
+                    showPublicProfilePreview -> PublicProfilePreviewScreen(
+                        user = currentUser,
+                        onBack = { showPublicProfilePreview = false },
+                        onEdit = { showPublicProfilePreview = false; showEditProfile = true }
                     )
                     showSubscription -> SubscriptionScreen(
                         initialSection = purchaseInitialSection,
@@ -926,11 +947,13 @@ private fun FastLoveApp() {
                                         blockedCount = blockedIds.size,
                                         plan = subscriptionPlan,
                                         planExpiryMillis = planExpiresAtMillis,
-                                        paymentHistory = paymentHistory.toList(),
                                         matchCount = matchedPeople.size,
                                         likeCount = likedPeople.size,
                                         onUpgrade = { showSubscription = true },
                                         onEdit = { showEditProfile = true },
+                                        onPreview = { showPublicProfilePreview = true },
+                                        onPaymentHistory = { showPaymentHistoryPage = true },
+                                        onToggleOnlineStatus = { enabled -> currentUser = currentUser.copy(showOnlineStatus = enabled); persist() },
                                         onShowBlocked = { showBlockedList = true },
                                         onDeleteRequest = { showDeleteRequest = true },
                                         onLogout = {
@@ -1471,6 +1494,11 @@ private fun AnimatedGifAuthBackground() {
         animationSpec = infiniteRepeatable(tween(2100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "lightPulseC"
     )
+    val heartBloom by pulse.animateFloat(
+        initialValue = 0.76f, targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(tween(2400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "heartBloomPulse"
+    )
     Box(Modifier.fillMaxSize()) {
         // The scene itself is a single still frame. No GIF playback, scaling, panning or rotation.
         AsyncImage(
@@ -1483,6 +1511,25 @@ private fun AnimatedGifAuthBackground() {
             Color(0xFF080D1A).copy(alpha = 0.28f), Color(0xFF0B1020).copy(alpha = 0.62f)
         ))))
         // Only the soft light blooms change brightness; their position and the artwork remain fixed.
+        // A restrained coral halo sits over the artwork's heart; only its light intensity pulses.
+        Box(
+            Modifier.align(Alignment.Center).offset(y = (-92).dp).size(236.dp)
+                .graphicsLayer { alpha = heartBloom }
+                .background(Brush.radialGradient(listOf(
+                    Color(0xFFFF8AAE).copy(alpha = 0.30f),
+                    TinderPink.copy(alpha = 0.18f),
+                    Color.Transparent
+                )), CircleShape)
+                .blur(12.dp)
+        )
+        Box(
+            Modifier.align(Alignment.Center).offset(y = (-92).dp).size(150.dp)
+                .graphicsLayer { alpha = heartBloom }
+                .background(Brush.radialGradient(listOf(
+                    TinderOrange.copy(alpha = 0.19f), Color.Transparent
+                )), CircleShape)
+                .blur(8.dp)
+        )
         Box(
             Modifier.align(Alignment.TopEnd).offset(x = (-34).dp, y = 84.dp).size(118.dp)
                 .graphicsLayer { alpha = glowA }
@@ -3115,6 +3162,10 @@ private fun DiscoverScreen(
                             Text("NOPE", Modifier.align(Alignment.TopEnd).padding(24.dp).rotate(20f).border(3.dp, TinderPink, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp), color = TinderPink.copy(alpha = passAlpha), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                         }
                         CompatibilityBadge(compatibilityScore(viewer, person), Modifier.align(Alignment.TopCenter).padding(top = 15.dp))
+                        OnlineStatusBadge(
+                            isOnline = person.isOnline,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 14.dp)
+                        )
                         Box(Modifier.fillMaxWidth().fillMaxHeight(0.43f).align(Alignment.BottomCenter).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.92f)))))
                         Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
                             if (person.likedYou && canSeeLikes) {
@@ -3303,6 +3354,8 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, onBack: () -> Unit, 
     var voiceError by remember { mutableStateOf("") }
     var showChatMenu by remember { mutableStateOf(false) }
     var showUnmatchConfirm by remember { mutableStateOf(false) }
+    var pendingDemoReplies by remember { mutableIntStateOf(0) }
+    val chatScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -3474,6 +3527,9 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, onBack: () -> Unit, 
                 }
             }
         }
+        if (pendingDemoReplies > 0) {
+            Text("${person.name} در حال نوشتن است…", color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 3.dp))
+        }
         if (voiceError.isNotBlank()) Text(voiceError, color = if (voiceError.contains("ذخیره شد")) SuccessGreen else TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
         Row(Modifier.fillMaxWidth().background(DarkSurface).padding(8.dp), verticalAlignment = Alignment.Bottom) {
             IconButton(onClick = { galleryLauncher.launch("image/*") }) { Icon(Icons.Default.Image, "عکس", tint = TinderPink) }
@@ -3488,9 +3544,18 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, onBack: () -> Unit, 
             Spacer(Modifier.width(8.dp))
             FilledIconButton(onClick = {
                 if (input.isNotBlank() && !isRecording) {
-                    messages.add(ChatMessage(input.trim(), true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date())))
+                    val sentText = input.trim()
+                    messages.add(ChatMessage(sentText, true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date())))
                     saveChatMessages(context, person.id, messages.toList())
                     input = ""; keyboard?.hide()
+                    pendingDemoReplies += 1
+                    chatScope.launch {
+                        delay(900L + (person.id % 5) * 180L)
+                        val reply = buildDemoReply(sentText, person)
+                        messages.add(ChatMessage(reply, false, SimpleDateFormat("HH:mm", Locale("fa")).format(Date())))
+                        saveChatMessages(context, person.id, messages.toList())
+                        pendingDemoReplies = (pendingDemoReplies - 1).coerceAtLeast(0)
+                    }
                 }
             }, enabled = !isRecording, colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink)) {
                 Icon(Icons.Default.Send, null)
@@ -3614,166 +3679,330 @@ private fun MyProfileScreen(
     blockedCount: Int,
     plan: SubscriptionPlan,
     planExpiryMillis: Long?,
-    paymentHistory: List<PaymentRecord>,
     matchCount: Int,
     likeCount: Int,
     onUpgrade: () -> Unit,
     onEdit: () -> Unit,
+    onPreview: () -> Unit,
+    onPaymentHistory: () -> Unit,
+    onToggleOnlineStatus: (Boolean) -> Unit,
     onShowBlocked: () -> Unit,
     onDeleteRequest: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(DarkBg)) {
-        // Hero header
-        Box(Modifier.fillMaxWidth().height(200.dp).background(Brush.verticalGradient(listOf(Color(0xFF2A0A12), DarkBg)))) {
-            Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Box(Modifier.size(96.dp).clip(CircleShape).border(3.dp, TinderPink, CircleShape)) {
-                    val primary = user.photos.getOrNull(user.primaryPhotoIndex)
-                    if (primary != null) {
-                        AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(primary)).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop)
-                    } else {
-                        Box(Modifier.fillMaxSize().background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
-                            Text(user.name.take(1).ifEmpty { "♡" }, fontSize = 40.sp, color = TextWhite, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Text(user.name, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
-                Text("${user.age} ساله • ${user.city}", color = TextGray, fontFamily = Vazirmatn, fontSize = 14.sp)
-            }
-            IconButton(onClick = onEdit, modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).background(DarkCard.copy(alpha = 0.7f), CircleShape)) {
-                Icon(Icons.Default.Edit, "ویرایش", tint = TextWhite)
-            }
-        }
-
-        // Stats row
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard("مچ", "$matchCount", Modifier.weight(1f))
-            StatCard("لایک", "$likeCount", Modifier.weight(1f))
-            StatCard("اشتراک", plan.title, Modifier.weight(1f))
-        }
-        if (plan != SubscriptionPlan.FREE) {
-            Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp), colors = CardDefaults.cardColors(containerColor = SuccessGreen.copy(alpha = 0.09f)), border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.25f)), shape = RoundedCornerShape(14.dp)) {
-                Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Verified, null, tint = SuccessGreen, modifier = Modifier.size(19.dp))
-                    Spacer(Modifier.width(9.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("اشتراک ${plan.title} فعال است", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
-                        Text(planExpiryMillis?.let { "اعتبار تا ${formatDatePersian(it)}" } ?: "تاریخ انقضای خرید قدیمی در نسخه قبلی ثبت نشده است", color = if (planExpiryMillis != null) SuccessGreen else TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
-                    }
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-        }
-        // Photos gallery
-        if (user.photos.isNotEmpty()) {
-            Text("عکس‌ها", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(horizontal = 20.dp))
-            Spacer(Modifier.height(10.dp))
-            LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                itemsIndexed(user.photos) { idx, uriStr ->
-                    val isMain = idx == user.primaryPhotoIndex
-                    Box(Modifier.size(100.dp).clip(RoundedCornerShape(14.dp)).border(if (isMain) 2.dp else 0.dp, TinderPink, RoundedCornerShape(14.dp))) {
-                        AsyncImage(model = ImageRequest.Builder(context).data(Uri.parse(uriStr)).crossfade(true).build(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        if (isMain) Text("اصلی", Modifier.align(Alignment.BottomCenter).background(TinderPink).padding(horizontal = 6.dp, vertical = 2.dp), color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
-                    }
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-        }
-
-        // About card
-        Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp)) {
-            Column(Modifier.padding(18.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(DarkBg).padding(bottom = 22.dp)) {
+        // Compact identity card: the full public-facing content lives in its own preview page.
+        Card(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
+        ) {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Info, null, tint = TinderPink, modifier = Modifier.size(20.dp))
+                    Box(Modifier.size(76.dp).clip(CircleShape).border(2.dp, TinderPink, CircleShape)) {
+                        val primary = user.photos.getOrNull(user.primaryPhotoIndex)
+                        if (primary != null) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context).data(Uri.parse(primary)).crossfade(true).build(),
+                                contentDescription = "عکس پروفایل",
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(Modifier.fillMaxSize().background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
+                                Text(user.name.take(1).ifEmpty { "♡" }, fontSize = 32.sp, color = TextWhite, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(user.name.ifBlank { "پروفایل من" }, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                        Text("${persianDigits(user.age.toString())} ساله · ${user.city.ifBlank { "شهر ثبت نشده" }}", color = TextGray, fontSize = 12.sp, fontFamily = Vazirmatn)
+                        Spacer(Modifier.height(7.dp))
+                        Text("${user.photos.size} عکس · ${user.interests.size} علاقه‌مندی", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                    }
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, "ویرایش پروفایل", tint = TinderPink)
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ProfileMiniStat("مچ‌ها", matchCount.toString(), Modifier.weight(1f))
+                    ProfileMiniStat("لایک‌ها", likeCount.toString(), Modifier.weight(1f))
+                    ProfileMiniStat("عکس‌ها", user.photos.size.toString(), Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(14.dp))
+                Button(
+                    onClick = onPreview,
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = TinderPink)
+                ) {
+                    Icon(Icons.Default.Visibility, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("درباره من", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
-                }
-                Spacer(Modifier.height(10.dp))
-                Text(user.about, color = TextGray, fontFamily = Vazirmatn, lineHeight = 22.sp, fontSize = 14.sp)
-                if (user.voiceIntro.isNotBlank() && File(user.voiceIntro).exists()) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("معرفی صوتی", color = BrandViolet, fontFamily = Vazirmatn, fontSize = 12.sp)
-                        VoiceIntroPlayer(user.voiceIntro)
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InfoChip(Icons.Default.Work, user.job)
-                    InfoChip(Icons.Default.LocationOn, user.city)
+                    Text("پیش‌نمایش پروفایل عمومی", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
                 }
             }
-        }
-        if (user.instagram.isNotBlank() || user.spotify.isNotBlank()) {
-            Spacer(Modifier.height(12.dp))
-            Text("شبکه‌های اجتماعی", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(horizontal = 20.dp))
-            Spacer(Modifier.height(8.dp))
-            SocialProfileBadges(instagram = user.instagram, spotify = user.spotify, modifier = Modifier.padding(horizontal = 20.dp))
-        }
-        Spacer(Modifier.height(14.dp))
-
-        // Interests
-        if (user.interests.isNotEmpty()) {
-            Text("علایق", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(horizontal = 20.dp))
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.padding(horizontal = 20.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                user.interests.forEach {
-                    Surface(shape = RoundedCornerShape(20.dp), color = TinderPink.copy(alpha = 0.15f), border = BorderStroke(1.dp, TinderPink.copy(alpha = 0.4f))) {
-                        Text(it, Modifier.padding(horizontal = 14.dp, vertical = 8.dp), color = TextWhite, fontFamily = Vazirmatn, fontSize = 13.sp)
-                    }
-                }
-            }
-            Spacer(Modifier.height(20.dp))
         }
 
-        // Actions
-        Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp)) {
-            Column {
-                ProfileActionRow(Icons.Default.Star, "ارتقا اشتراک (${plan.title})", TinderOrange, onUpgrade)
-                HorizontalDivider(color = DarkCard)
-                ProfileActionRow(Icons.Default.Edit, "ویرایش پروفایل", TinderPink, onEdit)
-                HorizontalDivider(color = DarkCard)
-                ProfileActionRow(Icons.Default.Block, "بلاک‌شده‌ها: $blockedCount", TextMuted, onShowBlocked)
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        Text("تاریخچه پرداخت", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(horizontal = 20.dp))
-        Spacer(Modifier.height(8.dp))
-        if (paymentHistory.isEmpty()) {
-            Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(14.dp)) {
-                Text("هنوز خرید اشتراکی ثبت نشده است.", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(16.dp))
-            }
-        } else {
-            paymentHistory.forEach { payment ->
-                Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(14.dp)) {
-                    Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(TinderOrange.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.ReceiptLong, null, tint = TinderOrange, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("اشتراک ${payment.planTitle}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
-                            Text("تاریخ خرید: ${formatDatePersian(payment.purchasedAtMillis)}", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
-                            Text("انقضا: ${formatDatePersian(payment.expiresAtMillis)}", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
-                            if (payment.durationDays > 0) Text("دوره: ${if (payment.durationDays == 7) "هفتگی" else "ماهانه"}", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
-                        }
-                        Text(formatToman(payment.priceToman), color = TinderOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-                    }
+        // Membership summary kept short, with a single action to manage it.
+        Card(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkCard),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(TinderOrange.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Star, null, tint = TinderOrange, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("اشتراک ${plan.title}", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 13.sp)
+                    Text(
+                        if (plan == SubscriptionPlan.FREE) "امکانات بیشتر با ارتقای اشتراک" else planExpiryMillis?.let { "فعال تا ${formatDatePersian(it)}" } ?: "اشتراک فعال",
+                        color = if (plan == SubscriptionPlan.FREE) TextMuted else SuccessGreen,
+                        fontSize = 10.sp, fontFamily = Vazirmatn
+                    )
+                }
+                TextButton(onClick = onUpgrade) {
+                    Text(if (plan == SubscriptionPlan.FREE) "ارتقا" else "مدیریت", color = TinderOrange, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
                 }
             }
         }
+
         Spacer(Modifier.height(20.dp))
-        TextButton(onClick = onDeleteRequest, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-            Text("درخواست حذف حساب کاربری", color = Color(0xFFFF6B6B), fontFamily = Vazirmatn, fontSize = 13.sp)
+        Text("حریم خصوصی", Modifier.padding(horizontal = 20.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 14.sp)
+        Card(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(SuccessGreen.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Circle, null, tint = SuccessGreen, modifier = Modifier.size(17.dp))
+                }
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("نمایش وضعیت آنلاین", color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
+                    Text(if (user.showOnlineStatus) "دیگران می‌توانند آنلاین بودنت را ببینند" else "وضعیت آنلاین تو از دیگران پنهان است", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                }
+                Switch(
+                    checked = user.showOnlineStatus,
+                    onCheckedChange = onToggleOnlineStatus,
+                    colors = SwitchDefaults.colors(checkedThumbColor = TextWhite, checkedTrackColor = SuccessGreen, uncheckedThumbColor = TextGray, uncheckedTrackColor = DarkCard)
+                )
+            }
         }
+
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(50.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, TinderPink)) {
-            Icon(Icons.Default.Logout, null, tint = TinderPink); Spacer(Modifier.width(8.dp))
+        Text("حساب کاربری", Modifier.padding(horizontal = 20.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 14.sp)
+        Card(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Column {
+                ProfileActionRow(Icons.Default.Edit, "ویرایش اطلاعات و عکس‌ها", TinderPink, onEdit)
+                HorizontalDivider(color = DarkCard)
+                ProfileActionRow(Icons.Default.Visibility, "پیش‌نمایش پروفایل عمومی", BrandViolet, onPreview)
+                HorizontalDivider(color = DarkCard)
+                ProfileActionRow(Icons.Default.ReceiptLong, "تاریخچه پرداخت", TinderOrange, onPaymentHistory)
+                HorizontalDivider(color = DarkCard)
+                ProfileActionRow(Icons.Default.Block, "کاربران مسدودشده · ${persianDigits(blockedCount.toString())}", TextMuted, onShowBlocked)
+            }
+        }
+        TextButton(onClick = onDeleteRequest, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Text("درخواست حذف حساب کاربری", color = Color(0xFFFF7777), fontFamily = Vazirmatn, fontSize = 12.sp)
+        }
+        OutlinedButton(
+            onClick = onLogout,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, TinderPink)
+        ) {
+            Icon(Icons.Default.Logout, null, tint = TinderPink)
+            Spacer(Modifier.width(8.dp))
             Text("خروج از حساب کاربری", color = TinderPink, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold)
         }
-        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun ProfileMiniStat(label: String, value: String, modifier: Modifier = Modifier) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(12.dp), color = DarkCard) {
+        Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(persianDigits(value), color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp, fontFamily = Vazirmatn)
+            Text(label, color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+        }
+    }
+}
+
+@Composable
+private fun PaymentHistoryScreen(records: List<PaymentRecord>, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Column(Modifier.weight(1f)) {
+                Text("تاریخچه پرداخت", color = TextWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Text("سوابق خرید اشتراک و تمدیدها", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            }
+            Icon(Icons.Default.ReceiptLong, null, tint = TinderOrange, modifier = Modifier.padding(end = 12.dp).size(23.dp))
+        }
+        if (records.isEmpty()) {
+            EmptyState("هنوز خریدی ثبت نشده", "پس از خرید اشتراک، رسید آن در این صفحه نگهداری می‌شود.", "🧾")
+        } else {
+            val total = records.sumOf { it.priceToman }
+            Card(Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = DarkCard), shape = RoundedCornerShape(18.dp)) {
+                Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("مجموع پرداخت‌های ثبت‌شده", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        Spacer(Modifier.height(4.dp))
+                        Text(formatToman(total), color = TinderOrange, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    }
+                    Text("${persianDigits(records.size.toString())} خرید", color = TextGray, fontSize = 11.sp, fontFamily = Vazirmatn)
+                }
+            }
+            LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(records, key = { "${it.purchasedAtMillis}_${it.planTitle}" }) { payment ->
+                    Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(17.dp), modifier = Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(TinderOrange.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.ReceiptLong, null, tint = TinderOrange, modifier = Modifier.size(21.dp))
+                            }
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("اشتراک ${payment.planTitle}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                                Spacer(Modifier.height(3.dp))
+                                Text("خرید: ${formatDatePersian(payment.purchasedAtMillis)}", color = TextGray, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                Text("انقضا: ${formatDatePersian(payment.expiresAtMillis)}", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                if (payment.durationDays > 0) Text("دوره ${if (payment.durationDays == 7) "هفتگی" else "ماهانه"}", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                            }
+                            Text(formatToman(payment.priceToman), color = TinderOrange, fontWeight = FontWeight.Bold, fontSize = 11.sp, fontFamily = Vazirmatn)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PublicProfilePreviewScreen(user: UserProfile, onBack: () -> Unit, onEdit: () -> Unit) {
+    val context = LocalContext.current
+    val photos = remember(user.photos, user.primaryPhotoIndex) {
+        val limited = user.photos.take(5)
+        val primary = limited.getOrNull(user.primaryPhotoIndex)
+        if (primary == null) limited else listOf(primary) + limited.filterIndexed { index, _ -> index != user.primaryPhotoIndex }
+    }
+    val pagerState = rememberPagerState(pageCount = { photos.size.coerceAtLeast(1) })
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Column(Modifier.weight(1f)) {
+                Text("پیش‌نمایش پروفایل عمومی", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp, fontFamily = Vazirmatn)
+                Text("این همان چیزی است که دیگران می‌بینند", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            }
+            TextButton(onClick = onEdit) { Text("ویرایش", color = TinderPink, fontFamily = Vazirmatn) }
+        }
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp).height(460.dp).clip(RoundedCornerShape(24.dp))) {
+                if (photos.isNotEmpty()) {
+                    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(Uri.parse(photos[page])).crossfade(true).build(),
+                            contentDescription = "عکس ${page + 1} از ${photos.size}",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                } else {
+                    Box(Modifier.fillMaxSize().background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
+                        Text(user.name.take(1).ifEmpty { "♡" }, color = TextWhite, fontSize = 100.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.80f)))))
+                Column(Modifier.align(Alignment.BottomStart).padding(19.dp)) {
+                    Text("${user.name.ifBlank { "نام کاربر" }}, ${persianDigits(user.age.toString())}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 25.sp, fontFamily = Vazirmatn)
+                    Text("${user.job.ifBlank { "" }}${if (user.job.isNotBlank() && user.city.isNotBlank()) " · " else ""}${user.city}", color = TextWhite.copy(alpha = 0.9f), fontSize = 12.sp, fontFamily = Vazirmatn)
+                }
+                Surface(Modifier.align(Alignment.TopEnd).padding(12.dp), shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.55f)) {
+                    Text("${persianDigits((pagerState.currentPage + 1).toString())} / ${persianDigits(photos.size.coerceAtLeast(1).toString())}", Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
+                }
+                if (user.showOnlineStatus) {
+                    OnlineStatusBadge(isOnline = true, modifier = Modifier.align(Alignment.TopStart).padding(12.dp))
+                }
+            }
+            if (photos.size > 1) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    repeat(photos.size) { page ->
+                        Box(Modifier.padding(horizontal = 3.dp).width(if (pagerState.currentPage == page) 20.dp else 6.dp).height(5.dp).clip(CircleShape).background(if (pagerState.currentPage == page) TinderPink else TextMuted.copy(alpha = 0.65f)))
+                    }
+                }
+            }
+            Card(Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("درباره من", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(8.dp))
+                    Text(user.about.ifBlank { "هنوز توضیحی اضافه نشده است." }, color = TextGray, fontSize = 13.sp, lineHeight = 22.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (user.job.isNotBlank()) InfoChip(Icons.Default.Work, user.job)
+                        if (user.city.isNotBlank()) InfoChip(Icons.Default.LocationOn, user.city)
+                    }
+                }
+            }
+            if (user.interests.isNotEmpty()) {
+                Text("علایق", Modifier.padding(horizontal = 18.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    user.interests.forEach { interest ->
+                        Surface(shape = RoundedCornerShape(20.dp), color = TinderPink.copy(alpha = 0.14f), border = BorderStroke(1.dp, TinderPink.copy(alpha = 0.32f))) {
+                            Text(interest, Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = TextWhite, fontSize = 11.sp, fontFamily = Vazirmatn)
+                        }
+                    }
+                }
+            }
+            if (user.instagram.isNotBlank() || user.spotify.isNotBlank()) {
+                Text("شبکه‌های اجتماعی", Modifier.padding(horizontal = 18.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                SocialProfileBadges(instagram = user.instagram, spotify = user.spotify, modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp))
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun OnlineStatusBadge(isOnline: Boolean, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xDD101626),
+        border = BorderStroke(1.dp, (if (isOnline) SuccessGreen else TextMuted).copy(alpha = 0.45f))
+    ) {
+        Row(Modifier.padding(horizontal = 9.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).background(if (isOnline) SuccessGreen else TextMuted, CircleShape))
+            Spacer(Modifier.width(5.dp))
+            Text(if (isOnline) "آنلاین" else "آفلاین", color = if (isOnline) SuccessGreen else TextGray, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+        }
+    }
+}
+
+private fun buildDemoReply(userText: String, person: Person): String {
+    val message = userText.trim().lowercase(Locale.ROOT)
+    return when {
+        listOf("سلام", "درود", "خوبی", "چطوری").any { it in message } -> "سلام 😊 خوشحالم پیام دادی. روزت چطور می‌گذره؟"
+        listOf("موسیقی", "آهنگ", "اسپاتیفای", "spotify").any { it in message } -> "چه خوب! این روزها بیشتر چه سبک موسیقی‌ای گوش می‌دی؟ من همیشه دنبال آهنگ‌های تازه‌ام 🎧"
+        listOf("سفر", "مسافرت", "گردش", "شهر").any { it in message } -> "چه جالب! از بین جاهایی که رفتی کدوم مقصد رو بیشتر دوست داشتی؟ ✈️"
+        listOf("کافه", "قهوه", "کافی").any { it in message } -> "من هم کافه‌های دنج رو دوست دارم ☕ معمولاً چه جور فضایی رو انتخاب می‌کنی؟"
+        listOf("کتاب", "مطالعه", "رمان").any { it in message } -> "چه عالی! آخرین کتابی که واقعاً از خوندنش لذت بردی چی بود؟ 📚"
+        listOf("فیلم", "سریال", "سینما").any { it in message } -> "عالیه! بیشتر چه ژانری می‌بینی؟ یه پیشنهاد خوب هم خوشحال می‌شم بشنوم 🎬"
+        listOf("کار", "شغل", "درس", "دانشگاه").any { it in message } -> "چه جالب! چی شد که به این حوزه علاقه‌مند شدی؟"
+        listOf("ورزش", "باشگاه", "فوتبال", "یوگا").any { it in message } -> "آفرین! ورزش موردعلاقه‌ات چیه و چند وقته دنبالش می‌کنی؟ 💪"
+        listOf("خودت", "تو چی", "تو چطور", "از خودت").any { it in message } -> "من بیشتر به ${person.interests.firstOrNull() ?: "گفت‌وگوهای خوب"} علاقه دارم 😊 تو هم از علایقت برام بگو."
+        message.length < 18 -> "خوشم اومد 😊 بیشتر برام تعریف می‌کنی؟"
+        else -> "جالبه که گفتی «${userText.take(42)}${if (userText.length > 42) "…" else ""}». دوست دارم بیشتر در موردش بدونم 🙂"
     }
 }
 
@@ -3875,21 +4104,36 @@ private fun BottomNav(tab: Int, onTab: (Int) -> Unit, matchCount: Int, likedMeCo
                             else -> 0
                         }
                         Box(
-                            Modifier.then(
-                                if (highlightTab == idx) Modifier.border(2.dp, TinderOrange, CircleShape).padding(4.dp)
-                                else Modifier
-                            )
+                            Modifier.size(28.dp).then(
+                                if (highlightTab == idx) Modifier.border(2.dp, TinderOrange, CircleShape).padding(2.dp) else Modifier
+                            ),
+                            contentAlignment = Alignment.Center
                         ) {
-                            if (badgeCount > 0) BadgedBox(badge = { Badge { Text(persianDigits(badgeCount.toString())) } }) {
-                                Icon(icon, label)
-                            } else Icon(icon, label)
+                            Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp))
+                            if (badgeCount > 0) {
+                                Box(
+                                    Modifier.align(Alignment.TopEnd).offset(x = 7.dp, y = (-5).dp)
+                                        .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                                        .clip(CircleShape)
+                                        .background(TinderPink)
+                                        .border(1.5.dp, DarkSurface, CircleShape)
+                                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        persianDigits(if (badgeCount > 99) "99+" else badgeCount.toString()),
+                                        color = TextWhite, fontSize = 8.sp, lineHeight = 9.sp,
+                                        fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, maxLines = 1
+                                    )
+                                }
+                            }
                         }
                     },
-                    label = { Text(label, fontFamily = Vazirmatn, fontSize = 11.sp) },
+                    label = { Text(label, fontFamily = Vazirmatn, fontSize = 10.sp, maxLines = 1) },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = TinderPink,
                         selectedTextColor = TinderPink,
-                        indicatorColor = TinderPink.copy(alpha = 0.15f),
+                        indicatorColor = TinderPink.copy(alpha = 0.13f),
                         unselectedIconColor = TextMuted,
                         unselectedTextColor = TextMuted
                     )
