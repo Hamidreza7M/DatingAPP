@@ -3,10 +3,14 @@ package ir.hamdam.demo
 import android.Manifest
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.graphics.Bitmap
 import android.graphics.Canvas as NativeCanvas
+import android.graphics.RectF
 import android.graphics.Paint as NativePaint
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
@@ -23,6 +27,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -65,6 +70,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -84,6 +90,10 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.withFrameNanos
@@ -163,7 +173,9 @@ data class UserProfile(
     val instagram: String = "",
     val spotify: String = "",
     val showOnlineStatus: Boolean = true,
-    val showLastSeen: Boolean = true
+    val showLastSeen: Boolean = true,
+    val referralCode: String = "",
+    val referredByCode: String = ""
 ) {
     val age: Int get() = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
 }
@@ -209,7 +221,9 @@ data class DateProposal(
     val status: DateProposalStatus = DateProposalStatus.PENDING,
     val createdAtMillis: Long = System.currentTimeMillis(),
     val isRevision: Boolean = false,
-    val revisesProposalId: String? = null
+    val revisesProposalId: String? = null,
+    val locationLatitude: Double? = null,
+    val locationLongitude: Double? = null
 )
 
 data class PaymentRecord(
@@ -401,6 +415,9 @@ private fun compatiblePeople(viewer: UserProfile): List<Person> = samplePeople.f
 private const val PREFS = "fastlove_prefs"
 private val gson = Gson()
 
+private fun generateReferralCode(): String =
+    "FL" + UUID.randomUUID().toString().replace("-", "").take(8).uppercase(Locale.US)
+
 private fun prefs(ctx: Context): SharedPreferences =
     ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -576,8 +593,11 @@ private fun formatLastSeen(minutesAgo: Int): String = when {
 }
 
 private fun formatDateTimePersian(timestampMillis: Long): String {
-    val text = SimpleDateFormat("EEEE d MMMM · HH:mm", Locale("fa")).format(Date(timestampMillis))
-    return persianDigits(text)
+    val jalali = gregorianToJalali(timestampMillis)
+    val weekdayIndex = Calendar.getInstance().apply { timeInMillis = timestampMillis }.get(Calendar.DAY_OF_WEEK)
+    val weekdays = listOf("", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه")
+    val time = SimpleDateFormat("HH:mm", Locale.US).format(Date(timestampMillis))
+    return persianDigits("${weekdays.getOrElse(weekdayIndex) { "" }} ${jalali.day} ${persianMonths[jalali.month - 1]} ${jalali.year} · $time")
 }
 
 private fun deleteChatMessages(context: Context, personId: Int) {
@@ -615,7 +635,15 @@ private fun FastLoveApp() {
 
     var isLoggedIn by remember { mutableStateOf(loadIsLoggedIn(context)) }
     var hasProfile by remember { mutableStateOf(loadHasProfile(context)) }
-    var currentUser by remember { mutableStateOf(loadUser(context)) }
+    var currentUser by remember {
+        mutableStateOf(loadUser(context).let { loaded ->
+            if (loaded.name.isNotBlank() && loaded.referralCode.isBlank()) {
+                loaded.copy(referralCode = generateReferralCode()).also { updated ->
+                    prefs(context).edit().putString("user", gson.toJson(updated)).apply()
+                }
+            } else loaded
+        })
+    }
     var subscriptionPlan by remember { mutableStateOf(loadPlan(context)) }
     var planExpiresAtMillis by remember { mutableStateOf(loadPlanExpiry(context)) }
     val paymentHistory = remember { mutableStateListOf<PaymentRecord>().also { it.addAll(loadPaymentHistory(context)) } }
@@ -652,6 +680,7 @@ private fun FastLoveApp() {
     var showOnMap by remember { mutableStateOf(prefs(context).getBoolean("showOnMap", false)) }
 
     var selectedPerson by remember { mutableStateOf<Person?>(null) }
+    var selectedDetailFromDiscover by remember { mutableStateOf(false) }
     var chatPerson by remember { mutableStateOf<Person?>(null) }
     var showFilters by remember { mutableStateOf(false) }
     var showSubscription by remember { mutableStateOf(false) }
@@ -661,6 +690,8 @@ private fun FastLoveApp() {
     var chatRefreshVersion by remember { mutableIntStateOf(0) }
     var showEditProfile by remember { mutableStateOf(false) }
     var showPaymentHistoryPage by remember { mutableStateOf(false) }
+    var showPrivacySettingsPage by remember { mutableStateOf(false) }
+    var showScheduledDatesPage by remember { mutableStateOf(false) }
     var showPublicProfilePreview by remember { mutableStateOf(false) }
     var showPayToMessage by remember { mutableStateOf<Person?>(null) }
     var showMatchPopup by remember { mutableStateOf<Person?>(null) }
@@ -779,20 +810,28 @@ private fun FastLoveApp() {
             Surface(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = DarkBg) {
                 when {
                     !isLoggedIn -> AuthFlow(
-                        onSuccess = { phone, register ->
+                        onSuccess = { phone, register, enteredReferralCode ->
                             if (register) {
-                                currentUser = UserProfile(phone = phone)
+                                currentUser = UserProfile(
+                                    phone = phone,
+                                    referralCode = generateReferralCode(),
+                                    referredByCode = enteredReferralCode
+                                )
                                 hasProfile = false
                             } else {
                                 // Login: try restore by phone
                                 val saved = loadUser(context)
                                 if (saved.phone == phone && saved.name.isNotBlank()) {
-                                    currentUser = saved
+                                    currentUser = saved.copy(referralCode = saved.referralCode.ifBlank { generateReferralCode() })
                                     hasProfile = loadHasProfile(context)
                                     subscriptionPlan = loadPlan(context)
                                     planExpiresAtMillis = loadPlanExpiry(context)
                                 } else {
-                                    currentUser = UserProfile(phone = phone)
+                                    currentUser = UserProfile(
+                                        phone = phone,
+                                        referralCode = generateReferralCode(),
+                                        referredByCode = enteredReferralCode
+                                    )
                                     // If no local profile for this phone, treat as need profile
                                     hasProfile = false
                                 }
@@ -810,7 +849,10 @@ private fun FastLoveApp() {
                             persist()
                         },
                         onComplete = { profile ->
-                            currentUser = profile
+                            currentUser = profile.copy(
+                                referralCode = currentUser.referralCode.ifBlank { generateReferralCode() },
+                                referredByCode = currentUser.referredByCode
+                            )
                             hasProfile = true
                             prefs(context).edit().putInt("tutorialVersion", 0).apply()
                             showTutorial = true
@@ -822,6 +864,26 @@ private fun FastLoveApp() {
                     showPaymentHistoryPage -> PaymentHistoryScreen(
                         records = paymentHistory.toList(),
                         onBack = { showPaymentHistoryPage = false }
+                    )
+                    showPrivacySettingsPage -> PrivacySettingsScreen(
+                        user = currentUser,
+                        isVisibleOnMap = showOnMap,
+                        onToggleOnlineStatus = { enabled -> currentUser = currentUser.copy(showOnlineStatus = enabled); persist() },
+                        onToggleLastSeen = { enabled -> currentUser = currentUser.copy(showLastSeen = enabled); persist() },
+                        onToggleMapVisibility = { enabled ->
+                            showOnMap = enabled
+                            prefs(context).edit().putBoolean("showOnMap", enabled).apply()
+                        },
+                        onDeleteRequest = { showPrivacySettingsPage = false; showDeleteRequest = true },
+                        onBack = { showPrivacySettingsPage = false }
+                    )
+                    showScheduledDatesPage -> ScheduledDatesScreen(
+                        upcomingDates = matchedPeople.flatMap { matched ->
+                            loadDateProposals(context, matched.id)
+                                .filter { it.status == DateProposalStatus.ACCEPTED && it.scheduledAtMillis >= System.currentTimeMillis() }
+                                .map { matched to it }
+                        }.sortedBy { it.second.scheduledAtMillis },
+                        onBack = { showScheduledDatesPage = false }
                     )
                     showPublicProfilePreview -> PublicProfilePreviewScreen(
                         user = currentUser,
@@ -913,7 +975,7 @@ private fun FastLoveApp() {
                             planExpiresAtMillis = null
                             paymentHistory.clear()
                         },
-                        onDismiss = { showDeleteRequest = false }
+                        onDismiss = { showDeleteRequest = false; showPrivacySettingsPage = true }
                     )
                     showReport != null -> ReportDialog(
                         person = showReport!!,
@@ -939,23 +1001,38 @@ private fun FastLoveApp() {
                             isMatched = matchedPeople.any { it.id == detailPerson.id },
                             canDirectMessage = detailPerson.id in paidDirectChatIds || matchedPeople.any { it.id == detailPerson.id },
                             isLiked = likedPeople.any { it.id == detailPerson.id },
-                            onBack = { selectedPerson = null },
+                            onBack = { selectedPerson = null; selectedDetailFromDiscover = false },
                             onLike = {
                                 val alreadyLiked = likedPeople.any { it.id == detailPerson.id }
                                 if (alreadyLiked) {
                                     android.widget.Toast.makeText(context, "این پروفایل قبلاً لایک شده است ❤️", android.widget.Toast.LENGTH_SHORT).show()
                                     selectedPerson = null
+                                    tab = 0
+                                    selectedDetailFromDiscover = false
                                 } else if (canSwipe()) {
-                                    // Resolve the canonical demo profile by ID before recording the interaction.
-                                    // This keeps map/detail copies and discovery cards on the same like record.
                                     val canonicalPerson = samplePeople.firstOrNull { it.id == detailPerson.id } ?: detailPerson
                                     doLike(canonicalPerson)
+                                    // Detail-page likes return directly to discovery; match state is still saved,
+                                    // while the full-screen match popup is intentionally skipped here.
+                                    showMatchPopup = null
+                                    if (selectedDetailFromDiscover) {
+                                        // Detail was opened from the current discovery card.
+                                        discoverIndex = (discoverIndex + 1).coerceAtMost(filteredPeople.size)
+                                    } else {
+                                        // When opened from another tab, resume at the next matching discovery card.
+                                        val detailIndex = filteredPeople.indexOfFirst { it.id == detailPerson.id }
+                                        if (detailIndex >= discoverIndex) {
+                                            discoverIndex = (detailIndex + 1).coerceAtMost(filteredPeople.size)
+                                        }
+                                    }
+                                    selectedPerson = null
+                                    selectedDetailFromDiscover = false
+                                    tab = 0
                                     android.widget.Toast.makeText(
                                         context,
                                         if (canonicalPerson.likedYou) "لایک ثبت شد و ارتباط شما مچ شد 💕" else "لایک با موفقیت ثبت شد ❤️",
                                         android.widget.Toast.LENGTH_SHORT
                                     ).show()
-                                    selectedPerson = null
                                 } else {
                                     android.widget.Toast.makeText(context, "سهمیه روزانه تمام شده است؛ برای ادامه اشتراک را ارتقا بده.", android.widget.Toast.LENGTH_LONG).show()
                                 }
@@ -964,6 +1041,8 @@ private fun FastLoveApp() {
                                 if (canSwipe()) {
                                     doPass(detailPerson)
                                     selectedPerson = null
+                                    selectedDetailFromDiscover = false
+                                    if (tab != 0) tab = 0
                                 } else {
                                     android.widget.Toast.makeText(context, "سهمیه روزانه تمام شده است؛ برای ادامه اشتراک را ارتقا بده.", android.widget.Toast.LENGTH_LONG).show()
                                 }
@@ -973,12 +1052,14 @@ private fun FastLoveApp() {
                                 likedPeople.removeAll { it.id == detailPerson.id }
                                 matchedPeople.removeAll { it.id == detailPerson.id }
                                 selectedPerson = null
+                                selectedDetailFromDiscover = false
                                 persist()
                             },
                             onChat = {
                                 if (detailPerson.id in paidDirectChatIds || matchedPeople.any { it.id == detailPerson.id }) {
                                     chatPerson = detailPerson
                                     selectedPerson = null
+                                    selectedDetailFromDiscover = false
                                 } else showPayToMessage = detailPerson
                             },
                             onReport = { showReport = detailPerson }
@@ -1016,7 +1097,7 @@ private fun FastLoveApp() {
                                     0 -> DiscoverScreen(
                                         viewer = currentUser,
                                         person = filteredPeople.getOrNull(discoverIndex),
-                                        onOpen = { selectedPerson = it },
+                                        onOpen = { selectedPerson = it; selectedDetailFromDiscover = true },
                                         onLike = { p ->
                                             if (canSwipe()) {
                                                 doLike(p)
@@ -1046,7 +1127,7 @@ private fun FastLoveApp() {
                                         paidIds = paidDirectChatIds,
                                         isFree = subscriptionPlan == SubscriptionPlan.FREE,
                                         onUpgrade = { showSubscription = true },
-                                        onOpen = { selectedPerson = it },
+                                        onOpen = { selectedPerson = it; selectedDetailFromDiscover = false },
                                         onChat = { p ->
                                             if (p in matchedPeople || p.id in paidDirectChatIds) chatPerson = p
                                             else showPayToMessage = p
@@ -1062,7 +1143,7 @@ private fun FastLoveApp() {
                                             showOnMap = enabled
                                             prefs(context).edit().putBoolean("showOnMap", enabled).apply()
                                         },
-                                        onOpenPerson = { selectedPerson = it }
+                                        onOpenPerson = { selectedPerson = it; selectedDetailFromDiscover = false }
                                     )
                                     3 -> {
                                         val chatMatches = (matchedPeople.filter { it.id !in blockedIds } +
@@ -1097,15 +1178,9 @@ private fun FastLoveApp() {
                                         onEdit = { showEditProfile = true },
                                         onPreview = { showPublicProfilePreview = true },
                                         onPaymentHistory = { showPaymentHistoryPage = true },
-                                        onToggleOnlineStatus = { enabled -> currentUser = currentUser.copy(showOnlineStatus = enabled); persist() },
-                                        onToggleLastSeen = { enabled -> currentUser = currentUser.copy(showLastSeen = enabled); persist() },
-                                        isVisibleOnMap = showOnMap,
-                                        onToggleMapVisibility = { enabled ->
-                                            showOnMap = enabled
-                                            prefs(context).edit().putBoolean("showOnMap", enabled).apply()
-                                        },
+                                        onPrivacySettings = { showPrivacySettingsPage = true },
+                                        onScheduledDates = { showScheduledDatesPage = true },
                                         onShowBlocked = { showBlockedList = true },
-                                        onDeleteRequest = { showDeleteRequest = true },
                                         onLogout = {
                                             clearSession(context)
                                             isLoggedIn = false
@@ -1830,9 +1905,10 @@ private fun AuthStepIndicator(step: Int) {
 }
 
 @Composable
-private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
+private fun AuthFlow(onSuccess: (String, Boolean, String) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
     var phone by remember { mutableStateOf("") }
+    var referralCode by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
     var registerMode by remember { mutableStateOf(true) }
@@ -1962,13 +2038,29 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                                         colors = fieldColors(),
                                         leadingIcon = { Icon(Icons.Default.Phone, null, tint = TinderPink) }
                                     )
+                                    Spacer(Modifier.height(10.dp))
+                                    OutlinedTextField(
+                                        value = referralCode,
+                                        onValueChange = { entered ->
+                                            referralCode = entered.filter { it.isLetterOrDigit() }.take(12).uppercase(Locale.US)
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = { Text("کد معرف (اختیاری)", fontFamily = Vazirmatn) },
+                                        placeholder = { Text("مثلاً FL12AB34CD", fontFamily = Vazirmatn) },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = fieldColors(),
+                                        leadingIcon = { Icon(Icons.Default.CardGiftcard, null, tint = BrandViolet) }
+                                    )
+                                    Text("کد معرف اختیاری است و فقط هنگام ساخت حساب جدید ثبت می‌شود.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 4.dp))
                                     if (error.isNotEmpty()) {
                                         Spacer(Modifier.height(8.dp))
                                         Text(error, color = Color(0xFFFF879D), fontSize = 12.sp, fontFamily = Vazirmatn)
                                     }
                                     Spacer(Modifier.height(12.dp))
                                     TinderButton(if (registerMode) "ادامه ثبت‌نام" else "ادامه ورود") {
-                                        if (phone.length >= 10) { error = ""; step = 2 } else error = "لطفاً یک شماره موبایل معتبر وارد کن"
+                                        if (phone.length < 10) error = "لطفاً یک شماره موبایل معتبر وارد کن"
+                                        else { error = ""; step = 2 }
                                     }
                                 }
                                 else -> {
@@ -2012,7 +2104,7 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                                     Spacer(Modifier.height(12.dp))
                                     TinderButton("تأیید و ادامه") {
                                         if (secondsLeft <= 0) error = "کد منقضی شده است"
-                                        else if (otp == "123456") { error = ""; onSuccess(phone, registerMode) }
+                                        else if (otp == "123456") { error = ""; onSuccess(phone, registerMode, referralCode.trim()) }
                                         else error = "کد واردشده صحیح نیست؛ کد تست ۱۲۳۴۵۶ است"
                                     }
                                     TextButton(onClick = { if (secondsLeft <= 0) { otp = ""; secondsLeft = 120; resendToken++ } }) {
@@ -3699,37 +3791,60 @@ private fun mapAvatarDrawable(
     symbol: String,
     backgroundColor: Int,
     isOnline: Boolean? = null,
-    isCount: Boolean = false
+    isCount: Boolean = false,
+    label: String? = null
 ): BitmapDrawable {
-    // Compact markers intentionally avoid text labels: text-heavy pins hide the base map.
     val density = context.resources.displayMetrics.density
-    val width = (54 * density).toInt().coerceAtLeast(54)
-    val height = (58 * density).toInt().coerceAtLeast(58)
+    val hasLabel = !isCount && !label.isNullOrBlank()
+    val width = ((if (hasLabel) 98 else 54) * density).toInt().coerceAtLeast(54)
+    val height = ((if (hasLabel) 72 else 58) * density).toInt().coerceAtLeast(58)
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = NativeCanvas(bitmap)
     val paint = NativePaint(NativePaint.ANTI_ALIAS_FLAG)
     val cx = width / 2f
-    val cy = 26 * density
-    paint.color = android.graphics.Color.argb(55, 0, 0, 0)
-    canvas.drawCircle(cx, cy + 2 * density, 20 * density, paint)
+    val cy = 23 * density
+
+    // A light shadow and outlined avatar keep markers readable without looking like large pins.
+    paint.color = android.graphics.Color.argb(65, 0, 0, 0)
+    canvas.drawCircle(cx, cy + 2.5f * density, 17.5f * density, paint)
     paint.color = backgroundColor
-    canvas.drawCircle(cx, cy, 19 * density, paint)
+    canvas.drawCircle(cx, cy, 17.5f * density, paint)
     paint.color = android.graphics.Color.WHITE
     paint.style = NativePaint.Style.STROKE
-    paint.strokeWidth = 2.2f * density
-    canvas.drawCircle(cx, cy, 19 * density, paint)
+    paint.strokeWidth = 2f * density
+    canvas.drawCircle(cx, cy, 17.5f * density, paint)
     paint.style = NativePaint.Style.FILL
     paint.textAlign = NativePaint.Align.CENTER
     paint.color = android.graphics.Color.WHITE
-    paint.textSize = if (isCount) 16 * density else 19 * density
-    canvas.drawText(symbol, cx, cy + (if (isCount) 5.5f else 7f) * density, paint)
+    paint.textSize = if (isCount) 15 * density else 18 * density
+    canvas.drawText(symbol, cx, cy + (if (isCount) 5f else 6.5f) * density, paint)
+
     if (isOnline != null) {
-        val statusX = cx + 14 * density
-        val statusY = cy - 14 * density
+        val statusX = cx + 13 * density
+        val statusY = cy - 13 * density
         paint.color = android.graphics.Color.rgb(18, 24, 39)
-        canvas.drawCircle(statusX, statusY, 7.2f * density, paint)
+        canvas.drawCircle(statusX, statusY, 6.8f * density, paint)
         paint.color = if (isOnline) android.graphics.Color.rgb(67, 225, 166) else android.graphics.Color.rgb(147, 158, 179)
-        canvas.drawCircle(statusX, statusY, 4.8f * density, paint)
+        canvas.drawCircle(statusX, statusY, 4.6f * density, paint)
+    }
+
+    if (hasLabel) {
+        val left = cx - 44 * density
+        val top = cy + 22 * density
+        val right = cx + 44 * density
+        val bottom = cy + 42 * density
+        paint.color = android.graphics.Color.argb(238, 18, 24, 39)
+        canvas.drawRoundRect(RectF(left, top, right, bottom), 8 * density, 8 * density, paint)
+        paint.color = android.graphics.Color.argb(235, 255, 255, 255)
+        paint.style = NativePaint.Style.STROKE
+        paint.strokeWidth = 0.8f * density
+        canvas.drawRoundRect(RectF(left, top, right, bottom), 8 * density, 8 * density, paint)
+        paint.style = NativePaint.Style.FILL
+        paint.color = android.graphics.Color.WHITE
+        paint.textAlign = NativePaint.Align.CENTER
+        paint.textSize = 9.5f * density
+        paint.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD)
+        canvas.drawText(label!!.take(8), cx, top + 13.5f * density, paint)
     }
     return BitmapDrawable(context.resources, bitmap)
 }
@@ -3951,7 +4066,7 @@ private fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
-                    Configuration.getInstance().userAgentValue = "FastLove-Android/2.17.1 (ir.fastlove.demo)"
+                    Configuration.getInstance().userAgentValue = "FastLove-Android/2.18.0 (ir.fastlove.demo)"
                     MapView(ctx).apply {
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
@@ -3998,12 +4113,13 @@ private fun MapScreen(
                             val person = located.person
                             val marker = Marker(map).apply {
                                 position = GeoPoint(located.latitude, located.longitude)
-                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                                 title = "${person.name} · ${persianDigits(person.age.toString())} سال"
                                 snippet = "${person.job} · ${if (person.showOnlineStatus) if (person.isOnline) "آنلاین" else "آفلاین" else "وضعیت پنهان"} · موقعیت تقریبی"
                                 icon = mapAvatarDrawable(
                                     map.context, person.emoji, person.tint.toArgb(),
-                                    if (person.showOnlineStatus) person.isOnline else null
+                                    if (person.showOnlineStatus) person.isOnline else null,
+                                    label = person.name
                                 )
                                 setOnMarkerClickListener { _, _ -> onOpenPerson(person); true }
                             }
@@ -4061,52 +4177,209 @@ private fun MapScreen(
 
 @Composable
 private fun MapStatPill(value: String, subtitle: String, tint: Color, modifier: Modifier = Modifier) {
-    Surface(modifier, color = tint.copy(alpha = 0.10f), shape = RoundedCornerShape(11.dp)) {
-        Column(Modifier.padding(horizontal = 9.dp, vertical = 6.dp)) {
-            Text(value, color = tint, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-            Text(subtitle, color = TextMuted, fontSize = 8.sp, fontFamily = Vazirmatn)
+    Surface(
+        modifier = modifier,
+        color = tint.copy(alpha = 0.09f),
+        shape = RoundedCornerShape(13.dp),
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.16f))
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).background(tint, CircleShape))
+            Spacer(Modifier.width(6.dp))
+            Column(Modifier.weight(1f)) {
+                Text(value, color = tint, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, maxLines = 1)
+                Text(subtitle, color = TextMuted, fontSize = 7.sp, fontFamily = Vazirmatn, maxLines = 1)
+            }
         }
     }
 }
+
+private data class JalaliDateParts(val year: Int, val month: Int, val day: Int)
+private data class JalaliCalibration(val gregorianYear: Int, val marchDay: Int, val leap: Int)
+
+private val jalaliBreaks = intArrayOf(-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178)
+private const val MILLIS_PER_DAY = 86_400_000L
+
+/** Persian-calendar conversion based on the established Jalali break-year algorithm. */
+private fun jalaliCalibration(jalaliYear: Int): JalaliCalibration {
+    val gregorianYear = jalaliYear + 621
+    var leapJ = -14
+    var previousBreak = jalaliBreaks.first()
+    var currentBreak = 0
+    var jump = 0
+    for (index in 1 until jalaliBreaks.size) {
+        currentBreak = jalaliBreaks[index]
+        jump = currentBreak - previousBreak
+        if (jalaliYear < currentBreak) break
+        leapJ += (jump / 33) * 8 + (jump % 33) / 4
+        previousBreak = currentBreak
+    }
+    val yearsSinceBreak = jalaliYear - previousBreak
+    leapJ += (yearsSinceBreak / 33) * 8 + ((yearsSinceBreak % 33) + 3) / 4
+    if (jump % 33 == 4 && jump - yearsSinceBreak == 4) leapJ += 1
+
+    val leapG = gregorianYear / 4 - ((gregorianYear / 100 + 1) * 3) / 4 - 150
+    val marchDay = 20 + leapJ - leapG
+    var leap = (((yearsSinceBreak + 1) % 33) - 1) % 4
+    if (leap == -1) leap = 4
+    return JalaliCalibration(gregorianYear, marchDay, leap)
+}
+
+private fun gregorianDateUtcMillis(year: Int, month: Int, day: Int): Long =
+    java.util.GregorianCalendar(java.util.TimeZone.getTimeZone("UTC"), Locale.US).apply {
+        clear()
+        set(year, month - 1, day, 12, 0, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+private fun gregorianToJalali(timestampMillis: Long): JalaliDateParts {
+    val local = Calendar.getInstance().apply { timeInMillis = timestampMillis }
+    val gregorianYear = local.get(Calendar.YEAR)
+    val gregorianMonth = local.get(Calendar.MONTH) + 1
+    val gregorianDay = local.get(Calendar.DAY_OF_MONTH)
+    val targetDay = gregorianDateUtcMillis(gregorianYear, gregorianMonth, gregorianDay)
+
+    var jalaliYear = gregorianYear - 621
+    var calibration = jalaliCalibration(jalaliYear)
+    var newYearDay = gregorianDateUtcMillis(calibration.gregorianYear, 3, calibration.marchDay)
+    var dayOfYear = ((targetDay - newYearDay) / MILLIS_PER_DAY).toInt()
+    if (dayOfYear < 0) {
+        jalaliYear -= 1
+        calibration = jalaliCalibration(jalaliYear)
+        newYearDay = gregorianDateUtcMillis(calibration.gregorianYear, 3, calibration.marchDay)
+        dayOfYear = ((targetDay - newYearDay) / MILLIS_PER_DAY).toInt()
+    }
+
+    return if (dayOfYear <= 185) {
+        JalaliDateParts(jalaliYear, 1 + dayOfYear / 31, dayOfYear % 31 + 1)
+    } else {
+        val remaining = dayOfYear - 186
+        JalaliDateParts(jalaliYear, 7 + remaining / 30, remaining % 30 + 1)
+    }
+}
+
+private fun persianDateToMillis(year: Int, month: Int, day: Int): Long {
+    val calibration = jalaliCalibration(year)
+    val daysBeforeMonth = if (month <= 7) (month - 1) * 31 else 186 + (month - 7) * 30
+    val utcMillis = gregorianDateUtcMillis(calibration.gregorianYear, 3, calibration.marchDay) +
+        (daysBeforeMonth + day - 1) * MILLIS_PER_DAY
+    val utc = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"), Locale.US).apply { timeInMillis = utcMillis }
+    return Calendar.getInstance().apply {
+        clear()
+        set(utc.get(Calendar.YEAR), utc.get(Calendar.MONTH), utc.get(Calendar.DAY_OF_MONTH), 12, 0, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+}
+
+private fun jalaliDaysInMonth(year: Int, month: Int): Int = when {
+    month in 1..6 -> 31
+    month in 7..11 -> 30
+    jalaliCalibration(year).leap == 0 -> 30
+    else -> 29
+}
+
+private fun persianMonthSerial(timestampMillis: Long): Int {
+    val date = gregorianToJalali(timestampMillis)
+    return date.year * 12 + date.month - 1
+}
+
+private fun persianDateLabel(timestampMillis: Long): String {
+    val jalali = gregorianToJalali(timestampMillis)
+    val weekdayIndex = Calendar.getInstance().apply { timeInMillis = timestampMillis }.get(Calendar.DAY_OF_WEEK)
+    val weekdays = listOf("", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه")
+    return "${weekdays.getOrElse(weekdayIndex) { "" }} ${persianDigits(jalali.day.toString())} ${persianMonths[jalali.month - 1]} ${persianDigits(jalali.year.toString())}"
+}
+
+private fun monthStartDay(timestampMillis: Long): Long = Calendar.getInstance().apply {
+    timeInMillis = timestampMillis
+    set(Calendar.HOUR_OF_DAY, 0)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+}.timeInMillis
 
 @Composable
 private fun DateProposalDialog(
     personName: String,
     isRevision: Boolean = false,
     onDismiss: () -> Unit,
-    onSubmit: (place: String, scheduledAtMillis: Long) -> Unit
+    onSubmit: (place: String, scheduledAtMillis: Long, latitude: Double?, longitude: Double?) -> Unit
 ) {
-    val dayOptions = remember {
-        (1..14).map { offset ->
-            val calendar = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 12)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-                add(Calendar.DAY_OF_YEAR, offset)
-            }
-            calendar.timeInMillis to persianDigits(SimpleDateFormat("EEEE d MMMM", Locale("fa")).format(calendar.time))
-        }
+    val todayStart = remember { monthStartDay(System.currentTimeMillis()) }
+    val maxAllowedDay = remember(todayStart) {
+        Calendar.getInstance().apply {
+            timeInMillis = todayStart
+            add(Calendar.DAY_OF_YEAR, 14)
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
-    val timeOptions = remember {
-        listOf("۱۶:۰۰" to (16 to 0), "۱۷:۰۰" to (17 to 0), "۱۸:۰۰" to (18 to 0), "۱۹:۰۰" to (19 to 0), "۲۰:۰۰" to (20 to 0), "۲۰:۳۰" to (20 to 30), "۲۱:۰۰" to (21 to 0))
+    val maxAllowedEnd = remember(todayStart) {
+        Calendar.getInstance().apply {
+            timeInMillis = maxAllowedDay
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
     }
+    val initialDate = remember(todayStart) {
+        Calendar.getInstance().apply {
+            timeInMillis = todayStart
+            add(Calendar.DAY_OF_YEAR, 1)
+            set(Calendar.HOUR_OF_DAY, 12)
+        }.timeInMillis
+    }
+    var selectedDateMillis by remember { mutableLongStateOf(initialDate) }
+    var displayedMonthSerial by remember { mutableIntStateOf(persianMonthSerial(initialDate)) }
+    var selectedHour by remember { mutableIntStateOf(19) }
+    var selectedMinute by remember { mutableIntStateOf(0) }
     var place by remember { mutableStateOf("") }
-    var selectedDay by remember { mutableIntStateOf(0) }
-    var selectedTime by remember { mutableIntStateOf(2) }
-    var dayMenu by remember { mutableStateOf(false) }
-    var timeMenu by remember { mutableStateOf(false) }
+    var selectedLatitude by remember { mutableStateOf<Double?>(null) }
+    var selectedLongitude by remember { mutableStateOf<Double?>(null) }
+    var showMapPicker by remember { mutableStateOf(false) }
+
+    val currentMonthSerial = persianMonthSerial(todayStart)
+    val maxMonthSerial = persianMonthSerial(maxAllowedDay)
+    val displayedYear = displayedMonthSerial / 12
+    val displayedMonth = displayedMonthSerial % 12 + 1
+    val firstDayMillis = remember(displayedYear, displayedMonth) {
+        persianDateToMillis(displayedYear, displayedMonth, 1)
+    }
+    val firstDayCalendar = remember(firstDayMillis) { Calendar.getInstance().apply { timeInMillis = firstDayMillis } }
+    val firstDayOffset = firstDayCalendar.get(Calendar.DAY_OF_WEEK) % 7 // Saturday is column zero.
+    val daysInMonth = jalaliDaysInMonth(displayedYear, displayedMonth)
+    val weekLabels = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
+    val selectedDayStart = monthStartDay(selectedDateMillis)
+    val proposedDateTime = remember(selectedDateMillis, selectedHour, selectedMinute) {
+        Calendar.getInstance().apply {
+            timeInMillis = selectedDateMillis
+            set(Calendar.HOUR_OF_DAY, selectedHour)
+            set(Calendar.MINUTE, selectedMinute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    val isDateWithinWindow = selectedDayStart >= todayStart && selectedDateMillis <= maxAllowedEnd
+    val canSubmit = (place.trim().length >= 3 || selectedLatitude != null) &&
+        isDateWithinWindow && proposedDateTime > System.currentTimeMillis()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = DarkSurface,
         title = {
             Column {
                 Text(if (isRevision) "پیشنهاد اصلاح دیت" else "پیشنهاد دیت اول", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-                Text("برای ${personName} مکان و زمان مناسبی پیشنهاد بده.", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
+                Text("برای $personName مکان و زمان مناسبی پیشنهاد بده.", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 570.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(11.dp)
+            ) {
                 OutlinedTextField(
                     value = place,
                     onValueChange = { place = it },
@@ -4117,35 +4390,146 @@ private fun DateProposalDialog(
                     singleLine = true,
                     colors = fieldColors()
                 )
-                Text("روز پیشنهادی", color = TextGray, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
-                Box {
-                    OutlinedButton(onClick = { dayMenu = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                        Icon(Icons.Default.CalendarMonth, null, tint = TinderPink)
-                        Spacer(Modifier.width(8.dp))
-                        Text(dayOptions[selectedDay].second, color = TextWhite, fontFamily = Vazirmatn)
-                        Spacer(Modifier.weight(1f))
-                        Icon(Icons.Default.ExpandMore, null, tint = TextMuted)
+                OutlinedButton(
+                    onClick = { showMapPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(13.dp),
+                    border = BorderStroke(1.dp, if (selectedLatitude != null) SuccessGreen.copy(alpha = 0.6f) else BrandViolet.copy(alpha = 0.5f)),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Icon(Icons.Default.Map, null, tint = if (selectedLatitude != null) SuccessGreen else BrandViolet)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (selectedLatitude != null) "موقعیت روی نقشه انتخاب شد" else "انتخاب اختیاری محل روی نقشه", color = TextWhite, fontFamily = Vazirmatn, fontSize = 11.sp)
+                    Spacer(Modifier.weight(1f))
+                    if (selectedLatitude != null) {
+                        Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(17.dp))
+                    } else {
+                        Icon(Icons.Default.ChevronLeft, null, tint = TextMuted)
                     }
-                    DropdownMenu(expanded = dayMenu, onDismissRequest = { dayMenu = false }) {
-                        dayOptions.forEachIndexed { index, option ->
-                            DropdownMenuItem(text = { Text(option.second, fontFamily = Vazirmatn) }, onClick = { selectedDay = index; dayMenu = false })
+                }
+                if (selectedLatitude != null && selectedLongitude != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Place, null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            "${"%.4f".format(Locale.US, selectedLatitude)}، ${"%.4f".format(Locale.US, selectedLongitude)}",
+                            color = SuccessGreen, fontSize = 9.sp, fontFamily = Vazirmatn
+                        )
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = {
+                            selectedLatitude = null
+                            selectedLongitude = null
+                            if (place == "موقعیت انتخاب‌شده روی نقشه") place = ""
+                        }) {
+                            Text("حذف موقعیت", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
                         }
                     }
                 }
-                Text("ساعت پیشنهادی", color = TextGray, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
-                Box {
-                    OutlinedButton(onClick = { timeMenu = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                        Icon(Icons.Default.Schedule, null, tint = TinderPink)
-                        Spacer(Modifier.width(8.dp))
-                        Text(timeOptions[selectedTime].first, color = TextWhite, fontFamily = Vazirmatn)
-                        Spacer(Modifier.weight(1f))
-                        Icon(Icons.Default.ExpandMore, null, tint = TextMuted)
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("تاریخ قرار · تقویم شمسی", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                        Text("فقط تا ۱۴ روز آینده امکان انتخاب داری", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
                     }
-                    DropdownMenu(expanded = timeMenu, onDismissRequest = { timeMenu = false }) {
-                        timeOptions.forEachIndexed { index, option ->
-                            DropdownMenuItem(text = { Text(option.first, fontFamily = Vazirmatn) }, onClick = { selectedTime = index; timeMenu = false })
+                    Surface(color = TinderPink.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp)) {
+                        Text(persianDateLabel(selectedDateMillis), Modifier.padding(horizontal = 9.dp, vertical = 6.dp), color = TinderPink, fontSize = 9.sp, fontFamily = Vazirmatn)
+                    }
+                }
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF171E31)),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.07f))
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${persianMonths[displayedMonth - 1]} ${persianDigits(displayedYear.toString())}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                            Spacer(Modifier.weight(1f))
+                            if (displayedMonthSerial > currentMonthSerial) {
+                                TextButton(
+                                    onClick = { displayedMonthSerial = currentMonthSerial },
+                                    contentPadding = PaddingValues(horizontal = 5.dp, vertical = 2.dp)
+                                ) { Text("ماه جاری", color = TextGray, fontSize = 9.sp, fontFamily = Vazirmatn) }
+                            }
+                            if (displayedMonthSerial < maxMonthSerial) {
+                                IconButton(
+                                    onClick = { displayedMonthSerial = (displayedMonthSerial + 1).coerceAtMost(maxMonthSerial) },
+                                    modifier = Modifier.size(31.dp)
+                                ) { Icon(Icons.Default.ChevronLeft, "ماه بعد", tint = TinderPink) }
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth()) {
+                            weekLabels.forEach { label ->
+                                Box(Modifier.weight(1f).height(25.dp), contentAlignment = Alignment.Center) {
+                                    Text(label, color = TextMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                }
+                            }
+                        }
+                        val dayCells: List<Int?> = List(firstDayOffset) { null } + (1..daysInMonth).map { it }
+                        dayCells.chunked(7).forEach { week ->
+                            Row(Modifier.fillMaxWidth()) {
+                                week.forEach { day ->
+                                    if (day == null) {
+                                        Spacer(Modifier.weight(1f).height(38.dp).padding(2.dp))
+                                    } else {
+                                        val dayMillis = persianDateToMillis(displayedYear, displayedMonth, day)
+                                        val dayStart = monthStartDay(dayMillis)
+                                        val enabled = dayStart >= todayStart && dayMillis <= maxAllowedDay
+                                        val selected = monthStartDay(selectedDateMillis) == dayStart
+                                        Surface(
+                                            onClick = { selectedDateMillis = dayMillis },
+                                            enabled = enabled,
+                                            modifier = Modifier.weight(1f).padding(2.dp).height(36.dp),
+                                            shape = RoundedCornerShape(11.dp),
+                                            color = when {
+                                                selected -> TinderPink
+                                                enabled -> DarkCard
+                                                else -> Color.Transparent
+                                            },
+                                            border = if (enabled && !selected) BorderStroke(1.dp, Color.White.copy(alpha = 0.045f)) else null
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    persianDigits(day.toString()),
+                                                    color = when { selected -> TextWhite; enabled -> TextGray; else -> TextMuted.copy(alpha = 0.35f) },
+                                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                                    fontSize = 11.sp,
+                                                    fontFamily = Vazirmatn
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                repeat((7 - week.size).coerceAtLeast(0)) {
+                                    Spacer(Modifier.weight(1f).height(38.dp).padding(2.dp))
+                                }
+                            }
                         }
                     }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("ساعت قرار", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                        Text("عقربه را برای ساعت یا دقیقه بچرخان / لمس کن", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                    }
+                    Surface(color = BrandViolet.copy(alpha = 0.14f), shape = RoundedCornerShape(12.dp)) {
+                        Text(
+                            persianDigits("%02d:%02d".format(selectedHour, selectedMinute)),
+                            Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = BrandViolet,
+                            fontWeight = FontWeight.Bold, fontSize = 15.sp, fontFamily = Vazirmatn
+                        )
+                    }
+                }
+                AnalogTimePicker(
+                    hour = selectedHour,
+                    minute = selectedMinute,
+                    onHourChange = { selectedHour = it },
+                    onMinuteChange = { selectedMinute = it }
+                )
+                if (!isDateWithinWindow) {
+                    Text("تاریخ باید بین امروز و ۱۴ روز آینده باشد.", color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
+                } else if (proposedDateTime <= System.currentTimeMillis()) {
+                    Text("این ساعت گذشته است؛ ساعت دیگری انتخاب کن.", color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
                 }
                 Text("قرار پس از تأیید طرف مقابل نهایی و در بالای چت سنجاق می‌شود.", color = TextMuted, fontSize = 10.sp, lineHeight = 18.sp, fontFamily = Vazirmatn)
             }
@@ -4153,22 +4537,234 @@ private fun DateProposalDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    val now = System.currentTimeMillis()
                     val selectedDate = Calendar.getInstance().apply {
-                        timeInMillis = dayOptions[selectedDay].first
-                        set(Calendar.HOUR_OF_DAY, timeOptions[selectedTime].second.first)
-                        set(Calendar.MINUTE, timeOptions[selectedTime].second.second)
+                        timeInMillis = selectedDateMillis
+                        set(Calendar.HOUR_OF_DAY, selectedHour)
+                        set(Calendar.MINUTE, selectedMinute)
                         set(Calendar.SECOND, 0)
                         set(Calendar.MILLISECOND, 0)
                     }.timeInMillis
-                    onSubmit(place.trim(), selectedDate)
+                    if (selectedDate > now && selectedDate <= maxAllowedEnd && (place.trim().length >= 3 || selectedLatitude != null)) {
+                        val finalPlace = place.trim().ifBlank { "موقعیت انتخاب‌شده روی نقشه" }
+                        onSubmit(finalPlace, selectedDate, selectedLatitude, selectedLongitude)
+                    }
                 },
-                enabled = place.trim().length >= 3,
+                enabled = canSubmit,
                 colors = ButtonDefaults.buttonColors(containerColor = TinderPink),
                 shape = RoundedCornerShape(12.dp)
             ) { Text(if (isRevision) "ارسال پیشنهاد اصلاح" else "ارسال پیشنهاد", fontFamily = Vazirmatn) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", color = TextGray, fontFamily = Vazirmatn) } }
     )
+    if (showMapPicker) {
+        DatePlaceMapPicker(
+            onDismiss = { showMapPicker = false },
+            onConfirm = { latitude, longitude ->
+                selectedLatitude = latitude
+                selectedLongitude = longitude
+                if (place.isBlank()) place = "موقعیت انتخاب‌شده روی نقشه"
+                showMapPicker = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun AnalogTimePicker(
+    hour: Int,
+    minute: Int,
+    onHourChange: (Int) -> Unit,
+    onMinuteChange: (Int) -> Unit
+) {
+    var selectingHour by remember { mutableStateOf(true) }
+    val isPm = hour >= 12
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                onClick = { selectingHour = true },
+                color = if (selectingHour) BrandViolet else DarkCard,
+                shape = RoundedCornerShape(11.dp),
+                border = BorderStroke(1.dp, if (selectingHour) BrandViolet else Color.White.copy(alpha = 0.07f))
+            ) {
+                val displayHour = if (hour % 12 == 0) 12 else hour % 12
+                Text(persianDigits("ساعت $displayHour"), Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+            }
+            Surface(
+                onClick = { selectingHour = false },
+                color = if (!selectingHour) BrandViolet else DarkCard,
+                shape = RoundedCornerShape(11.dp),
+                border = BorderStroke(1.dp, if (!selectingHour) BrandViolet else Color.White.copy(alpha = 0.07f))
+            ) {
+                Text(persianDigits("دقیقه %02d".format(minute)), Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+            }
+            Surface(
+                onClick = { onHourChange(if (isPm) hour - 12 else hour + 12) },
+                color = TinderPink.copy(alpha = 0.13f), shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(if (isPm) "ب.ظ" else "ق.ظ", Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = TinderPink, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+            }
+        }
+        BoxWithConstraints(Modifier.size(244.dp)) {
+            val dialSize = maxWidth
+            val center = dialSize / 2
+            val labelRadius = dialSize * 0.355f
+            Canvas(
+                Modifier.fillMaxSize().pointerInput(selectingHour, hour, minute, isPm) {
+                    detectTapGestures { tap ->
+                        val dx = tap.x - size.width / 2f
+                        val dy = tap.y - size.height / 2f
+                        val rawDegrees = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())) + 90.0
+                        val normalized = (rawDegrees + 360.0) % 360.0
+                        if (selectingHour) {
+                            val index = (kotlin.math.round(normalized / 30.0).toInt() % 12)
+                            val hour12 = if (index == 0) 12 else index
+                            val nextHour = if (isPm) hour12 % 12 + 12 else hour12 % 12
+                            onHourChange(nextHour)
+                            selectingHour = false
+                        } else {
+                            val nextMinute = kotlin.math.round(normalized / 6.0).toInt() % 60
+                            onMinuteChange(nextMinute)
+                        }
+                    }
+                }
+            ) {
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                val outer = size.minDimension * 0.475f
+                val selectorIndex = if (selectingHour) hour % 12 else minute
+                val selectorDegrees = (if (selectingHour) selectorIndex * 30.0 else selectorIndex * 6.0) - 90.0
+                val selectorRadians = selectorDegrees * PI / 180.0
+                val selectorRadius = if (selectingHour) outer * 0.76f else outer * 0.9f
+                val end = Offset(cx + cos(selectorRadians).toFloat() * selectorRadius, cy + sin(selectorRadians).toFloat() * selectorRadius)
+
+                drawCircle(Color(0xFF171E31), radius = outer, center = Offset(cx, cy))
+                drawCircle(BrandViolet.copy(alpha = 0.32f), radius = outer, center = Offset(cx, cy), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx()))
+                for (tick in 0 until 60) {
+                    val angle = (tick * 6.0 - 90.0) * PI / 180.0
+                    val major = tick % 5 == 0
+                    val r1 = outer * if (major) 0.91f else 0.95f
+                    val r2 = outer * 0.985f
+                    drawLine(
+                        color = if (major) TextGray.copy(alpha = 0.65f) else TextMuted.copy(alpha = 0.28f),
+                        start = Offset(cx + cos(angle).toFloat() * r1, cy + sin(angle).toFloat() * r1),
+                        end = Offset(cx + cos(angle).toFloat() * r2, cy + sin(angle).toFloat() * r2),
+                        strokeWidth = if (major) 1.5.dp.toPx() else 0.7.dp.toPx()
+                    )
+                }
+                drawLine(BrandViolet, Offset(cx, cy), end, strokeWidth = 3.dp.toPx())
+                drawCircle(BrandViolet, radius = 13.dp.toPx(), center = end)
+                drawCircle(TextWhite, radius = 4.dp.toPx(), center = Offset(cx, cy))
+            }
+            for (index in 0 until 12) {
+                val angle = (index * 30.0 - 90.0) * PI / 180.0
+                val dx = labelRadius * cos(angle).toFloat()
+                val dy = labelRadius * sin(angle).toFloat()
+                val labelValue = if (selectingHour) {
+                    if (index == 0) "۱۲" else persianDigits(index.toString())
+                } else {
+                    persianDigits("%02d".format(index * 5))
+                }
+                val selected = if (selectingHour) hour % 12 == index else minute / 5 == index && minute % 5 == 0
+                Box(
+                    Modifier.offset(x = center + dx.dp - 14.dp, y = center + dy.dp - 14.dp).size(28.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(labelValue, color = if (selected) TextWhite else TextGray, fontSize = if (selectingHour) 11.sp else 8.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontFamily = Vazirmatn)
+                }
+            }
+        }
+        Text(
+            if (selectingHour) "عدد ساعت را انتخاب کن؛ سپس صفحه دقیقه باز می‌شود." else "برای ثبت دقیقه، هر نقطه از صفحه ساعت را لمس کن.",
+            color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun DatePlaceMapPicker(
+    onDismiss: () -> Unit,
+    onConfirm: (latitude: Double, longitude: Double) -> Unit
+) {
+    val context = LocalContext.current
+    var mapViewState by remember { mutableStateOf<MapView?>(null) }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.96f).heightIn(min = 520.dp, max = 720.dp),
+            color = DarkSurface,
+            shape = RoundedCornerShape(22.dp),
+            border = BorderStroke(1.dp, BrandViolet.copy(alpha = 0.3f))
+        ) {
+            Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.LocationOn, null, tint = TinderPink)
+                    Spacer(Modifier.width(7.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("انتخاب محل قرار", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = Vazirmatn)
+                        Text("نقشه را جابه‌جا کن تا نقطهٔ موردنظر زیر نشانگر قرار بگیرد.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                    }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "بستن", tint = TextGray) }
+                }
+                Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(17.dp))) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { ctx ->
+                            Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+                            Configuration.getInstance().userAgentValue = "FastLove-Android/2.18.0 (ir.fastlove.demo)"
+                            MapView(ctx).apply {
+                                setTileSource(TileSourceFactory.MAPNIK)
+                                setMultiTouchControls(true)
+                                setUseDataConnection(true)
+                                controller.setZoom(14.5)
+                                controller.setCenter(GeoPoint(35.69439, 51.42151))
+                                onResume()
+                                mapViewState = this
+                            }
+                        },
+                        update = { }
+                    )
+                    Icon(
+                        Icons.Default.LocationOn,
+                        null,
+                        tint = TinderPink,
+                        modifier = Modifier.align(Alignment.Center).size(42.dp).offset(y = (-17).dp)
+                    )
+                    Surface(
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+                        shape = RoundedCornerShape(20.dp), color = Color(0xE8171D31)
+                    ) {
+                        Text("نشانگر ثابت است؛ نقشه را زیر آن حرکت بده", Modifier.padding(horizontal = 11.dp, vertical = 6.dp), color = TextWhite, fontSize = 9.sp, fontFamily = Vazirmatn)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp)) {
+                        Text("انصراف", color = TextGray, fontFamily = Vazirmatn)
+                    }
+                    Button(
+                        onClick = {
+                            val point = mapViewState?.mapCenter
+                            if (point != null) onConfirm(point.latitude, point.longitude)
+                            else onConfirm(35.69439, 51.42151)
+                        },
+                        modifier = Modifier.weight(1.4f),
+                        colors = ButtonDefaults.buttonColors(containerColor = TinderPink),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Check, null)
+                        Spacer(Modifier.width(5.dp))
+                        Text("ثبت این موقعیت", fontFamily = Vazirmatn)
+                    }
+                }
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            mapViewState?.onPause()
+            mapViewState?.onDetach()
+            mapViewState = null
+        }
+    }
 }
 
 @Composable
@@ -4387,6 +4983,13 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, canSeeLikes: Boolean
                         Spacer(Modifier.height(7.dp))
                         Text(proposal.place, color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = Vazirmatn)
                         Text(formatDateTimePersian(proposal.scheduledAtMillis), color = TextGray, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        if (proposal.locationLatitude != null && proposal.locationLongitude != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Map, null, tint = SuccessGreen, modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("موقعیت دقیق انتخاب‌شده روی نقشه پیوست است", color = SuccessGreen, fontSize = 9.sp, fontFamily = Vazirmatn)
+                            }
+                        }
                         if (proposal.status == DateProposalStatus.PENDING) {
                             Spacer(Modifier.height(8.dp))
                             if (proposal.proposerIsMe) {
@@ -4459,7 +5062,7 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, canSeeLikes: Boolean
                 personName = person.name,
                 isRevision = dateDialogIsRevision,
                 onDismiss = { showDateProposalDialog = false },
-                onSubmit = { place, scheduledAt ->
+                onSubmit = { place, scheduledAt, latitude, longitude ->
                     val proposal = DateProposal(
                         id = UUID.randomUUID().toString(),
                         personId = person.id,
@@ -4467,10 +5070,13 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, canSeeLikes: Boolean
                         scheduledAtMillis = scheduledAt,
                         proposerIsMe = true,
                         isRevision = dateDialogIsRevision,
-                        revisesProposalId = if (dateDialogIsRevision) activeDateProposal?.id else null
+                        revisesProposalId = if (dateDialogIsRevision) activeDateProposal?.id else null,
+                        locationLatitude = latitude,
+                        locationLongitude = longitude
                     )
                     updateDateProposal(proposal)
-                    messages.add(ChatMessage("${if (dateDialogIsRevision) "پیشنهاد اصلاح دیت" else "پیشنهاد دیت اول"}: $place · ${formatDateTimePersian(scheduledAt)}", true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date())))
+                    val mapLabel = if (latitude != null && longitude != null) " · موقعیت روی نقشه هم پیوست شد" else ""
+                    messages.add(ChatMessage("${if (dateDialogIsRevision) "پیشنهاد اصلاح دیت" else "پیشنهاد دیت اول"}: $place · ${formatDateTimePersian(scheduledAt)}$mapLabel", true, SimpleDateFormat("HH:mm", Locale("fa")).format(Date())))
                     saveChatMessages(context, person.id, messages.toList())
                     showDateProposalDialog = false
                     dateDialogIsRevision = false
@@ -4876,43 +5482,32 @@ private fun MyProfileScreen(
     onEdit: () -> Unit,
     onPreview: () -> Unit,
     onPaymentHistory: () -> Unit,
-    onToggleOnlineStatus: (Boolean) -> Unit,
-    onToggleLastSeen: (Boolean) -> Unit,
-    isVisibleOnMap: Boolean,
-    onToggleMapVisibility: (Boolean) -> Unit,
+    onPrivacySettings: () -> Unit,
+    onScheduledDates: () -> Unit,
     onShowBlocked: () -> Unit,
-    onDeleteRequest: () -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
-    val profileMapPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) onToggleMapVisibility(true)
-        else android.widget.Toast.makeText(context, "برای نمایش روی نقشه، دسترسی تقریبی موقعیت لازم است.", android.widget.Toast.LENGTH_LONG).show()
-    }
+    val referralCode = user.referralCode.ifBlank { "FL${user.phone.takeLast(6).ifBlank { "FASTLOVE" }}" }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(DarkBg).padding(bottom = 22.dp)) {
-        // Compact identity card: the full public-facing content lives in its own preview page.
         Card(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
             shape = RoundedCornerShape(24.dp),
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
         ) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(76.dp).clip(CircleShape).border(2.dp, TinderPink, CircleShape)) {
-                        val primary = user.photos.getOrNull(user.primaryPhotoIndex)
-                        if (primary != null) {
+                    Box(Modifier.size(76.dp).clip(CircleShape).background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
+                        if (user.photos.isNotEmpty()) {
                             AsyncImage(
-                                model = ImageRequest.Builder(context).data(Uri.parse(primary)).crossfade(true).build(),
+                                model = user.photos.getOrNull(user.primaryPhotoIndex.coerceIn(0, user.photos.lastIndex)),
                                 contentDescription = "عکس پروفایل",
-                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
-                        } else {
-                            Box(Modifier.fillMaxSize().background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
-                                Text(user.name.take(1).ifEmpty { "♡" }, fontSize = 32.sp, color = TextWhite, fontWeight = FontWeight.Bold)
-                            }
-                        }
+                        } else Text(user.name.take(1).ifEmpty { "♡" }, fontSize = 32.sp, color = TextWhite, fontWeight = FontWeight.Bold)
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
@@ -4921,15 +5516,13 @@ private fun MyProfileScreen(
                         Spacer(Modifier.height(7.dp))
                         Text("${user.photos.size} عکس · ${user.interests.size} علاقه‌مندی", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
                     }
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, "ویرایش پروفایل", tint = TinderPink)
-                    }
+                    IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "ویرایش پروفایل", tint = TinderPink) }
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ProfileMiniStat("مچ‌ها", matchCount.toString(), Modifier.weight(1f))
                     ProfileMiniStat("لایک‌ها", likeCount.toString(), Modifier.weight(1f))
-                    ProfileMiniStat("عکس‌ها", user.photos.size.toString(), Modifier.weight(1f))
+                    ProfileMiniStat("دیت‌ها", upcomingDates.size.toString(), Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(14.dp))
                 Button(
@@ -4945,7 +5538,6 @@ private fun MyProfileScreen(
             }
         }
 
-        // Membership summary kept short, with a single action to manage it.
         Card(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             colors = CardDefaults.cardColors(containerColor = DarkCard),
@@ -4970,124 +5562,96 @@ private fun MyProfileScreen(
             }
         }
 
-        Spacer(Modifier.height(20.dp))
-        Text("حریم خصوصی", Modifier.padding(horizontal = 20.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 14.sp)
+        Spacer(Modifier.height(14.dp))
         Card(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
-            shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            shape = RoundedCornerShape(19.dp),
+            border = BorderStroke(1.dp, BrandViolet.copy(alpha = 0.22f))
         ) {
-            Column {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(SuccessGreen.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Circle, null, tint = SuccessGreen, modifier = Modifier.size(16.dp))
+            Column(Modifier.fillMaxWidth().padding(15.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(BrandViolet.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.CardGiftcard, null, tint = BrandViolet, modifier = Modifier.size(20.dp))
                     }
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("نمایش وضعیت آنلاین", color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
-                        Text(if (user.showOnlineStatus) "دیگران می‌توانند آنلاین بودنت را ببینند" else "وضعیت آنلاین تو پنهان است", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                        Text("دعوت دوستان با کد معرف", color = TextWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        Text("کدت را کپی کن یا برای دوستانت بفرست", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
                     }
-                    Switch(
-                        checked = user.showOnlineStatus,
-                        onCheckedChange = onToggleOnlineStatus,
-                        colors = SwitchDefaults.colors(checkedThumbColor = TextWhite, checkedTrackColor = SuccessGreen, uncheckedThumbColor = TextGray, uncheckedTrackColor = DarkCard)
+                }
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color(0xFF10172A),
+                    shape = RoundedCornerShape(13.dp),
+                    border = BorderStroke(1.dp, BrandViolet.copy(alpha = 0.35f))
+                ) {
+                    Text(
+                        referralCode,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        textAlign = TextAlign.Center,
+                        color = TextWhite,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 2.sp
                     )
                 }
-                HorizontalDivider(color = DarkCard)
-                Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(BrandViolet.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.History, null, tint = BrandViolet, modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("نمایش آخرین بازدید در چت", color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
-                        Text(if (user.showLastSeen) "فقط برای مچ‌ها قابل مشاهده است" else "زمان آخرین بازدید پنهان است", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
-                    }
-                    Switch(
-                        checked = user.showLastSeen,
-                        onCheckedChange = onToggleLastSeen,
-                        colors = SwitchDefaults.colors(checkedThumbColor = TextWhite, checkedTrackColor = BrandViolet, uncheckedThumbColor = TextGray, uncheckedTrackColor = DarkCard)
-                    )
-                }
-                HorizontalDivider(color = DarkCard)
-                Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(TinderPink.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Map, null, tint = TinderPink, modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("نمایش پروفایل من روی نقشه", color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
-                        Text(if (isVisibleOnMap) "موقعیت تقریبی فعال است" else "برای دیگران روی نقشه نمایش داده نمی‌شوی", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
-                    }
-                    Switch(
-                        checked = isVisibleOnMap,
-                        onCheckedChange = { enabled ->
-                            if (enabled && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                                profileMapPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                            } else onToggleMapVisibility(enabled)
+                Spacer(Modifier.height(9.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("FastLove referral code", referralCode))
+                            android.widget.Toast.makeText(context, "کد معرف کپی شد", android.widget.Toast.LENGTH_SHORT).show()
                         },
-                        colors = SwitchDefaults.colors(checkedThumbColor = TextWhite, checkedTrackColor = TinderPink, uncheckedThumbColor = TextGray, uncheckedTrackColor = DarkCard)
-                    )
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, BrandViolet.copy(alpha = 0.6f)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, null, tint = BrandViolet, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("کپی کد", color = TextWhite, fontFamily = Vazirmatn, fontSize = 10.sp)
+                    }
+                    Button(
+                        onClick = {
+                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, "من در فست‌لاو هستم 💜 با کد معرف $referralCode ثبت‌نام کن.")
+                            }
+                            runCatching { context.startActivity(Intent.createChooser(sendIntent, "اشتراک‌گذاری کد معرف")) }
+                                .onFailure { android.widget.Toast.makeText(context, "اشتراک‌گذاری در دسترس نیست", android.widget.Toast.LENGTH_SHORT).show() }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandViolet),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 7.dp)
+                    ) {
+                        Icon(Icons.Default.Share, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("اشتراک‌گذاری", fontFamily = Vazirmatn, fontSize = 10.sp)
+                    }
                 }
-                HorizontalDivider(color = DarkCard)
-                ProfileActionRow(Icons.Default.DeleteForever, "حذف حساب کاربری", Color(0xFFFF7777), onDeleteRequest)
+                if (user.referredByCode.isNotBlank()) {
+                    Text("با کد ${user.referredByCode} دعوت شده‌ای.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 7.dp))
+                }
             }
         }
 
         Spacer(Modifier.height(18.dp))
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("دیت‌های برنامه‌ریزی‌شده", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 14.sp)
-            Spacer(Modifier.weight(1f))
-            Text("مرتب‌شده بر اساس نزدیک‌ترین زمان", color = SuccessGreen, fontSize = 9.sp, fontFamily = Vazirmatn)
-        }
-        if (upcomingDates.isEmpty()) {
-            Card(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.EventNote, null, tint = TextMuted, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text("هنوز دیت تأییدشده‌ای برنامه‌ریزی نکرده‌ای.", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
-                }
-            }
-        } else {
-            upcomingDates.sortedBy { it.second.scheduledAtMillis }.forEach { (datePerson, dateProposal) ->
-                Card(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
-                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.22f))
-                ) {
-                    Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(SuccessGreen.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.EventAvailable, null, tint = SuccessGreen, modifier = Modifier.size(21.dp))
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("با ${datePerson.name}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
-                            Text(dateProposal.place, color = TextGray, fontSize = 10.sp, fontFamily = Vazirmatn, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(formatDateTimePersian(dateProposal.scheduledAtMillis), color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
-                        }
-                        Icon(Icons.Default.PushPin, null, tint = SuccessGreen, modifier = Modifier.size(17.dp))
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-        Text("حساب کاربری", Modifier.padding(horizontal = 20.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 14.sp)
+        Text("تنظیمات و برنامه‌ها", Modifier.padding(horizontal = 20.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, fontSize = 14.sp)
         Card(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
             colors = CardDefaults.cardColors(containerColor = DarkSurface),
             shape = RoundedCornerShape(18.dp)
         ) {
             Column {
-                ProfileActionRow(Icons.Default.Edit, "ویرایش اطلاعات و عکس‌ها", TinderPink, onEdit)
+                ProfileActionRow(Icons.Default.Security, "حریم خصوصی", BrandViolet, onPrivacySettings)
                 HorizontalDivider(color = DarkCard)
-                ProfileActionRow(Icons.Default.Visibility, "پیش‌نمایش پروفایل عمومی", BrandViolet, onPreview)
+                ProfileActionRow(Icons.Default.EventAvailable, "دیت‌های برنامه‌ریزی‌شده · ${persianDigits(upcomingDates.size.toString())}", SuccessGreen, onScheduledDates)
+                HorizontalDivider(color = DarkCard)
+                ProfileActionRow(Icons.Default.Edit, "ویرایش اطلاعات و عکس‌ها", TinderPink, onEdit)
                 HorizontalDivider(color = DarkCard)
                 ProfileActionRow(Icons.Default.ReceiptLong, "تاریخچه پرداخت", TinderOrange, onPaymentHistory)
                 HorizontalDivider(color = DarkCard)
@@ -5103,6 +5667,131 @@ private fun MyProfileScreen(
             Icon(Icons.Default.Logout, null, tint = TinderPink)
             Spacer(Modifier.width(8.dp))
             Text("خروج از حساب کاربری", color = TinderPink, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun PrivacySettingsScreen(
+    user: UserProfile,
+    isVisibleOnMap: Boolean,
+    onToggleOnlineStatus: (Boolean) -> Unit,
+    onToggleLastSeen: (Boolean) -> Unit,
+    onToggleMapVisibility: (Boolean) -> Unit,
+    onDeleteRequest: () -> Unit,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    BackHandler(onBack = onBack)
+    val mapPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) onToggleMapVisibility(true)
+        else android.widget.Toast.makeText(context, "برای نمایش روی نقشه، دسترسی تقریبی موقعیت لازم است.", android.widget.Toast.LENGTH_LONG).show()
+    }
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Column(Modifier.weight(1f)) {
+                Text("حریم خصوصی", color = TextWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Text("کنترل کن دیگران چه اطلاعاتی از تو ببینند", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            }
+            Icon(Icons.Default.Security, null, tint = BrandViolet, modifier = Modifier.padding(end = 12.dp).size(22.dp))
+        }
+        Card(Modifier.fillMaxWidth().padding(16.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(20.dp)) {
+            Column {
+                PrivacySwitchRow(Icons.Default.Circle, "نمایش وضعیت آنلاین", if (user.showOnlineStatus) "دیگران می‌توانند آنلاین بودنت را ببینند" else "وضعیت آنلاین تو پنهان است", SuccessGreen, user.showOnlineStatus, onToggleOnlineStatus)
+                HorizontalDivider(color = DarkCard)
+                PrivacySwitchRow(Icons.Default.History, "نمایش آخرین بازدید", if (user.showLastSeen) "فقط برای مچ‌ها قابل مشاهده است" else "زمان آخرین بازدید پنهان است", BrandViolet, user.showLastSeen, onToggleLastSeen)
+                HorizontalDivider(color = DarkCard)
+                PrivacySwitchRow(
+                    Icons.Default.Map,
+                    "نمایش پروفایل من روی نقشه",
+                    if (isVisibleOnMap) "موقعیت تقریبی تو فعال است" else "موقعیت تو برای دیگران مخفی است",
+                    TinderPink,
+                    isVisibleOnMap,
+                    { enabled ->
+                        if (enabled && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                            mapPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        } else onToggleMapVisibility(enabled)
+                    }
+                )
+            }
+        }
+        Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0x55FF7777))) {
+            Column(Modifier.padding(14.dp)) {
+                Text("حذف حساب کاربری", color = Color(0xFFFF7777), fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Spacer(Modifier.height(4.dp))
+                Text("با حذف حساب، اطلاعات محلی این حساب از دستگاه پاک می‌شود.", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                TextButton(onClick = onDeleteRequest, modifier = Modifier.align(Alignment.End)) {
+                    Icon(Icons.Default.DeleteForever, null, tint = Color(0xFFFF7777))
+                    Spacer(Modifier.width(5.dp))
+                    Text("حذف حساب", color = Color(0xFFFF7777), fontFamily = Vazirmatn)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrivacySwitchRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    tint: Color,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(19.dp))
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
+            Text(subtitle, color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = TextWhite, checkedTrackColor = tint, uncheckedThumbColor = TextGray, uncheckedTrackColor = DarkCard))
+    }
+}
+
+@Composable
+private fun ScheduledDatesScreen(upcomingDates: List<Pair<Person, DateProposal>>, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    val sortedDates = remember(upcomingDates) { upcomingDates.sortedBy { it.second.scheduledAtMillis } }
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Column(Modifier.weight(1f)) {
+                Text("دیت‌های برنامه‌ریزی‌شده", color = TextWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                Text("از نزدیک‌ترین قرار تا زمان‌های بعدی", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            }
+            Icon(Icons.Default.EventAvailable, null, tint = SuccessGreen, modifier = Modifier.padding(end = 12.dp).size(22.dp))
+        }
+        if (sortedDates.isEmpty()) {
+            EmptyState("هنوز دیتی برنامه‌ریزی نشده", "پس از تأیید یک پیشنهاد در چت، قرار در این صفحه نمایش داده می‌شود.", "📅")
+        } else {
+            LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(sortedDates, key = { "${it.first.id}_${it.second.id}" }) { (datePerson, dateProposal) ->
+                    Card(
+                        Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.22f))
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(SuccessGreen.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.EventAvailable, null, tint = SuccessGreen, modifier = Modifier.size(22.dp))
+                            }
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("با ${datePerson.name}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                                Text(dateProposal.place, color = TextGray, fontSize = 10.sp, fontFamily = Vazirmatn, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(formatDateTimePersian(dateProposal.scheduledAtMillis), color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
+                            }
+                            Icon(Icons.Default.PushPin, null, tint = SuccessGreen, modifier = Modifier.size(17.dp))
+                        }
+                    }
+                }
+            }
         }
     }
 }
