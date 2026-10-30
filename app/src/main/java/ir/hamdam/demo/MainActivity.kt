@@ -78,16 +78,18 @@ val Vazirmatn = FontFamily(
     Font(R.font.vazirmatn_bold, FontWeight.Bold)
 )
 
-private val TinderPink = Color(0xFFFF4458)
-private val TinderOrange = Color(0xFFFF7854)
-private val DarkBg = Color(0xFF121212)
-private val DarkSurface = Color(0xFF1E1E1E)
-private val DarkCard = Color(0xFF2A2A2A)
-private val TextWhite = Color(0xFFFFFFFF)
-private val TextGray = Color(0xFFB0B0B0)
-private val TextMuted = Color(0xFF777777)
-private val SuccessGreen = Color(0xFF2ED573)
-private val GradientTinder = listOf(Color(0xFFFF4458), Color(0xFFFF7854))
+// FastLove visual system — warm coral, soft violet and layered midnight surfaces.
+private val TinderPink = Color(0xFFFF648C)
+private val TinderOrange = Color(0xFFFF9A78)
+private val BrandViolet = Color(0xFF9B8CFF)
+private val DarkBg = Color(0xFF0B1020)
+private val DarkSurface = Color(0xFF151B2D)
+private val DarkCard = Color(0xFF20283D)
+private val TextWhite = Color(0xFFF9F8FF)
+private val TextGray = Color(0xFFB9C1D8)
+private val TextMuted = Color(0xFF818BA7)
+private val SuccessGreen = Color(0xFF52D6A5)
+private val GradientTinder = listOf(Color(0xFFFF648C), Color(0xFFFF8A83), Color(0xFF9B8CFF))
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 enum class Gender { MALE, FEMALE, OTHER }
@@ -475,9 +477,17 @@ private fun FastLoveApp() {
 
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = TinderPink, secondary = TinderOrange,
-            background = DarkBg, surface = DarkSurface,
-            onPrimary = TextWhite, onBackground = TextWhite, onSurface = TextWhite
+            primary = TinderPink, secondary = TinderOrange, tertiary = BrandViolet,
+            background = DarkBg, surface = DarkSurface, surfaceVariant = DarkCard,
+            onPrimary = TextWhite, onSecondary = TextWhite,
+            onBackground = TextWhite, onSurface = TextWhite,
+            outline = Color(0xFF3B4561), outlineVariant = Color(0xFF2A334A)
+        ),
+        shapes = Shapes(
+            small = RoundedCornerShape(12.dp),
+            medium = RoundedCornerShape(18.dp),
+            large = RoundedCornerShape(26.dp),
+            extraLarge = RoundedCornerShape(32.dp)
         ),
         typography = Typography().let { base ->
             base.copy(
@@ -947,44 +957,126 @@ private fun UpgradeTeaserScreen(onUpgrade: () -> Unit) {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 @Composable
 private fun AnimatedAuthBackground() {
-    val infinite = rememberInfiniteTransition(label = "authBg")
-    val t by infinite.animateFloat(
-        0f, 360f,
-        infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Restart),
-        label = "rot"
+    val infinite = rememberInfiniteTransition(label = "authAtmosphere")
+    val drift by infinite.animateFloat(
+        initialValue = -28f,
+        targetValue = 28f,
+        animationSpec = infiniteRepeatable(tween(12500, easing = LinearEasing), RepeatMode.Reverse),
+        label = "orbDrift"
     )
-    val pulse by infinite.animateFloat(
-        0.55f, 1f,
-        infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "pulse"
+    val orbit by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(32000, easing = LinearEasing), RepeatMode.Restart),
+        label = "orbit"
     )
-    Box(Modifier.fillMaxSize().background(DarkBg)) {
+    val breathe by infinite.animateFloat(
+        initialValue = 0.72f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "breathe"
+    )
+
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF171326), DarkBg, Color(0xFF080D1A))))) {
         Box(
-            Modifier.size(260.dp)
-                .offset(x = (-30).dp, y = 60.dp)
-                .graphicsLayer { alpha = 0.4f * pulse; translationX = 18f * kotlin.math.sin(Math.toRadians(t.toDouble())).toFloat() }
-                .background(Brush.radialGradient(listOf(TinderPink.copy(alpha = 0.5f), Color.Transparent)), CircleShape)
+            Modifier.size(330.dp).align(Alignment.TopStart).offset(x = (-145).dp, y = 45.dp)
+                .graphicsLayer { alpha = 0.62f * breathe; translationX = drift; translationY = drift * 0.24f }
+                .background(Brush.radialGradient(listOf(TinderPink.copy(alpha = 0.42f), Color.Transparent)), CircleShape)
         )
         Box(
-            Modifier.size(200.dp).align(Alignment.TopEnd).offset(x = (-10).dp, y = 30.dp)
-                .graphicsLayer { alpha = 0.35f * pulse; translationY = 12f * kotlin.math.cos(Math.toRadians((t * 1.2).toDouble())).toFloat() }
-                .background(Brush.radialGradient(listOf(TinderOrange.copy(alpha = 0.45f), Color.Transparent)), CircleShape)
+            Modifier.size(290.dp).align(Alignment.BottomEnd).offset(x = 115.dp, y = 55.dp)
+                .graphicsLayer { alpha = 0.58f * breathe; translationX = -drift * 0.7f; translationY = -drift * 0.3f }
+                .background(Brush.radialGradient(listOf(BrandViolet.copy(alpha = 0.40f), Color.Transparent)), CircleShape)
         )
         Box(
-            Modifier.size(160.dp).align(Alignment.BottomCenter).offset(y = (-20).dp)
-                .graphicsLayer { alpha = 0.28f * pulse }
-                .background(Brush.radialGradient(listOf(Color(0xFFFF6B8A).copy(alpha = 0.35f), Color.Transparent)), CircleShape)
+            Modifier.size(190.dp).align(Alignment.TopEnd).offset(x = 65.dp, y = 215.dp)
+                .graphicsLayer { alpha = 0.30f * breathe }
+                .background(Brush.radialGradient(listOf(TinderOrange.copy(alpha = 0.34f), Color.Transparent)), CircleShape)
         )
-        Icon(Icons.Default.Favorite, null, tint = TinderPink.copy(alpha = 0.12f),
-            modifier = Modifier.align(Alignment.CenterStart).padding(start = 40.dp, bottom = 120.dp).size(28.dp)
-                .graphicsLayer { rotationZ = t * 0.15f })
-        Icon(Icons.Default.Favorite, null, tint = TinderOrange.copy(alpha = 0.1f),
-            modifier = Modifier.align(Alignment.TopEnd).padding(end = 50.dp, top = 100.dp).size(22.dp)
-                .graphicsLayer { rotationZ = -t * 0.1f })
-        Icon(Icons.Default.Favorite, null, tint = TinderPink.copy(alpha = 0.08f),
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 70.dp, bottom = 140.dp).size(18.dp)
-                .graphicsLayer { translationY = 10f * kotlin.math.sin(Math.toRadians((t * 2).toDouble())).toFloat() })
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF1A0A0C).copy(alpha = 0.55f), DarkBg.copy(alpha = 0.9f)))))
+
+        // Thin orbit rings add depth without competing with the form.
+        Box(
+            Modifier.size(300.dp).align(Alignment.Center).offset(x = 115.dp, y = 45.dp)
+                .graphicsLayer { rotationZ = orbit; alpha = 0.13f }
+                .border(1.dp, Color.White.copy(alpha = 0.32f), CircleShape)
+        )
+        Box(
+            Modifier.size(230.dp).align(Alignment.Center).offset(x = 115.dp, y = 45.dp)
+                .graphicsLayer { rotationZ = -orbit * 0.72f; alpha = 0.10f }
+                .border(1.dp, TinderPink.copy(alpha = 0.55f), CircleShape)
+        )
+
+        Icon(
+            Icons.Default.Favorite, null, tint = TinderPink.copy(alpha = 0.14f),
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 28.dp, top = 80.dp).size(30.dp)
+                .graphicsLayer { rotationZ = orbit * 0.08f; translationY = drift * 0.35f }
+        )
+        Icon(
+            Icons.Default.Favorite, null, tint = BrandViolet.copy(alpha = 0.18f),
+            modifier = Modifier.align(Alignment.TopEnd).padding(end = 48.dp, top = 115.dp).size(20.dp)
+                .graphicsLayer { rotationZ = -orbit * 0.12f; translationY = -drift * 0.3f }
+        )
+        Icon(
+            Icons.Default.Favorite, null, tint = TinderOrange.copy(alpha = 0.14f),
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 72.dp, bottom = 135.dp).size(16.dp)
+                .graphicsLayer { translationY = drift * 0.25f }
+        )
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0B1020).copy(alpha = 0.18f), Color(0xFF080D1A).copy(alpha = 0.54f)))))
+    }
+}
+
+@Composable
+private fun AuthChoiceCard(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    primary: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(20.dp)
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        color = Color.Transparent,
+        border = if (primary) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
+    ) {
+        Row(
+            Modifier
+                .background(
+                    if (primary) Brush.linearGradient(GradientTinder)
+                    else Brush.linearGradient(listOf(Color(0xFF252D45), Color(0xFF1B2237)))
+                )
+                .padding(horizontal = 17.dp, vertical = 17.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                Modifier.size(46.dp).clip(RoundedCornerShape(15.dp))
+                    .background(if (primary) Color.White.copy(alpha = 0.18f) else BrandViolet.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = TextWhite, modifier = Modifier.size(23.dp))
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp, fontFamily = Vazirmatn)
+                Text(subtitle, color = TextWhite.copy(alpha = if (primary) 0.88f else 0.66f), fontSize = 11.sp, fontFamily = Vazirmatn)
+            }
+            Icon(Icons.Default.ChevronLeft, null, tint = TextWhite.copy(alpha = 0.88f), modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun AuthStepIndicator(step: Int) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        repeat(3) { index ->
+            Box(
+                Modifier.weight(if (index == step) 2.2f else 1f).height(4.dp)
+                    .clip(CircleShape)
+                    .background(if (index <= step) Brush.horizontalGradient(GradientTinder) else Brush.horizontalGradient(listOf(DarkCard, DarkCard)))
+            )
+        }
     }
 }
 
@@ -996,75 +1088,170 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
     var error by remember { mutableStateOf("") }
     var registerMode by remember { mutableStateOf(true) }
     var secondsLeft by remember { mutableIntStateOf(120) }
-    LaunchedEffect(step) {
+    var resendToken by remember { mutableIntStateOf(0) }
+    val logoTransition = rememberInfiniteTransition(label = "authLogo")
+    val logoScale by logoTransition.animateFloat(
+        0.97f, 1.035f,
+        infiniteRepeatable(tween(1900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "logoScale"
+    )
+
+    LaunchedEffect(step, resendToken) {
         if (step == 2) {
             secondsLeft = 120
             while (secondsLeft > 0) { delay(1000); secondsLeft-- }
         }
     }
+
     Box(Modifier.fillMaxSize()) {
         AnimatedAuthBackground()
-    Column(
-        Modifier.fillMaxSize().padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(Modifier.height(20.dp))
-        Box(Modifier.size(100.dp).clip(CircleShape).background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(52.dp))
-        }
-        Spacer(Modifier.height(20.dp))
-        Text("فست لاو", fontSize = 38.sp, fontWeight = FontWeight.Bold, color = TinderPink, fontFamily = Vazirmatn)
-        Text("عشق اول و آخرت رو پیدا کن", fontSize = 15.sp, color = TextGray, fontFamily = Vazirmatn)
-        Spacer(Modifier.height(30.dp))
-        when (step) {
-            0 -> {
-                Text("خوش آمدید", fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = TextWhite, fontFamily = Vazirmatn)
-                Text("لطفاً یکی را انتخاب کنید", color = TextGray, fontSize = 14.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 8.dp))
-                Spacer(Modifier.height(28.dp))
-                Button(onClick = { registerMode = true; step = 1; error = "" }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
-                    Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(10.dp))
-                    Text("ثبت نام", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                }
-                Spacer(Modifier.height(14.dp))
-                OutlinedButton(onClick = { registerMode = false; step = 1; error = "" }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.5.dp, TinderPink), colors = ButtonDefaults.outlinedButtonColors(contentColor = TextWhite)) {
-                    Icon(Icons.Default.Login, null, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(10.dp))
-                    Text("ورود به حساب کاربری", fontFamily = Vazirmatn, fontSize = 16.sp)
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Spacer(Modifier.height(8.dp))
+            Box(
+                Modifier.size(88.dp).graphicsLayer { scaleX = logoScale; scaleY = logoScale }
+                    .clip(RoundedCornerShape(28.dp)).background(Brush.linearGradient(GradientTinder))
+                    .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(28.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(43.dp))
+                Box(Modifier.align(Alignment.BottomEnd).padding(9.dp).size(10.dp).background(Color.White.copy(alpha = 0.9f), CircleShape))
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("فست لاو", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite, fontFamily = Vazirmatn)
+            Text("آشنایی‌های واقعی، از یک شروع ساده", fontSize = 13.sp, color = TextGray, fontFamily = Vazirmatn)
+            Spacer(Modifier.height(26.dp))
+
+            Card(
+                Modifier.fillMaxWidth().widthIn(max = 500.dp).animateContentSize(),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xE8171F34)),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+            ) {
+                Column(Modifier.padding(horizontal = 21.dp, vertical = 23.dp)) {
+                    AuthStepIndicator(step)
+                    Spacer(Modifier.height(23.dp))
+                    Crossfade(targetState = step, label = "auth-step-content") { activeStep ->
+                        Column {
+                            when (activeStep) {
+                                0 -> {
+                                    Text("خوش اومدی! 👋", fontWeight = FontWeight.Bold, fontSize = 21.sp, color = TextWhite, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.height(6.dp))
+                                    Text("برای شروع ماجراجویی بعدی‌ات، یکی از گزینه‌ها را انتخاب کن.", color = TextGray, fontSize = 13.sp, lineHeight = 22.sp, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.height(22.dp))
+                                    AuthChoiceCard(
+                                        title = "ساخت حساب جدید",
+                                        subtitle = "چند قدم تا آشنایی‌های تازه",
+                                        icon = Icons.Default.PersonAdd,
+                                        primary = true
+                                    ) { registerMode = true; step = 1; error = "" }
+                                    Spacer(Modifier.height(12.dp))
+                                    AuthChoiceCard(
+                                        title = "ورود به حساب",
+                                        subtitle = "خوشحالیم دوباره می‌بینیمت",
+                                        icon = Icons.Default.Login,
+                                        primary = false
+                                    ) { registerMode = false; step = 1; error = "" }
+                                    Spacer(Modifier.height(15.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                                        Icon(Icons.Default.Shield, null, tint = SuccessGreen, modifier = Modifier.size(15.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("اطلاعاتت فقط برای حساب کاربری دمو استفاده می‌شود", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                    }
+                                }
+                                1 -> {
+                                    Text(if (registerMode) "شماره‌ات رو وارد کن" else "دوباره خوش اومدی", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.height(6.dp))
+                                    Text("کد تأیید برای ادامه به شماره موبایلت ارسال می‌شود.", color = TextGray, fontSize = 13.sp, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.height(20.dp))
+                                    OutlinedTextField(
+                                        value = phone,
+                                        onValueChange = { if (it.length <= 11) phone = it.filter { c -> c.isDigit() } },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = { Text("شماره موبایل", fontFamily = Vazirmatn) },
+                                        placeholder = { Text("۰۹۱۲۳۴۵۶۷۸۹", fontFamily = Vazirmatn) },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = fieldColors(),
+                                        leadingIcon = { Icon(Icons.Default.Phone, null, tint = TinderPink) }
+                                    )
+                                    if (error.isNotEmpty()) {
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(error, color = Color(0xFFFF879D), fontSize = 12.sp, fontFamily = Vazirmatn)
+                                    }
+                                    Spacer(Modifier.height(20.dp))
+                                    TinderButton(if (registerMode) "ادامه ثبت‌نام" else "ادامه ورود") {
+                                        if (phone.length >= 10) { error = ""; step = 2 } else error = "لطفاً یک شماره موبایل معتبر وارد کن"
+                                    }
+                                    TextButton(onClick = { step = 0; error = "" }) {
+                                        Text("بازگشت به انتخاب", color = TextGray, fontFamily = Vazirmatn)
+                                    }
+                                }
+                                else -> {
+                                    Text("تأیید شماره موبایل", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.height(7.dp))
+                                    Text("کد شش‌رقمی ارسال‌شده را وارد کن.", color = TextGray, fontSize = 13.sp, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.height(14.dp))
+                                    Surface(shape = RoundedCornerShape(14.dp), color = BrandViolet.copy(alpha = 0.13f), border = BorderStroke(1.dp, BrandViolet.copy(alpha = 0.28f))) {
+                                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Code, null, tint = BrandViolet, modifier = Modifier.size(20.dp))
+                                            Spacer(Modifier.width(9.dp))
+                                            Column {
+                                                Text("حالت نمایشی", color = BrandViolet, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                                Text("کد تست: ۱۲۳۴۵۶", color = TextWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
+                                            }
+                                            Spacer(Modifier.weight(1f))
+                                            Text(if (secondsLeft > 0) "${secondsLeft / 60}:${(secondsLeft % 60).toString().padStart(2, '0')}" else "منقضی", color = if (secondsLeft > 0) TextGray else TinderPink, fontFamily = Vazirmatn, fontSize = 12.sp)
+                                        }
+                                    }
+                                    Spacer(Modifier.height(15.dp))
+                                    OutlinedTextField(
+                                        value = otp,
+                                        onValueChange = { if (it.length <= 6) otp = it.filter { c -> c.isDigit() } },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = { Text("کد تأیید", fontFamily = Vazirmatn) },
+                                        placeholder = { Text("۱۲۳۴۵۶", fontFamily = Vazirmatn) },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(18.dp),
+                                        colors = fieldColors(),
+                                        leadingIcon = { Icon(Icons.Default.Lock, null, tint = TinderPink) }
+                                    )
+                                    if (error.isNotEmpty()) {
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(error, color = Color(0xFFFF879D), fontSize = 12.sp, fontFamily = Vazirmatn)
+                                    }
+                                    Spacer(Modifier.height(20.dp))
+                                    TinderButton("تأیید و ادامه") {
+                                        if (secondsLeft <= 0) error = "کد منقضی شده است"
+                                        else if (otp == "123456") { error = ""; onSuccess(phone, registerMode) }
+                                        else error = "کد واردشده صحیح نیست؛ کد تست ۱۲۳۴۵۶ است"
+                                    }
+                                    TextButton(onClick = { if (secondsLeft <= 0) { otp = ""; secondsLeft = 120; resendToken++ } }) {
+                                        Text("درخواست مجدد کد", color = if (secondsLeft <= 0) TinderPink else TextMuted, fontFamily = Vazirmatn)
+                                    }
+                                    TextButton(onClick = { step = 1; otp = ""; error = "" }) {
+                                        Text("تغییر شماره موبایل", color = TextGray, fontFamily = Vazirmatn)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            1 -> {
-                Text(if (registerMode) "ثبت نام با شماره موبایل" else "ورود با شماره موبایل", fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = TextWhite, fontFamily = Vazirmatn)
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(value = phone, onValueChange = { if (it.length <= 11) phone = it.filter { c -> c.isDigit() } }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("۰۹۱۲۳۴۵۶۷۸۹", fontFamily = Vazirmatn) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), singleLine = true, shape = RoundedCornerShape(16.dp), colors = fieldColors(), leadingIcon = { Icon(Icons.Default.Phone, null, tint = TinderPink) })
-                if (error.isNotEmpty()) Text(error, color = TinderPink, fontSize = 13.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 8.dp))
-                Spacer(Modifier.height(20.dp))
-                TinderButton(if (registerMode) "ادامه ثبت نام" else "ادامه ورود") {
-                    if (phone.length >= 10) { error = ""; step = 2 } else error = "شماره معتبر وارد کنید"
-                }
-                TextButton(onClick = { step = 0; phone = ""; error = "" }) { Text("بازگشت", color = TextGray, fontFamily = Vazirmatn) }
-            }
-            else -> {
-                Text("کد تأیید", fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = TextWhite, fontFamily = Vazirmatn)
-                Text("کد تست: 123456", fontSize = 14.sp, color = TinderPink, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 8.dp))
-                Text(if (secondsLeft > 0) "زمان باقی‌مانده: ${secondsLeft / 60}:${(secondsLeft % 60).toString().padStart(2, '0')}" else "کد منقضی شده", color = if (secondsLeft > 0) TextGray else TinderPink, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 8.dp))
-                Spacer(Modifier.height(16.dp))
-                OutlinedTextField(value = otp, onValueChange = { if (it.length <= 6) otp = it.filter { c -> c.isDigit() } }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("۱۲۳۴۵۶", fontFamily = Vazirmatn) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, shape = RoundedCornerShape(16.dp), colors = fieldColors(), leadingIcon = { Icon(Icons.Default.Lock, null, tint = TinderPink) })
-                if (error.isNotEmpty()) Text(error, color = TinderPink, fontSize = 13.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 8.dp))
-                Spacer(Modifier.height(28.dp))
-                TinderButton("تأیید و ادامه") {
-                    if (secondsLeft <= 0) error = "کد منقضی شده"
-                    else if (otp == "123456") { error = ""; onSuccess(phone, registerMode) }
-                    else error = "کد اشتباه است (تست: ۱۲۳۴۵۶)"
-                }
-                TextButton(onClick = { if (secondsLeft <= 0) { otp = ""; secondsLeft = 120 } }) { Text("درخواست مجدد کد", color = if (secondsLeft <= 0) TinderPink else TextMuted, fontFamily = Vazirmatn) }
-                TextButton(onClick = { step = 1; otp = ""; error = "" }) { Text("بازگشت", color = TextGray, fontFamily = Vazirmatn) }
-            }
+            Spacer(Modifier.height(16.dp))
+            Text("با ادامه، شرایط استفاده از نسخه آزمایشی را می‌پذیری.", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 // ─── Profile Setup ────────────────────────────────────────────────────────────
-    }
-
 @Composable
 private fun ProfileSetupScreen(phone: String, onComplete: (UserProfile) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
@@ -1514,10 +1701,53 @@ private fun PayToMessageDialog(person: Person, onConfirm: () -> Unit, onDismiss:
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-@Composable private fun SectionLabel(text: String) { Text(text, fontWeight = FontWeight.SemiBold, color = TextWhite, fontSize = 15.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(bottom = 8.dp)) }
-@Composable private fun TinderButton(text: String, onClick: () -> Unit) { Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) { Text(text, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold, fontSize = 16.sp) } }
-@Composable private fun fieldColors() = OutlinedTextFieldDefaults.colors(focusedBorderColor = TinderPink, unfocusedBorderColor = DarkCard, focusedTextColor = TextWhite, unfocusedTextColor = TextWhite, cursorColor = TinderPink, focusedContainerColor = DarkSurface, unfocusedContainerColor = DarkSurface)
-@Composable private fun chipColors(selected: Boolean) = FilterChipDefaults.filterChipColors(selectedContainerColor = TinderPink.copy(alpha = 0.3f), selectedLabelColor = TextWhite, containerColor = DarkSurface, labelColor = TextGray)
+@Composable private fun SectionLabel(text: String) {
+    Text(text, fontWeight = FontWeight.SemiBold, color = TextWhite, fontSize = 15.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(bottom = 8.dp))
+}
+
+@Composable
+private fun TinderButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(55.dp),
+        shape = RoundedCornerShape(18.dp),
+        contentPadding = PaddingValues(0.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, contentColor = TextWhite),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 1.dp)
+    ) {
+        Box(
+            Modifier.fillMaxSize().background(Brush.linearGradient(GradientTinder), RoundedCornerShape(18.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.ChevronLeft, null, modifier = Modifier.size(19.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun fieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = TinderPink,
+    unfocusedBorderColor = Color(0xFF3A4560),
+    focusedTextColor = TextWhite,
+    unfocusedTextColor = TextWhite,
+    cursorColor = TinderPink,
+    focusedContainerColor = DarkCard,
+    unfocusedContainerColor = DarkCard,
+    focusedLabelColor = TinderPink,
+    unfocusedLabelColor = TextMuted
+)
+
+@Composable
+private fun chipColors(selected: Boolean) = FilterChipDefaults.filterChipColors(
+    selectedContainerColor = TinderPink.copy(alpha = 0.22f),
+    selectedLabelColor = TextWhite,
+    containerColor = DarkSurface,
+    labelColor = TextGray
+)
 
 @Composable
 private fun InterestFlow(selected: Set<String>, onToggle: (String) -> Unit) {
@@ -1707,16 +1937,30 @@ private fun DiscoverScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Favorite, null, tint = TinderPink, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("فست لاو", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TinderPink, fontFamily = Vazirmatn)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(42.dp).clip(RoundedCornerShape(15.dp)).background(Brush.linearGradient(GradientTinder)),
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(23.dp)) }
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text("فست لاو", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite, fontFamily = Vazirmatn)
+                Text("کشف ارتباط‌های تازه", fontSize = 10.sp, color = TextMuted, fontFamily = Vazirmatn)
+            }
             Spacer(Modifier.weight(1f))
             if (swipesRemaining != null) {
-                Text("سوایپ: $swipesRemaining", color = if (swipesRemaining <= 2) TinderOrange else TextGray, fontSize = 11.sp, fontFamily = Vazirmatn)
+                Surface(shape = RoundedCornerShape(14.dp), color = if (swipesRemaining <= 2) TinderOrange.copy(alpha = 0.13f) else DarkSurface, border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))) {
+                    Row(Modifier.padding(horizontal = 9.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.FavoriteBorder, null, tint = if (swipesRemaining <= 2) TinderOrange else TextGray, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("$swipesRemaining", color = if (swipesRemaining <= 2) TinderOrange else TextGray, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    }
+                }
                 IconButton(onClick = onUpgrade) { Icon(Icons.Default.Star, null, tint = TinderOrange) }
             }
-            IconButton(onClick = onFilter) { Icon(Icons.Default.Tune, null, tint = TextWhite) }
+            IconButton(onClick = onFilter, modifier = Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(DarkSurface)) {
+                Icon(Icons.Default.Tune, null, tint = TextWhite)
+            }
         }
         if (person == null) EmptyState("دیگه کسی نیست!", "فیلترها رو تغییر بده یا بعداً بیا", "🎉")
         else {
@@ -1742,9 +1986,10 @@ private fun DiscoverScreen(
                             )
                         }
                         .clickable { onOpen(person) },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(26.dp),
                     colors = CardDefaults.cardColors(containerColor = DarkCard),
-                    elevation = CardDefaults.cardElevation(8.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f))
                 ) {
                     Box(Modifier.fillMaxSize()) {
                         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(person.tint, DarkCard))), contentAlignment = Alignment.Center) {
@@ -2125,7 +2370,7 @@ private fun MyProfileScreen(
 
 @Composable
 private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(14.dp)) {
+    Card(modifier = modifier, colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
             Text(label, fontSize = 12.sp, color = TextMuted, fontFamily = Vazirmatn)
@@ -2135,7 +2380,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
 
 @Composable
 private fun InfoChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Surface(shape = RoundedCornerShape(10.dp), color = DarkCard) {
+    Surface(shape = RoundedCornerShape(14.dp), color = DarkCard, border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = TinderPink, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp))
             Text(text, color = TextGray, fontSize = 12.sp, fontFamily = Vazirmatn)
@@ -2156,9 +2401,9 @@ private fun ProfileActionRow(icon: androidx.compose.ui.graphics.vector.ImageVect
 
 @Composable
 private fun PersonRow(person: Person, onClick: () -> Unit, action: @Composable () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(14.dp), color = DarkSurface, modifier = Modifier.fillMaxWidth()) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(18.dp), color = DarkSurface, border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)), modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(52.dp).clip(CircleShape).background(person.tint), contentAlignment = Alignment.Center) { Text(person.emoji, fontSize = 26.sp) }
+            Box(Modifier.size(54.dp).clip(CircleShape).background(Brush.linearGradient(listOf(person.tint, Color.White.copy(alpha = 0.72f)))).border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape), contentAlignment = Alignment.Center) { Text(person.emoji, fontSize = 26.sp) }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("${person.name}, ${person.age}", fontWeight = FontWeight.SemiBold, color = TextWhite, fontFamily = Vazirmatn)
@@ -2171,16 +2416,38 @@ private fun PersonRow(person: Person, onClick: () -> Unit, action: @Composable (
 
 @Composable
 private fun EmptyState(title: String, subtitle: String, emoji: String) {
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text(emoji, fontSize = 56.sp); Spacer(Modifier.height(12.dp))
+    val pulseTransition = rememberInfiniteTransition(label = "emptyState")
+    val pulse by pulseTransition.animateFloat(
+        0.96f, 1.04f,
+        infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "emptyPulse"
+    )
+    Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Box(
+            Modifier.size(116.dp).graphicsLayer { scaleX = pulse; scaleY = pulse }
+                .background(Brush.radialGradient(listOf(TinderPink.copy(alpha = 0.20f), BrandViolet.copy(alpha = 0.06f), Color.Transparent)), CircleShape)
+                .border(1.dp, Color.White.copy(alpha = 0.06f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) { Text(emoji, fontSize = 52.sp) }
+        Spacer(Modifier.height(20.dp))
         Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn, textAlign = TextAlign.Center)
-        if (subtitle.isNotBlank()) { Spacer(Modifier.height(6.dp)); Text(subtitle, color = TextMuted, fontFamily = Vazirmatn, textAlign = TextAlign.Center) }
+        if (subtitle.isNotBlank()) {
+            Spacer(Modifier.height(7.dp))
+            Text(subtitle, color = TextMuted, fontSize = 13.sp, lineHeight = 21.sp, fontFamily = Vazirmatn, textAlign = TextAlign.Center)
+        }
     }
 }
 
 @Composable
 private fun BottomNav(tab: Int, onTab: (Int) -> Unit, matchCount: Int) {
-    NavigationBar(containerColor = DarkSurface, contentColor = TextWhite) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = DarkSurface,
+        shape = RoundedCornerShape(topStart = 25.dp, topEnd = 25.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+        shadowElevation = 14.dp
+    ) {
+    NavigationBar(containerColor = Color.Transparent, contentColor = TextWhite, tonalElevation = 0.dp) {
         val items = listOf(
             Triple(0, Icons.Default.Explore, "کشف"),
             Triple(1, Icons.Default.FavoriteBorder, "لایک‌ها"),
@@ -2199,5 +2466,6 @@ private fun BottomNav(tab: Int, onTab: (Int) -> Unit, matchCount: Int) {
                 colors = NavigationBarItemDefaults.colors(selectedIconColor = TinderPink, selectedTextColor = TinderPink, indicatorColor = TinderPink.copy(alpha = 0.15f), unselectedIconColor = TextMuted, unselectedTextColor = TextMuted)
             )
         }
+    }
     }
 }
