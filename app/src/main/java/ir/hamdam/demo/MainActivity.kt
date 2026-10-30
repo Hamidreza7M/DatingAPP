@@ -3951,7 +3951,7 @@ private fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
-                    Configuration.getInstance().userAgentValue = "FastLove-Android/2.17.0 (ir.fastlove.demo)"
+                    Configuration.getInstance().userAgentValue = "FastLove-Android/2.17.1 (ir.fastlove.demo)"
                     MapView(ctx).apply {
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
@@ -3988,7 +3988,7 @@ private fun MapScreen(
                                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                                 title = area.name
                                 snippet = "${persianDigits(count.toString())} کاربر در این محدوده · تعداد تقریبی"
-                                icon = mapAvatarDrawable(ctx, persianDigits(count.toString()), BrandViolet.toArgb(), isCount = true)
+                                icon = mapAvatarDrawable(map.context, persianDigits(count.toString()), BrandViolet.toArgb(), isCount = true)
                             }
                             map.overlays.add(marker)
                         }
@@ -4002,7 +4002,7 @@ private fun MapScreen(
                                 title = "${person.name} · ${persianDigits(person.age.toString())} سال"
                                 snippet = "${person.job} · ${if (person.showOnlineStatus) if (person.isOnline) "آنلاین" else "آفلاین" else "وضعیت پنهان"} · موقعیت تقریبی"
                                 icon = mapAvatarDrawable(
-                                    ctx, person.emoji, person.tint.toArgb(),
+                                    map.context, person.emoji, person.tint.toArgb(),
                                     if (person.showOnlineStatus) person.isOnline else null
                                 )
                                 setOnMarkerClickListener { _, _ -> onOpenPerson(person); true }
@@ -4017,7 +4017,7 @@ private fun MapScreen(
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                             title = "موقعیت تقریبی تو"
                             snippet = "${user.age} سال · ${user.job} · نمایش برای دیگران فعال است"
-                            icon = mapAvatarDrawable(ctx, "من", TinderPink.toArgb(), true)
+                            icon = mapAvatarDrawable(map.context, "من", TinderPink.toArgb(), true)
                         }
                         map.overlays.add(selfMarker)
                     }
