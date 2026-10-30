@@ -4667,7 +4667,7 @@ private fun AnalogTimePicker(
                 }
                 val selected = if (selectingHour) hour % 12 == index else minute / 5 == index && minute % 5 == 0
                 Box(
-                    Modifier.offset(x = center + dx.dp - 14.dp, y = center + dy.dp - 14.dp).size(28.dp),
+                    Modifier.offset(x = center + dx - 14.dp, y = center + dy - 14.dp).size(28.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(labelValue, color = if (selected) TextWhite else TextGray, fontSize = if (selectingHour) 11.sp else 8.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontFamily = Vazirmatn)
