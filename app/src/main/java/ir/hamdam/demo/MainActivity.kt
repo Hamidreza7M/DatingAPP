@@ -54,6 +54,8 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardActions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -1495,8 +1497,8 @@ private fun AnimatedGifAuthBackground() {
         label = "lightPulseC"
     )
     val heartBloom by pulse.animateFloat(
-        initialValue = 0.76f, targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(2400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        initialValue = 0.80f, targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(tween(2700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "heartBloomPulse"
     )
     Box(Modifier.fillMaxSize()) {
@@ -1513,22 +1515,22 @@ private fun AnimatedGifAuthBackground() {
         // Only the soft light blooms change brightness; their position and the artwork remain fixed.
         // A restrained coral halo sits over the artwork's heart; only its light intensity pulses.
         Box(
-            Modifier.align(Alignment.Center).offset(y = (-92).dp).size(236.dp)
+            Modifier.align(Alignment.Center).offset(y = (-92).dp).size(252.dp)
                 .graphicsLayer { alpha = heartBloom }
                 .background(Brush.radialGradient(listOf(
-                    Color(0xFFFF8AAE).copy(alpha = 0.30f),
-                    TinderPink.copy(alpha = 0.18f),
+                    Color(0xFFFF7FA8).copy(alpha = 0.42f),
+                    TinderPink.copy(alpha = 0.24f),
                     Color.Transparent
                 )), CircleShape)
-                .blur(12.dp)
+                .blur(11.dp)
         )
         Box(
-            Modifier.align(Alignment.Center).offset(y = (-92).dp).size(150.dp)
+            Modifier.align(Alignment.Center).offset(y = (-92).dp).size(166.dp)
                 .graphicsLayer { alpha = heartBloom }
                 .background(Brush.radialGradient(listOf(
-                    TinderOrange.copy(alpha = 0.19f), Color.Transparent
+                    TinderOrange.copy(alpha = 0.27f), Color.Transparent
                 )), CircleShape)
-                .blur(8.dp)
+                .blur(7.dp)
         )
         Box(
             Modifier.align(Alignment.TopEnd).offset(x = (-34).dp, y = 84.dp).size(118.dp)
@@ -1689,6 +1691,8 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
         step = if (step == 2) 1 else 0
         error = ""
     }
+    val authScroll = rememberScrollState()
+    val authKeyboard = LocalSoftwareKeyboardController.current
     val logoTransition = rememberInfiniteTransition(label = "authLogo")
     val logoScale by logoTransition.animateFloat(
         0.97f, 1.035f,
@@ -1703,27 +1707,41 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize().imePadding()) {
+    Box(Modifier.fillMaxSize()) {
         AnimatedGifAuthBackground()
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 22.dp),
+            Modifier.fillMaxSize()
+                .imePadding()
+                .navigationBarsPadding()
+                .verticalScroll(authScroll)
+                .padding(horizontal = 18.dp, vertical = if (step == 0) 18.dp else 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
-            Spacer(Modifier.height(8.dp))
-            Box(
-                Modifier.size(88.dp).graphicsLayer { scaleX = logoScale; scaleY = logoScale }
-                    .clip(RoundedCornerShape(28.dp)).background(Brush.linearGradient(GradientTinder))
-                    .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(28.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(43.dp))
-                Box(Modifier.align(Alignment.BottomEnd).padding(9.dp).size(10.dp).background(Color.White.copy(alpha = 0.9f), CircleShape))
+            if (step == 0) {
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    Modifier.size(82.dp).graphicsLayer { scaleX = logoScale; scaleY = logoScale }
+                        .clip(RoundedCornerShape(26.dp)).background(Brush.linearGradient(GradientTinder))
+                        .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(26.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(40.dp))
+                    Box(Modifier.align(Alignment.BottomEnd).padding(9.dp).size(10.dp).background(Color.White.copy(alpha = 0.9f), CircleShape))
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("فست لاو", fontSize = 31.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite, fontFamily = Vazirmatn)
+                Text("آشنایی‌های واقعی، از یک شروع ساده", fontSize = 12.sp, color = TextGray, fontFamily = Vazirmatn)
+                Spacer(Modifier.height(18.dp))
+            } else {
+                Row(Modifier.fillMaxWidth().padding(start = 2.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(Brush.linearGradient(GradientTinder)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Favorite, null, tint = TextWhite, modifier = Modifier.size(19.dp))
+                    }
+                    Spacer(Modifier.width(9.dp))
+                    Text("فست لاو", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                }
             }
-            Spacer(Modifier.height(16.dp))
-            Text("فست لاو", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = TextWhite, fontFamily = Vazirmatn)
-            Text("آشنایی‌های واقعی، از یک شروع ساده", fontSize = 13.sp, color = TextGray, fontFamily = Vazirmatn)
-            Spacer(Modifier.height(26.dp))
 
             Card(
                 Modifier.fillMaxWidth().widthIn(max = 500.dp).animateContentSize(),
@@ -1732,7 +1750,7 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
             ) {
-                Column(Modifier.padding(horizontal = 21.dp, vertical = 23.dp)) {
+                Column(Modifier.padding(horizontal = if (step == 0) 21.dp else 16.dp, vertical = if (step == 0) 20.dp else 14.dp)) {
                     if (step > 0) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = {
@@ -1776,14 +1794,18 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                                     Text(if (registerMode) "شماره‌ات رو وارد کن" else "ورود به حساب", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextWhite, fontFamily = Vazirmatn)
                                     Spacer(Modifier.height(6.dp))
                                     Text("کد تأیید برای ادامه به شماره موبایلت ارسال می‌شود.", color = TextGray, fontSize = 13.sp, fontFamily = Vazirmatn)
-                                    Spacer(Modifier.height(20.dp))
+                                    Spacer(Modifier.height(12.dp))
                                     OutlinedTextField(
                                         value = phone,
-                                        onValueChange = { if (it.length <= 11) phone = it.filter { c -> c.isDigit() } },
+                                        onValueChange = { entered ->
+                                            val normalized = latinDigits(entered).filter { it.isDigit() }
+                                            if (normalized.length <= 11) phone = normalized
+                                        },
                                         modifier = Modifier.fillMaxWidth(),
                                         label = { Text("شماره موبایل", fontFamily = Vazirmatn) },
                                         placeholder = { Text("۰۹۱۲۳۴۵۶۷۸۹", fontFamily = Vazirmatn) },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
+                                        keyboardActions = KeyboardActions(onDone = { authKeyboard?.hide() }),
                                         singleLine = true,
                                         shape = RoundedCornerShape(18.dp),
                                         colors = fieldColors(),
@@ -1793,7 +1815,7 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                                         Spacer(Modifier.height(8.dp))
                                         Text(error, color = Color(0xFFFF879D), fontSize = 12.sp, fontFamily = Vazirmatn)
                                     }
-                                    Spacer(Modifier.height(20.dp))
+                                    Spacer(Modifier.height(12.dp))
                                     TinderButton(if (registerMode) "ادامه ثبت‌نام" else "ادامه ورود") {
                                         if (phone.length >= 10) { error = ""; step = 2 } else error = "لطفاً یک شماره موبایل معتبر وارد کن"
                                     }
@@ -1818,11 +1840,15 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                                     Spacer(Modifier.height(15.dp))
                                     OutlinedTextField(
                                         value = otp,
-                                        onValueChange = { if (it.length <= 6) otp = it.filter { c -> c.isDigit() } },
+                                        onValueChange = { entered ->
+                                            val normalized = latinDigits(entered).filter { it.isDigit() }
+                                            if (normalized.length <= 6) otp = normalized
+                                        },
                                         modifier = Modifier.fillMaxWidth(),
                                         label = { Text("کد تأیید", fontFamily = Vazirmatn) },
                                         placeholder = { Text("۱۲۳۴۵۶", fontFamily = Vazirmatn) },
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                                        keyboardActions = KeyboardActions(onDone = { authKeyboard?.hide() }),
                                         singleLine = true,
                                         shape = RoundedCornerShape(18.dp),
                                         colors = fieldColors(),
@@ -1832,7 +1858,7 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
                                         Spacer(Modifier.height(8.dp))
                                         Text(error, color = Color(0xFFFF879D), fontSize = 12.sp, fontFamily = Vazirmatn)
                                     }
-                                    Spacer(Modifier.height(20.dp))
+                                    Spacer(Modifier.height(12.dp))
                                     TinderButton("تأیید و ادامه") {
                                         if (secondsLeft <= 0) error = "کد منقضی شده است"
                                         else if (otp == "123456") { error = ""; onSuccess(phone, registerMode) }
@@ -1859,8 +1885,9 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
 private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (UserProfile) -> Unit) {
     var step by remember { mutableIntStateOf(0) }
     var name by remember { mutableStateOf("") }
-    var birthYearPersian by remember { mutableIntStateOf(1380) }
-    var birthMonth by remember { mutableIntStateOf(1) }
+    var nameConfirmed by remember { mutableStateOf(false) }
+    var birthYearPersian by remember { mutableIntStateOf(0) }
+    var birthMonth by remember { mutableIntStateOf(0) }
     var gender by remember { mutableStateOf(Gender.FEMALE) }
     var orientation by remember { mutableStateOf(Orientation.STRAIGHT) }
     var goal by remember { mutableStateOf(RelationGoal.FRIENDSHIP) }
@@ -1868,6 +1895,8 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
     var city by remember { mutableStateOf("تهران") }
     var about by remember { mutableStateOf("") }
     var voiceIntro by remember { mutableStateOf("") }
+    var instagram by remember { mutableStateOf("") }
+    var spotify by remember { mutableStateOf("") }
     var selectedInterests by remember { mutableStateOf(setOf<String>()) }
     var selectedPhotos by remember { mutableStateOf(listOf<String>()) }
     var primaryPhotoIndex by remember { mutableIntStateOf(0) }
@@ -1878,8 +1907,9 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
     var showJobPicker by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
     val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-    val age = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
+    val age = if (birthYearPersian > 0) (currentPersianYear() - birthYearPersian).coerceIn(18, 80) else 18
     val context = LocalContext.current
+    val setupKeyboard = LocalSoftwareKeyboardController.current
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
     var showInterestPicker by remember { mutableStateOf(false) }
     BackHandler {
@@ -1976,14 +2006,36 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
                         }
                     }
                     Spacer(Modifier.height(20.dp))
-                    SectionLabel("نام نمایشی")
-                    OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("مثلاً سارا", fontFamily = Vazirmatn) }, singleLine = true, shape = RoundedCornerShape(14.dp), colors = fieldColors(), leadingIcon = { Icon(Icons.Default.Person, null, tint = TinderPink) })
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        SectionLabel("نام نمایشی")
+                        Spacer(Modifier.weight(1f))
+                        if (nameConfirmed) {
+                            Surface(shape = RoundedCornerShape(14.dp), color = SuccessGreen.copy(alpha = 0.14f)) {
+                                Row(Modifier.padding(horizontal = 9.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(13.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("نام تأیید شد", color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                }
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it; nameConfirmed = false; error = "" },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("مثلاً سارا", fontFamily = Vazirmatn) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { setupKeyboard?.hide() }),
+                        shape = RoundedCornerShape(14.dp), colors = fieldColors(),
+                        leadingIcon = { Icon(Icons.Default.Person, null, tint = TinderPink) }
+                    )
                     Spacer(Modifier.height(20.dp))
                     SectionLabel("ماه تولد")
                     var showMonthPicker by remember { mutableStateOf(false) }
                     Surface(onClick = { showMonthPicker = true }, shape = RoundedCornerShape(14.dp), color = DarkSurface, border = BorderStroke(1.dp, DarkCard), modifier = Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CalendarMonth, null, tint = TinderPink); Spacer(Modifier.width(12.dp)); Text(persianMonths[birthMonth - 1], color = TextWhite, fontFamily = Vazirmatn); Spacer(Modifier.weight(1f)); Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
+                            Icon(Icons.Default.CalendarMonth, null, tint = TinderPink); Spacer(Modifier.width(12.dp)); Text(if (birthMonth in 1..12) persianMonths[birthMonth - 1] else "انتخاب ماه تولد", color = if (birthMonth in 1..12) TextWhite else TextMuted, fontFamily = Vazirmatn); Spacer(Modifier.weight(1f)); Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
                         }
                     }
                     if (showMonthPicker) {
@@ -2015,11 +2067,11 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
                     Surface(onClick = { showYearPicker = true }, shape = RoundedCornerShape(14.dp), color = DarkSurface, border = BorderStroke(1.dp, DarkCard), modifier = Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Cake, null, tint = TinderPink); Spacer(Modifier.width(12.dp))
-                            Text("$birthYearPersian", Modifier.weight(1f), color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                            Text(if (birthYearPersian > 0) persianDigits(birthYearPersian.toString()) else "انتخاب سال تولد", Modifier.weight(1f), color = if (birthYearPersian > 0) TextWhite else TextMuted, fontFamily = Vazirmatn, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                             Icon(Icons.Default.ArrowDropDown, null, tint = TextMuted)
                         }
                     }
-                    if (showYearPicker) YearPickerDialog(selected = birthYearPersian, minYear = currentPersianYear() - 80, maxYear = currentPersianYear() - 18, onSelect = { birthYearPersian = it; showYearPicker = false }, onDismiss = { showYearPicker = false })
+                    if (showYearPicker) YearPickerDialog(selected = birthYearPersian.takeIf { it > 0 } ?: (currentPersianYear() - 25), minYear = currentPersianYear() - 80, maxYear = currentPersianYear() - 18, onSelect = { birthYearPersian = it; showYearPicker = false }, onDismiss = { showYearPicker = false })
                 }
                 1 -> {
                     Text("چند انتخاب ساده برای پیشنهادهای بهتر", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn)
@@ -2239,7 +2291,30 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
                     OutlinedTextField(value = about, onValueChange = { about = it }, modifier = Modifier.fillMaxWidth().height(140.dp), placeholder = { Text("اهل کافه و کتابم...", fontFamily = Vazirmatn) }, shape = RoundedCornerShape(14.dp), colors = fieldColors())
                     Spacer(Modifier.height(16.dp))
                     VoiceIntroEditor(path = voiceIntro, onPathChange = { voiceIntro = it })
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(18.dp))
+                    SectionLabel("شبکه‌های اجتماعی (اختیاری)")
+                    Text("می‌توانی اینستاگرام و اسپاتیفای را اضافه کنی؛ هر دو فیلد اختیاری هستند.", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = instagram, onValueChange = { instagram = it }, modifier = Modifier.fillMaxWidth(),
+                        singleLine = true, label = { Text("اینستاگرام", fontFamily = Vazirmatn) },
+                        placeholder = { Text("نام کاربری یا لینک پروفایل", fontFamily = Vazirmatn) },
+                        leadingIcon = { Icon(Icons.Default.CameraAlt, null, tint = TinderPink) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { setupKeyboard?.hide() }),
+                        shape = RoundedCornerShape(14.dp), colors = fieldColors()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = spotify, onValueChange = { spotify = it }, modifier = Modifier.fillMaxWidth(),
+                        singleLine = true, label = { Text("اسپاتیفای", fontFamily = Vazirmatn) },
+                        placeholder = { Text("نام کاربری یا لینک پروفایل", fontFamily = Vazirmatn) },
+                        leadingIcon = { Icon(Icons.Default.MusicNote, null, tint = SuccessGreen) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { setupKeyboard?.hide() }),
+                        shape = RoundedCornerShape(14.dp), colors = fieldColors()
+                    )
+                    Spacer(Modifier.height(18.dp))
                     Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp)) {
                         Column(Modifier.fillMaxWidth().padding(18.dp)) {
                             if (selectedPhotos.isNotEmpty()) {
@@ -2283,17 +2358,32 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
             if (step > 0) OutlinedButton(onClick = { step--; error = "" }, modifier = Modifier.weight(1f).height(52.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, TextMuted)) { Text("قبلی", fontFamily = Vazirmatn, color = TextWhite) }
             Button(onClick = {
                 when (step) {
-                    0 -> if (name.isBlank()) error = "نام را وارد کنید" else { error = ""; step = 1 }
+                    0 -> {
+                        if (!nameConfirmed) {
+                            if (name.trim().length < 2) {
+                                error = "نام را وارد کن و سپس تأیید نام را بزن"
+                            } else {
+                                nameConfirmed = true
+                                error = ""
+                                setupKeyboard?.hide()
+                            }
+                        } else when {
+                            name.trim().length < 2 -> { nameConfirmed = false; error = "نام الزامی است" }
+                            birthMonth !in 1..12 -> error = "ماه تولدت را انتخاب کن"
+                            birthYearPersian !in (currentPersianYear() - 80)..(currentPersianYear() - 18) -> error = "سال تولد معتبرت را انتخاب کن (۱۸ سال به بالا)"
+                            else -> { error = ""; step = 1 }
+                        }
+                    }
                     1 -> if (job.isBlank()) error = "شغل را انتخاب کنید" else { error = ""; step = 2 }
                     2 -> when {
                         selectedPhotos.isEmpty() -> error = "حداقل یک عکس واقعی اضافه کنید"
                         selectedInterests.size < 3 -> error = "حداقل ۳ علاقه انتخاب کنید"
                         else -> { error = ""; step = 3 }
                     }
-                    3 -> onComplete(UserProfile(name = name.trim(), birthYearPersian = birthYearPersian, birthMonth = birthMonth, gender = gender, orientation = orientation, goal = goal, job = job, city = city, about = about.trim().ifBlank { "هنوز چیزی ننوشتم 😊" }, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), phone = phone, voiceIntro = voiceIntro))
+                    3 -> onComplete(UserProfile(name = name.trim(), birthYearPersian = birthYearPersian, birthMonth = birthMonth, gender = gender, orientation = orientation, goal = goal, job = job, city = city, about = about.trim().ifBlank { "هنوز چیزی ننوشتم 😊" }, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), phone = phone, voiceIntro = voiceIntro, instagram = instagram.trim(), spotify = spotify.trim()))
                 }
             }, modifier = Modifier.weight(if (step > 0) 1.5f else 1f).height(52.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
-                Text(if (step == 3) "شروع کن 🚀" else "بعدی", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+                Text(when { step == 0 && !nameConfirmed -> "تأیید نام"; step == 3 -> "شروع کن 🚀"; step == 0 -> "ادامه"; else -> "بعدی" }, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -3016,6 +3106,14 @@ private fun compatibilityScore(viewer: UserProfile, person: Person): Float {
 
 private fun persianDigits(value: String): String = value.map { c -> if (c in '0'..'9') ('۰'.code + (c - '0')).toChar() else c }.joinToString("")
 
+private fun latinDigits(value: String): String = value.map { c ->
+    when (c) {
+        in '۰'..'۹' -> ('0'.code + (c - '۰')).toChar()
+        in '٠'..'٩' -> ('0'.code + (c - '٠')).toChar()
+        else -> c
+    }
+}.joinToString("")
+
 @Composable
 private fun CompatibilityBadge(score: Float, modifier: Modifier = Modifier) {
     val scoreColor = when {
@@ -3551,7 +3649,7 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, onBack: () -> Unit, 
                     pendingDemoReplies += 1
                     chatScope.launch {
                         delay(900L + (person.id % 5) * 180L)
-                        val reply = buildDemoReply(sentText, person)
+                        val reply = buildDemoReply(sentText, person, messages.toList())
                         messages.add(ChatMessage(reply, false, SimpleDateFormat("HH:mm", Locale("fa")).format(Date())))
                         saveChatMessages(context, person.id, messages.toList())
                         pendingDemoReplies = (pendingDemoReplies - 1).coerceAtLeast(0)
@@ -3564,65 +3662,207 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, onBack: () -> Unit, 
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PersonDetailScreen(
     person: Person, canSeeLikes: Boolean, isMatched: Boolean, canDirectMessage: Boolean,
     onBack: () -> Unit, onLike: () -> Unit, onPass: () -> Unit, onBlock: () -> Unit, onChat: () -> Unit, onReport: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().background(DarkBg).verticalScroll(rememberScrollState())) {
-        Box(Modifier.fillMaxWidth().height(320.dp).background(Brush.verticalGradient(listOf(person.tint, DarkBg)))) {
-            Text(person.emoji, fontSize = 120.sp, modifier = Modifier.align(Alignment.Center))
-            IconButton(onClick = onBack, modifier = Modifier.padding(8.dp)) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
-            IconButton(onClick = onReport, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) { Icon(Icons.Default.Flag, "گزارش", tint = TextWhite) }
+    val galleryLabels = remember(person.id, person.interests) {
+        listOf("پروفایل", person.interests.getOrNull(0) ?: "علایق", person.interests.getOrNull(1) ?: "زندگی روزمره")
+    }
+    val gallerySymbols = remember(person.id, person.interests) {
+        fun symbolFor(value: String): String = when {
+            value.contains("کافه") || value.contains("قهوه") -> "☕"
+            value.contains("موسیقی") -> "🎧"
+            value.contains("سفر") || value.contains("گردش") -> "✈️"
+            value.contains("کتاب") -> "📚"
+            value.contains("فیلم") -> "🎬"
+            value.contains("ورزش") -> "🏃"
+            value.contains("طبیعت") || value.contains("کوه") -> "🌿"
+            value.contains("عکاسی") || value.contains("هنر") -> "📷"
+            value.contains("آشپزی") || value.contains("غذا") -> "🍓"
+            else -> person.emoji
         }
-        Column(Modifier.padding(20.dp)) {
-            Text("${person.name}, ${person.age}", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
-            Text("${person.job} · ${person.city} · ${person.distanceKm} کیلومتر", color = TextGray, fontFamily = Vazirmatn)
-            if (person.likedYou && canSeeLikes) {
-                Spacer(Modifier.height(8.dp))
-                Surface(shape = RoundedCornerShape(20.dp), color = TinderPink) {
-                    Text("❤️ تو را لایک کرده", Modifier.padding(horizontal = 12.dp, vertical = 6.dp), color = TextWhite, fontFamily = Vazirmatn)
+        listOf(person.emoji, symbolFor(person.interests.getOrNull(0).orEmpty()), symbolFor(person.interests.getOrNull(1).orEmpty()))
+    }
+    val pagerState = rememberPagerState(pageCount = { galleryLabels.size })
+
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(
+            Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Column(Modifier.weight(1f)) {
+                Text("پروفایل", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp, fontFamily = Vazirmatn)
+                Text("نمایی که قبل از آشنایی می‌بینی", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            }
+            IconButton(onClick = onReport) { Icon(Icons.Default.Flag, "گزارش", tint = TextGray) }
+        }
+
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Box(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)
+                    .height(448.dp).clip(RoundedCornerShape(24.dp))
+            ) {
+                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                    val pageColor = when (page) {
+                        0 -> person.tint
+                        1 -> Color(0xFF51416E)
+                        else -> Color(0xFF315B68)
+                    }
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.linearGradient(listOf(pageColor, Color(0xFF141B30), DarkBg))
+                        ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            Modifier.size(270.dp).background(
+                                Brush.radialGradient(listOf(Color.White.copy(alpha = 0.22f), Color.Transparent)), CircleShape
+                            )
+                        )
+                        Text(gallerySymbols[page], fontSize = if (page == 0) 132.sp else 106.sp)
+                        Surface(
+                            Modifier.align(Alignment.TopCenter).padding(top = 15.dp),
+                            shape = RoundedCornerShape(18.dp), color = Color.Black.copy(alpha = 0.25f)
+                        ) {
+                            Text(
+                                if (page == 0) "عکس اصلی دمو" else galleryLabels[page],
+                                Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                color = TextWhite.copy(alpha = 0.92f), fontSize = 10.sp, fontFamily = Vazirmatn
+                            )
+                        }
+                    }
+                }
+                Box(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(172.dp)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.84f))))
+                )
+                Column(Modifier.align(Alignment.BottomStart).padding(19.dp)) {
+                    Text(
+                        "${person.name}, ${persianDigits(person.age.toString())}",
+                        color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 25.sp, fontFamily = Vazirmatn
+                    )
+                    Text(
+                        "${person.job} · ${person.city} · ${persianDigits(person.distanceKm.toString())} کیلومتر",
+                        color = TextWhite.copy(alpha = 0.9f), fontSize = 12.sp, fontFamily = Vazirmatn
+                    )
+                }
+                Surface(
+                    Modifier.align(Alignment.TopEnd).padding(12.dp),
+                    shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.55f)
+                ) {
+                    Text(
+                        "${persianDigits((pagerState.currentPage + 1).toString())} / ${persianDigits(galleryLabels.size.toString())}",
+                        Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn
+                    )
+                }
+                OnlineStatusBadge(isOnline = person.isOnline, modifier = Modifier.align(Alignment.TopStart).padding(12.dp))
+                if (person.likedYou && canSeeLikes) {
+                    Surface(
+                        Modifier.align(Alignment.BottomEnd).padding(14.dp),
+                        shape = RoundedCornerShape(20.dp), color = TinderPink
+                    ) {
+                        Text("❤️ تو را لایک کرده", Modifier.padding(horizontal = 11.dp, vertical = 6.dp), color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
+                    }
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Text(person.about, color = TextWhite, fontFamily = Vazirmatn, lineHeight = 22.sp)
-            Spacer(Modifier.height(16.dp))
-            Text("علایق", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                person.interests.forEach { tag -> AssistChip(onClick = {}, label = { Text(tag, fontFamily = Vazirmatn) }) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                repeat(galleryLabels.size) { page ->
+                    Box(
+                        Modifier.padding(horizontal = 3.dp).width(if (pagerState.currentPage == page) 20.dp else 6.dp)
+                            .height(5.dp).clip(CircleShape)
+                            .background(if (pagerState.currentPage == page) TinderPink else TextMuted.copy(alpha = 0.65f))
+                    )
+                }
+            }
+
+            Card(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("درباره ${person.name}", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(8.dp))
+                    Text(person.about, color = TextGray, fontFamily = Vazirmatn, lineHeight = 22.sp, fontSize = 13.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        InfoChip(Icons.Default.Work, person.job)
+                        InfoChip(Icons.Default.LocationOn, person.city)
+                    }
+                }
+            }
+
+            if (person.interests.isNotEmpty()) {
+                Text("علایق", Modifier.padding(horizontal = 18.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                FlowRow(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    person.interests.forEach { interest ->
+                        Surface(
+                            shape = RoundedCornerShape(20.dp), color = TinderPink.copy(alpha = 0.14f),
+                            border = BorderStroke(1.dp, TinderPink.copy(alpha = 0.32f))
+                        ) {
+                            Text(interest, Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = TextWhite, fontSize = 11.sp, fontFamily = Vazirmatn)
+                        }
+                    }
+                }
             }
             if (person.instagram.isNotBlank() || person.spotify.isNotBlank()) {
-                Spacer(Modifier.height(16.dp))
-                SocialProfileBadges(instagram = person.instagram, spotify = person.spotify)
+                Text("شبکه‌های اجتماعی", Modifier.padding(horizontal = 18.dp), color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                SocialProfileBadges(
+                    instagram = person.instagram, spotify = person.spotify,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)
+                )
             }
-            Spacer(Modifier.height(24.dp))
-            // Like + Dislike both present
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (!isMatched) {
-                    OutlinedButton(onClick = onPass, modifier = Modifier.weight(1f).height(50.dp), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.5.dp, TextGray)) {
-                        Icon(Icons.Default.Close, null, tint = TextGray); Spacer(Modifier.width(6.dp))
-                        Text("رد کردن", fontFamily = Vazirmatn, color = TextGray)
+
+            Card(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    if (!isMatched) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            OutlinedButton(
+                                onClick = onPass, modifier = Modifier.weight(1f).height(48.dp),
+                                shape = RoundedCornerShape(14.dp), border = BorderStroke(1.5.dp, TextGray)
+                            ) {
+                                Icon(Icons.Default.Close, null, tint = TextGray); Spacer(Modifier.width(6.dp))
+                                Text("رد کردن", fontFamily = Vazirmatn, color = TextGray)
+                            }
+                            Button(
+                                onClick = onLike, modifier = Modifier.weight(1f).height(48.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = TinderPink), shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(Icons.Default.Favorite, null); Spacer(Modifier.width(6.dp))
+                                Text("لایک", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
                     }
-                    Button(onClick = onLike, modifier = Modifier.weight(1f).height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink), shape = RoundedCornerShape(14.dp)) {
-                        Icon(Icons.Default.Favorite, null); Spacer(Modifier.width(6.dp))
-                        Text("لایک", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = onChat, modifier = Modifier.fillMaxWidth().height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = if (canDirectMessage) SuccessGreen else TinderOrange),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text(
+                            when { isMatched -> "چت"; canDirectMessage -> "چت (پرداخت‌شده)"; else -> "پیام مستقیم" },
+                            fontFamily = Vazirmatn, fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = onBlock, modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFFFF6B6B))
+                    ) {
+                        Text("بلاک", color = Color(0xFFFF6B6B), fontFamily = Vazirmatn)
                     }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Button(onClick = onChat, modifier = Modifier.fillMaxWidth().height(50.dp), colors = ButtonDefaults.buttonColors(containerColor = if (canDirectMessage) SuccessGreen else TinderOrange), shape = RoundedCornerShape(14.dp)) {
-                Text(when { isMatched -> "چت"; canDirectMessage -> "چت (پرداخت‌شده)"; else -> "پیام مستقیم" }, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(onClick = onBlock, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFFFF6B6B))) {
-                Text("بلاک", color = Color(0xFFFF6B6B), fontFamily = Vazirmatn)
-            }
-            Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onReport, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Flag, null, tint = TextMuted, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
-                Text("گزارش تخلف به ادمین", color = TextMuted, fontFamily = Vazirmatn, fontSize = 13.sp)
-            }
+            Spacer(Modifier.height(20.dp))
         }
     }
 }
@@ -3989,21 +4229,116 @@ private fun OnlineStatusBadge(isOnline: Boolean, modifier: Modifier = Modifier) 
     }
 }
 
-private fun buildDemoReply(userText: String, person: Person): String {
-    val message = userText.trim().lowercase(Locale.ROOT)
+private fun demoConversationTopic(text: String): String {
+    val message = text.trim().lowercase(Locale.ROOT)
     return when {
-        listOf("سلام", "درود", "خوبی", "چطوری").any { it in message } -> "سلام 😊 خوشحالم پیام دادی. روزت چطور می‌گذره؟"
-        listOf("موسیقی", "آهنگ", "اسپاتیفای", "spotify").any { it in message } -> "چه خوب! این روزها بیشتر چه سبک موسیقی‌ای گوش می‌دی؟ من همیشه دنبال آهنگ‌های تازه‌ام 🎧"
-        listOf("سفر", "مسافرت", "گردش", "شهر").any { it in message } -> "چه جالب! از بین جاهایی که رفتی کدوم مقصد رو بیشتر دوست داشتی؟ ✈️"
-        listOf("کافه", "قهوه", "کافی").any { it in message } -> "من هم کافه‌های دنج رو دوست دارم ☕ معمولاً چه جور فضایی رو انتخاب می‌کنی؟"
-        listOf("کتاب", "مطالعه", "رمان").any { it in message } -> "چه عالی! آخرین کتابی که واقعاً از خوندنش لذت بردی چی بود؟ 📚"
-        listOf("فیلم", "سریال", "سینما").any { it in message } -> "عالیه! بیشتر چه ژانری می‌بینی؟ یه پیشنهاد خوب هم خوشحال می‌شم بشنوم 🎬"
-        listOf("کار", "شغل", "درس", "دانشگاه").any { it in message } -> "چه جالب! چی شد که به این حوزه علاقه‌مند شدی؟"
-        listOf("ورزش", "باشگاه", "فوتبال", "یوگا").any { it in message } -> "آفرین! ورزش موردعلاقه‌ات چیه و چند وقته دنبالش می‌کنی؟ 💪"
-        listOf("خودت", "تو چی", "تو چطور", "از خودت").any { it in message } -> "من بیشتر به ${person.interests.firstOrNull() ?: "گفت‌وگوهای خوب"} علاقه دارم 😊 تو هم از علایقت برام بگو."
-        message.length < 18 -> "خوشم اومد 😊 بیشتر برام تعریف می‌کنی؟"
-        else -> "جالبه که گفتی «${userText.take(42)}${if (userText.length > 42) "…" else ""}». دوست دارم بیشتر در موردش بدونم 🙂"
+        listOf("سلام", "درود", "خوبی", "چطوری", "چه خبر").any { it in message } -> "greeting"
+        listOf("موسیقی", "آهنگ", "اسپاتیفای", "spotify", "خواننده", "کنسرت").any { it in message } -> "music"
+        listOf("سفر", "مسافرت", "گردش", "شهر", "مسیر", "تعطیلات").any { it in message } -> "travel"
+        listOf("کافه", "قهوه", "کافی", "رستوران", "غذا").any { it in message } -> "cafe"
+        listOf("کتاب", "مطالعه", "رمان", "داستان").any { it in message } -> "book"
+        listOf("فیلم", "سریال", "سینما", "بازیگر").any { it in message } -> "movie"
+        listOf("کار", "شغل", "درس", "دانشگاه", "شرکت", "حرفه").any { it in message } -> "work"
+        listOf("ورزش", "باشگاه", "فوتبال", "یوگا", "پیاده", "دویدن").any { it in message } -> "sport"
+        listOf("خودت", "تو چی", "تو چطور", "از خودت", "علاقه‌ات").any { it in message } -> "about_person"
+        else -> "general"
     }
+}
+
+private fun buildDemoReply(userText: String, person: Person, conversation: List<ChatMessage>): String {
+    val message = userText.trim()
+    val normalizedMessage = message.lowercase(Locale.ROOT)
+    val isShortFollowUp = normalizedMessage in setOf(
+        "آره", "اره", "بله", "نه", "دقیقاً", "دقیقا", "موافقم", "منم همینطور", "منم", "درسته", "چه خوب", "جالبه", "مرسی", "ممنون"
+    )
+    val shortFollowUps = setOf("آره", "اره", "بله", "نه", "دقیقاً", "دقیقا", "موافقم", "منم همینطور", "منم", "درسته", "چه خوب", "جالبه", "مرسی", "ممنون")
+    val previousUserText = conversation.dropLast(1).lastOrNull {
+        it.isMe && it.type == MsgType.TEXT && it.text.trim().lowercase(Locale.ROOT) !in shortFollowUps
+    }?.text
+    val topic = if (isShortFollowUp && previousUserText != null) demoConversationTopic(previousUserText) else demoConversationTopic(message)
+    val hasOpeningGreeting = conversation.firstOrNull()?.let {
+        !it.isMe && it.type == MsgType.TEXT && it.text.startsWith("سلام! خوشحالم")
+    } == true
+    val replyTurn = (conversation.count { !it.isMe && it.type == MsgType.TEXT } - if (hasOpeningGreeting) 1 else 0).coerceAtLeast(0)
+    val otherInterest = person.interests.firstOrNull() ?: "گفت‌وگوهای خوب"
+    val secondInterest = person.interests.getOrNull(1) ?: "موسیقی"
+    val city = person.city.ifBlank { "شهر خودم" }
+    val clipped = message.take(70) + if (message.length > 70) "…" else ""
+
+    val replies = when (topic) {
+        "greeting" -> listOf(
+            "سلام، چه خوب که پیام دادی 😊 روزت تا اینجا چطور گذشته؟ امروز اتفاق جالبی افتاده؟",
+            "مرسی، خوبم! خوشحالم داریم بیشتر آشنا می‌شیم. معمولاً وقتی وقت آزاد داری دوست داری چیکار کنی؟",
+            "سلام دوباره 😊 راستی امروز بیشتر روز شلوغی داشتی یا تونستی برای خودت وقت بذاری؟",
+            "خوشحالم که گپ می‌زنیم. این روزها چیزی هست که حسابی منتظرش باشی؟",
+            "راستی آخر هفته‌ات رو معمولاً چطور می‌گذرونی؛ استراحت یا بیرون رفتن؟"
+        )
+        "music" -> listOf(
+            "من معمولاً سراغ ${otherInterest} و آهنگ‌های آروم می‌رم 🎧 تو بیشتر با آهنگ انرژی می‌گیری یا آهنگ‌های ملایم؟",
+            "چه انتخاب خوبی! اخیراً آهنگی بوده که چند بار پشت سر هم گوشش بدی؟ اسمش رو بهم می‌گی؟",
+            "من پلی‌لیست‌های متنوع رو دوست دارم. برای رانندگی یا پیاده‌روی چه آهنگی رو پیشنهاد می‌کنی؟",
+            "اگه بخوای فقط یک خواننده رو برای یک سفر طولانی انتخاب کنی، انتخابت کیه؟",
+            "معمولاً آهنگ‌ها رو بر اساس حال و هوات انتخاب می‌کنی یا سبک خاصی رو همیشه دنبال می‌کنی؟"
+        )
+        "travel" -> listOf(
+            "سفر همیشه حال آدم رو عوض می‌کنه ✈️ من دوست دارم یک بار بیشتر جاهای دیدنی ${city} رو بگردم. تو سفر برنامه‌ریزی‌شده رو ترجیح می‌دی یا یهویی؟",
+            "بین مقصدهای شلوغ و طبیعت خلوت، من معمولاً طبیعت رو انتخاب می‌کنم. بهترین خاطره سفرت چی بوده؟",
+            "چه خوب! اگه همین آخر هفته فرصت سفر کوتاه داشته باشی، کجا رو انتخاب می‌کنی و چرا؟",
+            "من از کشف کوچه‌ها و جاهای کمترشناخته‌شده هم لذت می‌برم. تو بیشتر جاذبه‌های معروف رو می‌بینی یا جاهای محلی؟",
+            "سفر با دوست‌ها رو بیشتر دوست داری یا یک سفر آروم و دونفره؟"
+        )
+        "cafe" -> listOf(
+            "من کافه‌های دنج با موسیقی ملایم رو خیلی دوست دارم ☕ تو بیشتر فضای خلوت رو می‌پسندی یا کافه‌های پرجنب‌وجوش؟",
+            "یک قهوه خوب و گفت‌وگوی طولانی ترکیب جذابیه! نوشیدنی همیشگی‌ات چیه؟",
+            "پس باید یک روز چند کافه خوب رو امتحان کنیم 😊 بیشتر کافه با منظره رو دوست داری یا فضای گرم و جمع‌وجور؟",
+            "اگه بخوای یک کافه رو چند بار انتخاب کنی، بیشتر به قهوه‌اش اهمیت می‌دی یا فضای اونجا؟",
+            "من معمولاً کنار قهوه یک دسر کوچیک هم می‌گیرم 😄 تو شیرینی دوست داری یا خوراکی شور؟"
+        )
+        "book" -> listOf(
+            "کتاب خوب آدم رو تا چند روز درگیر خودش می‌کنه 📚 بیشتر رمان می‌خونی یا کتاب‌های غیرداستانی؟",
+            "من داستان‌هایی رو دوست دارم که شخصیت‌هاشون واقعی و باورپذیر باشن. کتابی هست که دوست داشته باشی دوباره بخونیش؟",
+            "این یکی رو باید به فهرست مطالعه‌ام اضافه کنم. آخرین چیزی که خوندی و بهت پیشنهاد می‌کنی چی بوده؟",
+            "برای کتاب خوندن سکوت رو ترجیح می‌دی یا موسیقی بی‌کلام؟",
+            "شخصیت کتابی‌ای هست که هنوز بعد از تموم‌شدن داستان یادت مونده باشه؟"
+        )
+        "movie" -> listOf(
+            "فیلم خوب با یک همراه خوش‌سلیقه خیلی می‌چسبه 🎬 پایان‌های غیرقابل‌پیش‌بینی رو دوست داری یا داستان‌های آروم؟",
+            "من معمولاً فیلمی رو انتخاب می‌کنم که بعدش بشه درباره‌اش حرف زد. آخرین فیلمی که دیدی ارزش دیدن داشت؟",
+            "اگه قرار باشه امشب فیلم ببینیم، تو انتخابت کمدیه یا معمایی؟",
+            "سریال کوتاه رو ترجیح می‌دی یا داستانی که چند فصل ادامه داشته باشه؟",
+            "فیلمی هست که هر بار ببینیش باز هم برات جذاب باشه؟"
+        )
+        "work" -> listOf(
+            "جالبه، به نظر میاد برات مهمه کاری که انجام می‌دی معنا داشته باشه. کدوم بخش کارت بیشتر بهت انرژی می‌ده؟",
+            "مسیر رسیدن به این حوزه چطور بود؟ از اول بهش علاقه داشتی یا کم‌کم انتخابش کردی؟",
+            "بیرون از کار چه چیزی کمک می‌کنه ذهنت رو از مشغله‌ها جدا کنی؟",
+            "اگه می‌تونستی یک مهارت تازه یاد بگیری، چی انتخاب می‌کردی؟",
+            "تعادل کار و زندگی برات آسونه یا هنوز داری راه خودت رو پیدا می‌کنی؟"
+        )
+        "sport" -> listOf(
+            "چه خوب! من هم فعالیت و تحرک رو دوست دارم 💪 بیشتر ورزش انفرادی رو می‌پسندی یا گروهی؟",
+            "ثبات توی ورزش از خود تمرین سخت‌تره! چه چیزی باعث می‌شه انگیزه‌ات رو حفظ کنی؟",
+            "اگه بخوای یک فعالیت تازه امتحان کنی، چی رو انتخاب می‌کنی؟",
+            "بیشتر صبح‌ها ورزش می‌کنی یا عصرها؟ من فکر می‌کنم زمانش خیلی روی انگیزه اثر داره.",
+            "ورزشی هست که همیشه دلت خواسته امتحانش کنی ولی هنوز فرصت نشده؟"
+        )
+        "about_person" -> listOf(
+            "من به ${otherInterest} علاقه دارم و از تجربه‌های تازه خوشم میاد 😊 معمولاً ${secondInterest} هم جزو برنامه‌هامه. تو چه چیزی رو هیچ‌وقت خسته‌کننده نمی‌دونی؟",
+            "فکر کنم از گفت‌وگوی صمیمی و آدم‌های کنجکاو خوشم میاد. دوست دارم بدونم چه چیزی بیشتر از همه خوشحالت می‌کنه؟",
+            "من بیشتر آدم تجربه‌کردنم تا فقط برنامه‌ریزی کردن! تو بیشتر اهل تجربه‌های تازه‌ای یا چیزهای آشنا و مطمئن؟",
+            "یک روز ایده‌آل برای تو چه شکلیه؟ از صبح تا شبش رو چطور می‌گذرونی؟",
+            "چه ویژگی‌ای در آدم‌ها باعث می‌شه از همون اول باهاشون احساس راحتی کنی؟"
+        )
+        else -> listOf(
+            "جالبه که گفتی «$clipped» 😊 دوست دارم بیشتر از زاویه نگاهت بدونم؛ چی باعث شد به این موضوع فکر کنی؟",
+            "می‌فهمم چی می‌گی. به نظرت جذاب‌ترین قسمت این ماجرا چیه؟ دوست دارم بیشتر برام تعریف کنی.",
+            "این موضوع چند تا جنبه جالب داره! خودت کدوم بخشش رو بیشتر دوست داری یا برات مهم‌تره؟",
+            "خوبه که اینو گفتی. راستی بین ${otherInterest} و ${secondInterest} کدوم رو بیشتر ترجیح می‌دی؟",
+            "از حرفت این‌طور برداشت کردم که برات مهمه با جزئیات به موضوع نگاه کنی. درست متوجه شدم؟",
+            "دوست دارم بیشتر با سلیقه‌ات آشنا بشم؛ یک چیز کوچیک که همیشه حالت رو خوب می‌کنه چیه؟"
+        )
+    }
+    return replies[replyTurn % replies.size]
 }
 
 @Composable
