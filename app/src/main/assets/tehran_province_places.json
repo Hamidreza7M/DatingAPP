@@ -1,0 +1,152 @@
+{
+  "province": "استان تهران",
+  "coordinate_system": "WGS84",
+  "description": "نقاط مرکز شهر/مراکز اداری؛ این داده‌ها مرز دقیق محدوده شهرها نیستند.",
+  "source": "GeoNames (CC BY 4.0; https://www.geonames.org/), using the GeoNames-derived city-centre subset documented by sajaddp/list-of-cities-in-Iran (2026-09-19 data snapshot).",
+  "cities": [
+    {
+      "name": "تهران",
+      "county": "تهران",
+      "latitude": 35.69439,
+      "longitude": 51.42151
+    },
+    {
+      "name": "دماوند",
+      "county": "دماوند",
+      "latitude": 35.71842,
+      "longitude": 52.06958
+    },
+    {
+      "name": "ری",
+      "county": "ری",
+      "latitude": 35.59354,
+      "longitude": 51.43997
+    },
+    {
+      "name": "تجریش",
+      "county": "شمیرانات",
+      "latitude": 35.8044,
+      "longitude": 51.4256
+    },
+    {
+      "name": "ورامین",
+      "county": "ورامین",
+      "latitude": 35.3242,
+      "longitude": 51.6457
+    },
+    {
+      "name": "شهریار",
+      "county": "شهریار",
+      "latitude": 35.65884,
+      "longitude": 51.05775
+    },
+    {
+      "name": "اسلامشهر",
+      "county": "اسلامشهر",
+      "latitude": 35.55222,
+      "longitude": 51.23504
+    },
+    {
+      "name": "رباط‌کریم",
+      "county": "رباط‌کریم",
+      "latitude": 35.4846,
+      "longitude": 51.0829
+    },
+    {
+      "name": "پاکدشت",
+      "county": "پاکدشت",
+      "latitude": 35.47854,
+      "longitude": 51.6834
+    },
+    {
+      "name": "فیروزکوه",
+      "county": "فیروزکوه",
+      "latitude": 35.75674,
+      "longitude": 52.77062
+    },
+    {
+      "name": "قدس",
+      "county": "قدس",
+      "latitude": 35.7214,
+      "longitude": 51.109
+    },
+    {
+      "name": "ملارد",
+      "county": "ملارد",
+      "latitude": 35.6659,
+      "longitude": 50.9767
+    },
+    {
+      "name": "پیشوا",
+      "county": "پیشوا",
+      "latitude": 35.308,
+      "longitude": 51.7267
+    },
+    {
+      "name": "گلستان",
+      "county": "بهارستان",
+      "latitude": 35.5183,
+      "longitude": 51.1819
+    },
+    {
+      "name": "پردیس",
+      "county": "پردیس",
+      "latitude": 35.74687,
+      "longitude": 51.81222
+    },
+    {
+      "name": "قرچک",
+      "county": "قرچک",
+      "latitude": 35.42873,
+      "longitude": 51.57757
+    },
+    {
+      "name": "آبعلی",
+      "county": "دماوند",
+      "latitude": 35.7677,
+      "longitude": 51.9635
+    },
+    {
+      "name": "لواسان",
+      "county": "شمیرانات",
+      "latitude": 35.8231,
+      "longitude": 51.6333
+    },
+    {
+      "name": "فشم",
+      "county": "شمیرانات",
+      "latitude": 35.9302,
+      "longitude": 51.5267
+    },
+    {
+      "name": "بومهن",
+      "county": "پردیس",
+      "latitude": 35.7295,
+      "longitude": 51.8653
+    },
+    {
+      "name": "نصیرشهر",
+      "county": "رباط‌کریم",
+      "latitude": 35.4918,
+      "longitude": 51.1392
+    },
+    {
+      "name": "نسیم‌شهر",
+      "county": "بهارستان",
+      "latitude": 35.5631,
+      "longitude": 51.1633
+    },
+    {
+      "name": "اندیشه",
+      "county": "شهریار",
+      "latitude": 35.6803,
+      "longitude": 51.0193
+    },
+    {
+      "name": "باقرشهر",
+      "county": "ری",
+      "latitude": 35.5325,
+      "longitude": 51.4037
+    }
+  ]
+}
