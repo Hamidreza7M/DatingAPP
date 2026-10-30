@@ -60,8 +60,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import coil.ImageLoader
-import coil.decode.GifDecoder
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.gson.Gson
@@ -137,7 +135,9 @@ data class UserProfile(
     val photos: List<String> = emptyList(),
     val primaryPhotoIndex: Int = 0,
     val phone: String = "",
-    val voiceIntro: String = ""
+    val voiceIntro: String = "",
+    val instagram: String = "",
+    val spotify: String = ""
 ) {
     val age: Int get() = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
 }
@@ -156,7 +156,9 @@ data class Person(
     val emoji: String,
     val tint: Color,
     val distanceKm: Int,
-    val likedYou: Boolean = false
+    val likedYou: Boolean = false,
+    val instagram: String = "",
+    val spotify: String = ""
 )
 
 data class ChatMessage(
@@ -165,6 +167,17 @@ data class ChatMessage(
     val time: String,
     val type: MsgType = MsgType.TEXT
 )
+
+data class PaymentRecord(
+    val planTitle: String,
+    val priceToman: Int,
+    val purchasedAtMillis: Long,
+    val expiresAtMillis: Long,
+    val durationDays: Int = 0
+)
+
+private fun formatDatePersian(timestampMillis: Long): String =
+    persianDigits(SimpleDateFormat("yyyy/MM/dd", Locale.US).format(Date(timestampMillis)))
 
 data class FilterState(
     val minAge: Int = 18,
@@ -257,7 +270,9 @@ private val samplePeople: List<Person> = buildList {
             emoji = emojisF[i % emojisF.size],
             tint = Color(tintsF[i % tintsF.size]),
             distanceKm = 1 + (i * 3) % 45,
-            likedYou = i % 3 == 0
+            likedYou = i % 3 == 0,
+            instagram = if (i % 3 != 0) "fastlove_${id - 1}" else "",
+            spotify = if (i % 4 == 0) "fastlove_user${id - 1}" else ""
         ))
     }
     // 40 male
@@ -281,7 +296,9 @@ private val samplePeople: List<Person> = buildList {
             emoji = emojisM[i % emojisM.size],
             tint = Color(tintsM[i % tintsM.size]),
             distanceKm = 2 + (i * 5) % 48,
-            likedYou = i % 4 == 0
+            likedYou = i % 4 == 0,
+            instagram = if (i % 4 != 1) "fastlove_${id - 1}" else "",
+            spotify = if (i % 3 == 0) "fastlove_user${id - 1}" else ""
         ))
     }
     // 5 other
@@ -299,7 +316,9 @@ private val samplePeople: List<Person> = buildList {
             emoji = "⭐",
             tint = Color(0xFFE0E0E0),
             distanceKm = 5 + i * 4,
-            likedYou = i % 2 == 0
+            likedYou = i % 2 == 0,
+            instagram = if (i % 2 == 0) "fastlove_${id - 1}" else "",
+            spotify = if (i % 2 == 1) "fastlove_user${id - 1}" else ""
         ))
     }
 }
@@ -375,14 +394,36 @@ private fun loadUser(ctx: Context): UserProfile {
                 storeUriInAppFiles(ctx, uri, "profile_photos") ?: stored
             } else stored
         }
-        val normalized = loaded.copy(photos = durablePhotos, voiceIntro = loaded.voiceIntro.orEmpty())
+        val normalized = loaded.copy(
+            photos = durablePhotos,
+            voiceIntro = loaded.voiceIntro.orEmpty(),
+            instagram = loaded.instagram.orEmpty(),
+            spotify = loaded.spotify.orEmpty()
+        )
         prefs(ctx).edit().putString("user", gson.toJson(normalized)).apply()
         normalized
     } catch (_: Exception) { UserProfile() }
 }
 private fun loadPlan(ctx: Context): SubscriptionPlan {
     val n = prefs(ctx).getString("plan", "FREE") ?: "FREE"
-    return try { SubscriptionPlan.valueOf(n) } catch (_: Exception) { SubscriptionPlan.FREE }
+    val plan = try { SubscriptionPlan.valueOf(n) } catch (_: Exception) { SubscriptionPlan.FREE }
+    val expiry = prefs(ctx).getLong("planExpiresAtMillis", 0L)
+    return if (plan != SubscriptionPlan.FREE && expiry > 0L && expiry <= System.currentTimeMillis()) SubscriptionPlan.FREE else plan
+}
+
+private fun loadPlanExpiry(ctx: Context): Long? {
+    val expiry = prefs(ctx).getLong("planExpiresAtMillis", 0L)
+    return expiry.takeIf { it > System.currentTimeMillis() && loadPlan(ctx) != SubscriptionPlan.FREE }
+}
+
+private fun loadPaymentHistory(ctx: Context): List<PaymentRecord> {
+    val json = prefs(ctx).getString("paymentHistory", "[]") ?: "[]"
+    return try { gson.fromJson(json, object : TypeToken<List<PaymentRecord>>() {}.type) ?: emptyList() }
+    catch (_: Exception) { emptyList() }
+}
+
+private fun savePaymentHistory(ctx: Context, records: List<PaymentRecord>) {
+    prefs(ctx).edit().putString("paymentHistory", gson.toJson(records)).apply()
 }
 private fun loadIntList(ctx: Context, key: String): List<Int> {
     val json = prefs(ctx).getString(key, "[]") ?: "[]"
@@ -488,6 +529,8 @@ private fun FastLoveApp() {
     var hasProfile by remember { mutableStateOf(loadHasProfile(context)) }
     var currentUser by remember { mutableStateOf(loadUser(context)) }
     var subscriptionPlan by remember { mutableStateOf(loadPlan(context)) }
+    var planExpiresAtMillis by remember { mutableStateOf(loadPlanExpiry(context)) }
+    val paymentHistory = remember { mutableStateListOf<PaymentRecord>().also { it.addAll(loadPaymentHistory(context)) } }
     var paidMessageCredits by remember { mutableIntStateOf(prefs(context).getInt("messageCredits", 0)) }
 
     var tab by remember { mutableIntStateOf(0) }
@@ -632,6 +675,7 @@ private fun FastLoveApp() {
                                     currentUser = saved
                                     hasProfile = loadHasProfile(context)
                                     subscriptionPlan = loadPlan(context)
+                                    planExpiresAtMillis = loadPlanExpiry(context)
                                 } else {
                                     currentUser = UserProfile(phone = phone)
                                     // If no local profile for this phone, treat as need profile
@@ -663,13 +707,29 @@ private fun FastLoveApp() {
                     showSubscription -> SubscriptionScreen(
                         initialSection = purchaseInitialSection,
                         currentPlan = subscriptionPlan,
+                        currentPlanExpiry = planExpiresAtMillis,
                         messageCredits = paidMessageCredits,
                         onBack = { showSubscription = false; purchaseInitialSection = 0 },
-                        onChoosePlan = { plan ->
-                            subscriptionPlan = plan
-                            showSubscription = false
-                            purchaseInitialSection = 0
-                            persist()
+                        onChoosePlan = { plan, durationDays, price ->
+                            if (plan == SubscriptionPlan.FREE) {
+                                subscriptionPlan = SubscriptionPlan.FREE
+                                planExpiresAtMillis = null
+                                prefs(context).edit().remove("planExpiresAtMillis").putString("plan", "FREE").apply()
+                                persist()
+                                null
+                            } else {
+                                val purchasedAt = System.currentTimeMillis()
+                                val baseExpiry = planExpiresAtMillis?.takeIf { subscriptionPlan != SubscriptionPlan.FREE && it > purchasedAt } ?: purchasedAt
+                                val expiresAt = baseExpiry + durationDays.toLong() * 24L * 60L * 60L * 1000L
+                                subscriptionPlan = plan
+                                planExpiresAtMillis = expiresAt
+                                prefs(context).edit().putString("plan", plan.name).putLong("planExpiresAtMillis", expiresAt).apply()
+                                val record = PaymentRecord(plan.title, price, purchasedAt, expiresAt, durationDays)
+                                paymentHistory.add(0, record)
+                                savePaymentHistory(context, paymentHistory.toList())
+                                persist()
+                                expiresAt
+                            }
                         },
                         onBuyMessages = { count ->
                             paidMessageCredits += count
@@ -716,12 +776,16 @@ private fun FastLoveApp() {
                             isLoggedIn = false
                             hasProfile = false
                             currentUser = UserProfile()
+                            subscriptionPlan = SubscriptionPlan.FREE
+                            dailySwipes = 0
                             likedPeople.clear()
                             matchedPeople.clear()
                             blockedIds.clear()
                             unmatchedIds.clear()
                             paidDirectChatIds.clear()
                             paidMessageCredits = 0
+                            planExpiresAtMillis = null
+                            paymentHistory.clear()
                         },
                         onDismiss = { showDeleteRequest = false }
                     )
@@ -861,6 +925,8 @@ private fun FastLoveApp() {
                                         user = currentUser,
                                         blockedCount = blockedIds.size,
                                         plan = subscriptionPlan,
+                                        planExpiryMillis = planExpiresAtMillis,
+                                        paymentHistory = paymentHistory.toList(),
                                         matchCount = matchedPeople.size,
                                         likeCount = likedPeople.size,
                                         onUpgrade = { showSubscription = true },
@@ -873,6 +939,8 @@ private fun FastLoveApp() {
                                             hasProfile = false
                                             currentUser = UserProfile()
                                             subscriptionPlan = SubscriptionPlan.FREE
+                                            planExpiresAtMillis = null
+                                            paymentHistory.clear()
                                             dailySwipes = 0
                                             swipeDay = currentDayKey()
                                             likedPeople.clear()
@@ -1047,7 +1115,7 @@ private fun ReportDialog(person: Person, onSubmit: (ReportReason, String) -> Uni
         onDismissRequest = onDismiss,
         title = { Text("گزارش ${person.name}", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
         text = {
-            Column {
+            Column(Modifier.imePadding().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
                 Text("دلیل گزارش را انتخاب کنید:", color = TextGray, fontFamily = Vazirmatn, fontSize = 13.sp)
                 Spacer(Modifier.height(10.dp))
                 REPORT_REASONS.forEach { r ->
@@ -1099,13 +1167,15 @@ private fun ReportDialog(person: Person, onSubmit: (ReportReason, String) -> Uni
 private fun SubscriptionScreen(
     initialSection: Int,
     currentPlan: SubscriptionPlan,
+    currentPlanExpiry: Long?,
     messageCredits: Int,
     onBack: () -> Unit,
-    onChoosePlan: (SubscriptionPlan) -> Unit,
+    onChoosePlan: (SubscriptionPlan, Int, Int) -> Long?,
     onBuyMessages: (Int) -> Unit
 ) {
     var selectedSection by remember(initialSection) { mutableIntStateOf(initialSection.coerceIn(0, 1)) }
     var periodWeekly by remember { mutableStateOf(true) }
+    var purchaseSuccess by remember { mutableStateOf<PaymentRecord?>(null) }
     val messagePackages = listOf(
         Triple(1, 1_000_000, 0),
         Triple(5, 4_500_000, 10),
@@ -1155,6 +1225,13 @@ private fun SubscriptionScreen(
                         Column(Modifier.weight(1f)) {
                             Text("اشتراک فعلی", color = TextMuted, fontSize = 11.sp, fontFamily = Vazirmatn)
                             Text(currentPlan.title, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 18.sp, fontFamily = Vazirmatn)
+                            if (currentPlan != SubscriptionPlan.FREE) {
+                                Text(
+                                    currentPlanExpiry?.let { "فعال تا ${formatDatePersian(it)}" } ?: "تاریخ خرید قدیمی در این نسخه ثبت نشده است",
+                                    color = if (currentPlanExpiry != null) SuccessGreen else TextMuted,
+                                    fontSize = 10.sp, fontFamily = Vazirmatn
+                                )
+                            }
                         }
                         Surface(shape = RoundedCornerShape(20.dp), color = SuccessGreen.copy(alpha = 0.12f)) {
                             Text("فعال", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontFamily = Vazirmatn)
@@ -1176,7 +1253,12 @@ private fun SubscriptionScreen(
                 listOf(SubscriptionPlan.PRO to (if (periodWeekly) 99000 else 299000), SubscriptionPlan.VIP to (if (periodWeekly) 149000 else 449000)).forEach { (plan, price) ->
                     val isCurrent = currentPlan == plan
                     Card(
-                        onClick = { onChoosePlan(plan) },
+                        onClick = {
+                            val purchasedAt = System.currentTimeMillis()
+                            val durationDays = if (periodWeekly) 7 else 30
+                            val expiry = onChoosePlan(plan, durationDays, price)
+                            if (expiry != null) purchaseSuccess = PaymentRecord(plan.title, price, purchasedAt, expiry, durationDays)
+                        },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = if (isCurrent) TinderPink.copy(alpha = 0.16f) else DarkSurface),
@@ -1207,7 +1289,7 @@ private fun SubscriptionScreen(
                         }
                     }
                 }
-                OutlinedButton(onClick = { onChoosePlan(SubscriptionPlan.FREE) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp)) {
+                OutlinedButton(onClick = { onChoosePlan(SubscriptionPlan.FREE, 0, 0) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(14.dp)) {
                     Text("ادامه با پلن رایگان", fontFamily = Vazirmatn, color = TextGray)
                 }
                 Spacer(Modifier.height(24.dp))
@@ -1262,6 +1344,23 @@ private fun SubscriptionScreen(
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+    purchaseSuccess?.let { purchased ->
+        AlertDialog(
+            onDismissRequest = { purchaseSuccess = null },
+            containerColor = DarkSurface,
+            icon = { Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(34.dp)) },
+            title = { Text("خرید با موفقیت انجام شد", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text("اشتراک ${purchased.planTitle} با موفقیت به حساب شما اضافه شد.", color = TextGray, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(8.dp))
+                    Text("مبلغ: ${formatToman(purchased.priceToman)}", color = TinderOrange, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Text("تاریخ انقضا: ${formatDatePersian(purchased.expiresAtMillis)}", color = SuccessGreen, fontSize = 12.sp, fontFamily = Vazirmatn)
+                }
+            },
+            confirmButton = { TextButton(onClick = { purchaseSuccess = null }) { Text("متوجه شدم", color = TinderPink, fontFamily = Vazirmatn) } }
+        )
     }
 }
 
@@ -1356,50 +1455,51 @@ private fun ProductTourOverlay(step: Int, onNext: () -> Unit, onSkip: () -> Unit
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 @Composable
 private fun AnimatedGifAuthBackground() {
-    val context = LocalContext.current
-    val imageLoader = remember(context) {
-        ImageLoader.Builder(context)
-            .components { add(GifDecoder.Factory()) }
-            .build()
-    }
-    val motion = rememberInfiniteTransition(label = "authGifMotion")
-    val zoom by motion.animateFloat(
-        initialValue = 1.02f,
-        targetValue = 1.075f,
-        animationSpec = infiniteRepeatable(tween(16000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "authBackgroundZoom"
+    val pulse = rememberInfiniteTransition(label = "authLightEffects")
+    val glowA by pulse.animateFloat(
+        initialValue = 0.30f, targetValue = 0.78f,
+        animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "lightPulseA"
     )
-    val driftX by motion.animateFloat(
-        initialValue = -9f,
-        targetValue = 9f,
-        animationSpec = infiniteRepeatable(tween(21000, easing = LinearEasing), RepeatMode.Reverse),
-        label = "authBackgroundDrift"
+    val glowB by pulse.animateFloat(
+        initialValue = 0.18f, targetValue = 0.58f,
+        animationSpec = infiniteRepeatable(tween(3400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "lightPulseB"
     )
-
+    val glowC by pulse.animateFloat(
+        initialValue = 0.20f, targetValue = 0.62f,
+        animationSpec = infiniteRepeatable(tween(2100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "lightPulseC"
+    )
     Box(Modifier.fillMaxSize()) {
+        // The scene itself is a single still frame. No GIF playback, scaling, panning or rotation.
         AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(R.raw.login_background)
-                .crossfade(false)
-                .build(),
-            imageLoader = imageLoader,
+            model = R.drawable.login_background_static,
             contentDescription = null,
-            modifier = Modifier.fillMaxSize().graphicsLayer {
-                scaleX = zoom
-                scaleY = zoom
-                translationX = driftX
-            },
+            modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
+            Color(0xFF080D1A).copy(alpha = 0.28f), Color(0xFF0B1020).copy(alpha = 0.62f)
+        ))))
+        // Only the soft light blooms change brightness; their position and the artwork remain fixed.
         Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF080D1A).copy(alpha = 0.36f),
-                        Color(0xFF0B1020).copy(alpha = 0.68f)
-                    )
-                )
-            )
+            Modifier.align(Alignment.TopEnd).offset(x = (-34).dp, y = 84.dp).size(118.dp)
+                .graphicsLayer { alpha = glowA }
+                .background(Brush.radialGradient(listOf(TinderOrange.copy(alpha = 0.54f), Color.Transparent)), CircleShape)
+                .blur(16.dp)
+        )
+        Box(
+            Modifier.align(Alignment.CenterStart).offset(x = 22.dp, y = (-24).dp).size(92.dp)
+                .graphicsLayer { alpha = glowB }
+                .background(Brush.radialGradient(listOf(TinderPink.copy(alpha = 0.48f), Color.Transparent)), CircleShape)
+                .blur(18.dp)
+        )
+        Box(
+            Modifier.align(Alignment.BottomEnd).offset(x = (-52).dp, y = (-128).dp).size(104.dp)
+                .graphicsLayer { alpha = glowC }
+                .background(Brush.radialGradient(listOf(BrandViolet.copy(alpha = 0.42f), Color.Transparent)), CircleShape)
+                .blur(18.dp)
         )
     }
 }
@@ -1556,7 +1656,7 @@ private fun AuthFlow(onSuccess: (String, Boolean) -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().imePadding()) {
         AnimatedGifAuthBackground()
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 22.dp),
@@ -1782,7 +1882,7 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
         else galleryLauncher.launch("image/*")
     }
 
-    Column(Modifier.fillMaxSize().background(DarkBg)) {
+    Column(Modifier.fillMaxSize().background(DarkBg).imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = {
                 if (step > 0) { step = (step - 1).coerceAtLeast(0); error = "" }
@@ -2211,6 +2311,8 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
     var city by remember { mutableStateOf(user.city) }
     var about by remember { mutableStateOf(user.about) }
     var voiceIntro by remember { mutableStateOf(user.voiceIntro.orEmpty()) }
+    var instagram by remember { mutableStateOf(user.instagram.orEmpty()) }
+    var spotify by remember { mutableStateOf(user.spotify.orEmpty()) }
     var orientation by remember { mutableStateOf(user.orientation) }
     var selectedInterests by remember { mutableStateOf(user.interests.toSet()) }
     var selectedPhotos by remember { mutableStateOf(user.photos) }
@@ -2248,7 +2350,7 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
         Gender.FEMALE -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.LESBIAN to "لزبین", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "دیگر")
         else -> listOf(Orientation.STRAIGHT to "دگرجنس‌گرا", Orientation.GAY to "همجنس‌گرا", Orientation.LESBIAN to "لزبین", Orientation.BISEXUAL to "دوجنس‌گرا", Orientation.OTHER to "دیگر")
     }
-    Column(Modifier.fillMaxSize().background(DarkBg)) {
+    Column(Modifier.fillMaxSize().background(DarkBg).imePadding()) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
             Text("ویرایش پروفایل", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
@@ -2327,13 +2429,32 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
             OutlinedTextField(value = about, onValueChange = { about = it }, modifier = Modifier.fillMaxWidth().height(120.dp), shape = RoundedCornerShape(14.dp), colors = fieldColors())
             Spacer(Modifier.height(14.dp))
             VoiceIntroEditor(path = voiceIntro, onPathChange = { voiceIntro = it })
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(18.dp))
+            SectionLabel("شبکه‌های اجتماعی (اختیاری)")
+            Text("نام کاربری یا لینک پروفایل را وارد کن؛ هرکدام را خواستی خالی بگذار.", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = instagram, onValueChange = { instagram = it }, modifier = Modifier.fillMaxWidth(),
+                singleLine = true, label = { Text("اینستاگرام", fontFamily = Vazirmatn) },
+                placeholder = { Text("username یا لینک پروفایل", fontFamily = Vazirmatn) },
+                leadingIcon = { Icon(Icons.Default.CameraAlt, null, tint = TinderPink) },
+                shape = RoundedCornerShape(14.dp), colors = fieldColors()
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = spotify, onValueChange = { spotify = it }, modifier = Modifier.fillMaxWidth(),
+                singleLine = true, label = { Text("اسپاتیفای", fontFamily = Vazirmatn) },
+                placeholder = { Text("username یا لینک پروفایل", fontFamily = Vazirmatn) },
+                leadingIcon = { Icon(Icons.Default.MusicNote, null, tint = SuccessGreen) },
+                shape = RoundedCornerShape(14.dp), colors = fieldColors()
+            )
+            Spacer(Modifier.height(16.dp))
             SectionLabel("علایق")
             InterestFlow(selectedInterests) { interest -> selectedInterests = if (interest in selectedInterests) selectedInterests - interest else selectedInterests + interest }
             Spacer(Modifier.height(24.dp))
         }
         Button(onClick = {
-            onSave(user.copy(name = name.trim(), job = job, city = city, about = about.trim(), orientation = orientation, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), voiceIntro = voiceIntro))
+            onSave(user.copy(name = name.trim(), job = job, city = city, about = about.trim(), orientation = orientation, interests = selectedInterests.toList(), photos = selectedPhotos, primaryPhotoIndex = primaryPhotoIndex.coerceIn(0, (selectedPhotos.size - 1).coerceAtLeast(0)), voiceIntro = voiceIntro, instagram = instagram.trim(), spotify = spotify.trim()))
         }, modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp), shape = RoundedCornerShape(14.dp), colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
             Text("ذخیره تغییرات", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
         }
@@ -2559,7 +2680,7 @@ private fun InterestPickerDialog(
             }
         },
         text = {
-            Column(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).imePadding()) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
@@ -2660,7 +2781,7 @@ private fun CityPickerDialog(cities: List<String>, selected: String, title: Stri
     var query by remember { mutableStateOf("") }
     val filtered = cities.filter { it.contains(query) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title, fontFamily = Vazirmatn) }, text = {
-        Column {
+        Column(Modifier.imePadding().heightIn(max = 380.dp)) {
             OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("جستجو...", fontFamily = Vazirmatn) }, singleLine = true, colors = fieldColors(), shape = RoundedCornerShape(12.dp))
             Spacer(Modifier.height(8.dp))
             Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
@@ -2682,7 +2803,7 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
     val selectedCount = selectedCities.size + selectedJobs.size + selectedInterests.size + selectedGoals.size +
         (if (minAge != 18 || maxAge != 45) 1 else 0) + (if (maxDistance != 50) 1 else 0)
 
-    Column(Modifier.fillMaxSize().background(DarkBg)) {
+    Column(Modifier.fillMaxSize().background(DarkBg).imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = TextWhite) }
             Column(Modifier.weight(1f)) {
@@ -3006,6 +3127,10 @@ private fun DiscoverScreen(
                             Text("${person.job} · ${person.distanceKm} کیلومتر · ${person.city}", color = TextGray, fontSize = 14.sp, fontFamily = Vazirmatn)
                             Spacer(Modifier.height(6.dp))
                             Text(person.about, color = TextWhite.copy(alpha = 0.9f), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
+                            if (person.instagram.isNotBlank() || person.spotify.isNotBlank()) {
+                                Spacer(Modifier.height(7.dp))
+                                SocialProfileBadges(instagram = person.instagram, spotify = person.spotify, compact = true)
+                            }
                         }
                     }
                 }
@@ -3402,6 +3527,10 @@ private fun PersonDetailScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 person.interests.forEach { tag -> AssistChip(onClick = {}, label = { Text(tag, fontFamily = Vazirmatn) }) }
             }
+            if (person.instagram.isNotBlank() || person.spotify.isNotBlank()) {
+                Spacer(Modifier.height(16.dp))
+                SocialProfileBadges(instagram = person.instagram, spotify = person.spotify)
+            }
             Spacer(Modifier.height(24.dp))
             // Like + Dislike both present
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -3434,11 +3563,58 @@ private fun PersonDetailScreen(
 }
 
 // ─── My Profile — modern redesign ─────────────────────────────────────────────
+private fun socialProfileUrl(platform: String, rawValue: String): String {
+    val value = rawValue.trim()
+    if (value.startsWith("https://", true) || value.startsWith("http://", true)) return value
+    return when (platform) {
+        "instagram" -> "https://www.instagram.com/${value.removePrefix("@").trim('/')}/"
+        else -> "https://open.spotify.com/user/${value.trim('/') }"
+    }
+}
+
+@Composable
+private fun SocialProfileBadges(
+    instagram: String,
+    spotify: String,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
+) {
+    val context = LocalContext.current
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (instagram.isNotBlank()) {
+            Surface(
+                onClick = { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(socialProfileUrl("instagram", instagram)))) } },
+                shape = RoundedCornerShape(18.dp), color = Color(0xFFB84E83).copy(alpha = 0.18f), border = BorderStroke(1.dp, Color(0xFFDB78A6).copy(alpha = 0.40f))
+            ) {
+                Row(Modifier.padding(horizontal = if (compact) 7.dp else 10.dp, vertical = if (compact) 4.dp else 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CameraAlt, null, tint = Color(0xFFFF9FC4), modifier = Modifier.size(if (compact) 12.dp else 16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (instagram.startsWith("http", true)) "Instagram" else "@${instagram.removePrefix("@")}", modifier = Modifier.widthIn(max = if (compact) 98.dp else 125.dp), color = TextWhite, fontSize = if (compact) 9.sp else 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
+                }
+            }
+        }
+        if (spotify.isNotBlank()) {
+            Surface(
+                onClick = { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(socialProfileUrl("spotify", spotify)))) } },
+                shape = RoundedCornerShape(18.dp), color = SuccessGreen.copy(alpha = 0.13f), border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.35f))
+            ) {
+                Row(Modifier.padding(horizontal = if (compact) 7.dp else 10.dp, vertical = if (compact) 4.dp else 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.MusicNote, null, tint = SuccessGreen, modifier = Modifier.size(if (compact) 12.dp else 16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (spotify.startsWith("http", true)) "Spotify" else spotify, modifier = Modifier.widthIn(max = if (compact) 98.dp else 125.dp), color = TextWhite, fontSize = if (compact) 9.sp else 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun MyProfileScreen(
     user: UserProfile,
     blockedCount: Int,
     plan: SubscriptionPlan,
+    planExpiryMillis: Long?,
+    paymentHistory: List<PaymentRecord>,
     matchCount: Int,
     likeCount: Int,
     onUpgrade: () -> Unit,
@@ -3477,8 +3653,19 @@ private fun MyProfileScreen(
             StatCard("لایک", "$likeCount", Modifier.weight(1f))
             StatCard("اشتراک", plan.title, Modifier.weight(1f))
         }
-        Spacer(Modifier.height(20.dp))
-
+        if (plan != SubscriptionPlan.FREE) {
+            Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp), colors = CardDefaults.cardColors(containerColor = SuccessGreen.copy(alpha = 0.09f)), border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.25f)), shape = RoundedCornerShape(14.dp)) {
+                Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Verified, null, tint = SuccessGreen, modifier = Modifier.size(19.dp))
+                    Spacer(Modifier.width(9.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("اشتراک ${plan.title} فعال است", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                        Text(planExpiryMillis?.let { "اعتبار تا ${formatDatePersian(it)}" } ?: "تاریخ انقضای خرید قدیمی در نسخه قبلی ثبت نشده است", color = if (planExpiryMillis != null) SuccessGreen else TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+        }
         // Photos gallery
         if (user.photos.isNotEmpty()) {
             Text("عکس‌ها", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(horizontal = 20.dp))
@@ -3519,6 +3706,12 @@ private fun MyProfileScreen(
                 }
             }
         }
+        if (user.instagram.isNotBlank() || user.spotify.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Text("شبکه‌های اجتماعی", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(horizontal = 20.dp))
+            Spacer(Modifier.height(8.dp))
+            SocialProfileBadges(instagram = user.instagram, spotify = user.spotify, modifier = Modifier.padding(horizontal = 20.dp))
+        }
         Spacer(Modifier.height(14.dp))
 
         // Interests
@@ -3543,6 +3736,32 @@ private fun MyProfileScreen(
                 ProfileActionRow(Icons.Default.Edit, "ویرایش پروفایل", TinderPink, onEdit)
                 HorizontalDivider(color = DarkCard)
                 ProfileActionRow(Icons.Default.Block, "بلاک‌شده‌ها: $blockedCount", TextMuted, onShowBlocked)
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        Text("تاریخچه پرداخت", fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn, modifier = Modifier.padding(horizontal = 20.dp))
+        Spacer(Modifier.height(8.dp))
+        if (paymentHistory.isEmpty()) {
+            Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(14.dp)) {
+                Text("هنوز خرید اشتراکی ثبت نشده است.", color = TextMuted, fontSize = 12.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(16.dp))
+            }
+        } else {
+            paymentHistory.forEach { payment ->
+                Card(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(14.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(TinderOrange.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.ReceiptLong, null, tint = TinderOrange, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("اشتراک ${payment.planTitle}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                            Text("تاریخ خرید: ${formatDatePersian(payment.purchasedAtMillis)}", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                            Text("انقضا: ${formatDatePersian(payment.expiresAtMillis)}", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                            if (payment.durationDays > 0) Text("دوره: ${if (payment.durationDays == 7) "هفتگی" else "ماهانه"}", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        }
+                        Text(formatToman(payment.priceToman), color = TinderOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    }
+                }
             }
         }
         Spacer(Modifier.height(20.dp))
