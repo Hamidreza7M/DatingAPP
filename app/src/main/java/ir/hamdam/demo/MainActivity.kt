@@ -2,6 +2,7 @@ package ir.hamdam.demo
 
 import android.Manifest
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -82,6 +83,22 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
+import androidx.camera.view.PreviewView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.Executor
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.gson.Gson
@@ -130,6 +147,12 @@ private val TextGray = Color(0xFFB9C1D8)
 private val TextMuted = Color(0xFF818BA7)
 private val SuccessGreen = Color(0xFF52D6A5)
 private val GradientTinder = listOf(Color(0xFFFF648C), Color(0xFFFF8A83), Color(0xFF9B8CFF))
+
+private tailrec fun Context.findComponentActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is ContextWrapper -> baseContext.findComponentActivity()
+    else -> null
+}
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 enum class Gender { MALE, FEMALE, OTHER }
@@ -253,7 +276,8 @@ data class FilterState(
     val interests: Set<String> = emptySet(),
     val maxDistance: Int = 50,
     val cities: Set<String> = emptySet(),
-    val goals: Set<RelationGoal> = emptySet()
+    val goals: Set<RelationGoal> = emptySet(),
+    val verifiedOnly: Boolean = false
 )
 
 data class ReportReason(val id: String, val title: String)
@@ -791,7 +815,8 @@ private fun FastLoveApp() {
             (filters.cities.isEmpty() || p.city in filters.cities) &&
             (filters.jobs.isEmpty() || p.job in filters.jobs) &&
             (filters.interests.isEmpty() || p.interests.any { it in filters.interests }) &&
-            (filters.goals.isEmpty() || p.goal in filters.goals)
+            (filters.goals.isEmpty() || p.goal in filters.goals) &&
+            (!filters.verifiedOnly || p.isVerified)
         }
     }
 
@@ -3282,8 +3307,10 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
     var selectedJobs by remember { mutableStateOf(current.jobs) }
     var selectedInterests by remember { mutableStateOf(current.interests) }
     var selectedGoals by remember { mutableStateOf(current.goals) }
+    var verifiedOnly by remember { mutableStateOf(current.verifiedOnly) }
     val selectedCount = selectedCities.size + selectedJobs.size + selectedInterests.size + selectedGoals.size +
-        (if (minAge != 18 || maxAge != 45) 1 else 0) + (if (maxDistance != 50) 1 else 0)
+        (if (minAge != 18 || maxAge != 45) 1 else 0) + (if (maxDistance != 50) 1 else 0) +
+        (if (verifiedOnly) 1 else 0)
 
     Column(Modifier.fillMaxSize().background(DarkBg).imePadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -3295,6 +3322,7 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
             TextButton(onClick = {
                 minAge = 18; maxAge = 45; maxDistance = 50
                 selectedCities = emptySet(); selectedJobs = emptySet(); selectedInterests = emptySet(); selectedGoals = emptySet()
+                verifiedOnly = false
             }) { Text("پاک‌سازی", color = TinderOrange, fontFamily = Vazirmatn) }
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp)) {
@@ -3336,6 +3364,28 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
             CompactFilterPicker("شغل", availableJobs, selectedJobs, "شغل را جست‌وجو کن") { job ->
                 selectedJobs = if (job in selectedJobs) selectedJobs - job else selectedJobs + job
             }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    VerifiedBadge(size = 22.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("فقط کاربران تأییدشده", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                        Text("نمایش پروفایل‌های دارای تیک آبی", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                    }
+                    Switch(
+                        checked = verifiedOnly,
+                        onCheckedChange = { verifiedOnly = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF268DFF))
+                    )
+                }
+            }
             Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 18.dp)) {
                 Column(Modifier.padding(14.dp)) {
                     Text("هدف رابطه", color = TextWhite, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
@@ -3350,7 +3400,7 @@ private fun FilterScreen(current: FilterState, onApply: (FilterState) -> Unit, o
                 }
             }
         }
-        Button(onClick = { onApply(FilterState(minAge, maxAge, selectedJobs, selectedInterests, maxDistance, selectedCities, selectedGoals)) },
+        Button(onClick = { onApply(FilterState(minAge, maxAge, selectedJobs, selectedInterests, maxDistance, selectedCities, selectedGoals, verifiedOnly)) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp).height(52.dp), shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
             Text("نمایش افراد مطابق فیلتر", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
@@ -4487,9 +4537,11 @@ private fun DateProposalDialog(
     var selectedHour by remember { mutableIntStateOf(19) }
     var selectedMinute by remember { mutableIntStateOf(0) }
     var place by remember { mutableStateOf("") }
+    var placeConfirmed by remember { mutableStateOf(false) }
     var selectedLatitude by remember { mutableStateOf<Double?>(null) }
     var selectedLongitude by remember { mutableStateOf<Double?>(null) }
     var showMapPicker by remember { mutableStateOf(false) }
+    var showCalendar by remember { mutableStateOf(false) }
 
     val currentMonthSerial = persianMonthSerial(todayStart)
     val maxMonthSerial = persianMonthSerial(maxAllowedDay)
@@ -4513,7 +4565,7 @@ private fun DateProposalDialog(
         }.timeInMillis
     }
     val isDateWithinWindow = selectedDayStart >= todayStart && selectedDateMillis <= maxAllowedEnd
-    val canSubmit = (place.trim().length >= 3 || selectedLatitude != null) &&
+    val canSubmit = (placeConfirmed || selectedLatitude != null) &&
         isDateWithinWindow && proposedDateTime > System.currentTimeMillis()
 
     AlertDialog(
@@ -4532,7 +4584,12 @@ private fun DateProposalDialog(
             ) {
                 OutlinedTextField(
                     value = place,
-                    onValueChange = { place = it },
+                    onValueChange = {
+                        place = it
+                        placeConfirmed = false
+                        selectedLatitude = null
+                        selectedLongitude = null
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("مکان قرار", fontFamily = Vazirmatn) },
                     placeholder = { Text("مثلاً کافه‌ای در خیابان ولیعصر", fontFamily = Vazirmatn, fontSize = 11.sp) },
@@ -4540,6 +4597,27 @@ private fun DateProposalDialog(
                     singleLine = true,
                     colors = fieldColors()
                 )
+                if (place.trim().length >= 3 && selectedLatitude == null) {
+                    if (!placeConfirmed) {
+                        Button(
+                            onClick = { placeConfirmed = true },
+                            modifier = Modifier.fillMaxWidth().height(40.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25364A)),
+                            shape = RoundedCornerShape(11.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("تأیید مکان واردشده", color = Color.White, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("مکان واردشده تأیید شد", color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        }
+                    }
+                }
                 OutlinedButton(
                     onClick = { showMapPicker = true },
                     modifier = Modifier.fillMaxWidth(),
@@ -4567,6 +4645,7 @@ private fun DateProposalDialog(
                             onClick = {
                                 selectedLatitude = null
                                 selectedLongitude = null
+                                placeConfirmed = false
                                 if (place == "موقعیت انتخاب‌شده روی نقشه") place = ""
                             },
                             contentPadding = PaddingValues(horizontal = 5.dp, vertical = 1.dp)
@@ -4574,15 +4653,27 @@ private fun DateProposalDialog(
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("تاریخ قرار · تقویم شمسی", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = Vazirmatn)
-                        Text("امکان انتخاب تاریخ تا ۳ ماه آینده را داری", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
-                    }
-                    Surface(color = TinderPink.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp)) {
-                        Text(persianDateLabel(selectedDateMillis), Modifier.padding(horizontal = 9.dp, vertical = 6.dp), color = TinderPink, fontSize = 9.sp, fontFamily = Vazirmatn)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    shape = RoundedCornerShape(15.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { showCalendar = !showCalendar }.padding(horizontal = 13.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.CalendarMonth, null, tint = TinderPink, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(9.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("تاریخ دیت", color = TextWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                            Text(persianDateLabel(selectedDateMillis), color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                        }
+                        Text(if (showCalendar) "بستن تقویم" else "تغییر تاریخ", color = TinderPink, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
+                        Spacer(Modifier.width(4.dp))
+                        Icon(if (showCalendar) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = TinderPink, modifier = Modifier.size(18.dp))
                     }
                 }
+                if (showCalendar) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF171E31)),
                     shape = RoundedCornerShape(16.dp),
@@ -4630,7 +4721,7 @@ private fun DateProposalDialog(
                                         val enabled = dayStart >= todayStart && dayMillis <= maxAllowedDay
                                         val selected = monthStartDay(selectedDateMillis) == dayStart
                                         Surface(
-                                            onClick = { selectedDateMillis = dayMillis },
+                                            onClick = { selectedDateMillis = dayMillis; showCalendar = false },
                                             enabled = enabled,
                                             modifier = Modifier.weight(1f).padding(2.dp).height(33.dp),
                                             shape = RoundedCornerShape(11.dp),
@@ -4659,6 +4750,8 @@ private fun DateProposalDialog(
                             }
                         }
                     }
+                }
+
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -4699,7 +4792,7 @@ private fun DateProposalDialog(
                         set(Calendar.SECOND, 0)
                         set(Calendar.MILLISECOND, 0)
                     }.timeInMillis
-                    if (selectedDate > now && selectedDate <= maxAllowedEnd && (place.trim().length >= 3 || selectedLatitude != null)) {
+                    if (selectedDate > now && selectedDate <= maxAllowedEnd && (placeConfirmed || selectedLatitude != null)) {
                         val finalPlace = place.trim().ifBlank { "موقعیت انتخاب‌شده روی نقشه" }
                         onSubmit(finalPlace, selectedDate, selectedLatitude, selectedLongitude)
                     }
@@ -4717,6 +4810,7 @@ private fun DateProposalDialog(
             onConfirm = { latitude, longitude ->
                 selectedLatitude = latitude
                 selectedLongitude = longitude
+                placeConfirmed = true
                 if (place.isBlank()) place = "موقعیت انتخاب‌شده روی نقشه"
                 showMapPicker = false
             }
@@ -5640,8 +5734,8 @@ private val verificationPrompts = listOf(
 )
 
 private fun createPrivateVerificationVideoFile(context: Context): File {
-    val directory = File(context.filesDir, "media/profile_verification").apply { mkdirs() }
-    return File(directory, "verification_${System.currentTimeMillis()}_${UUID.randomUUID()}.mp4")
+    val directory = File(context.cacheDir, "profile_verification_capture").apply { mkdirs() }
+    return File(directory, "verification_capture_${System.currentTimeMillis()}_${UUID.randomUUID()}.mp4")
 }
 
 @Composable
@@ -5682,43 +5776,57 @@ private fun ProfileVerificationScreen(
     onSubmit: (videoUri: String, prompt: String) -> Unit
 ) {
     val context = LocalContext.current
-    BackHandler(onBack = onBack)
+    val activity = remember(context) { context.findComponentActivity() }
     var prompt by remember { mutableStateOf(verificationPrompts.random()) }
     var selectedVideoUri by remember { mutableStateOf("") }
-    var captureFile by remember { mutableStateOf<File?>(null) }
     var error by remember { mutableStateOf("") }
+    var isCameraCaptureOpen by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var submitProgress by remember { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    BackHandler(enabled = !isCameraCaptureOpen, onBack = onBack)
 
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { selected ->
-            val saved = storeUriInAppFiles(context, selected, "profile_verification")
-            if (saved != null) {
-                selectedVideoUri = saved
-                error = ""
-            } else {
-                error = "خواندن ویدیو ممکن نشد؛ فایل دیگری را انتخاب کن."
-            }
-        }
-    }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { success ->
-        val file = captureFile
-        if (success && file != null && file.exists() && file.length() > 0L) {
-            selectedVideoUri = Uri.fromFile(file).toString()
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val allGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (allGranted) {
             error = ""
-        } else if (!success) {
-            error = "ضبط ویدیو کامل نشد؛ دوباره تلاش کن."
-            file?.takeIf { it.exists() }?.delete()
+            isCameraCaptureOpen = true
+        } else {
+            error = "برای ضبط ویدیو باید دسترسی دوربین و میکروفون را فعال کنی."
         }
     }
 
     fun startCameraCapture() {
-        runCatching {
-            val output = createPrivateVerificationVideoFile(context)
-            captureFile = output
-            val outputUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", output)
-            cameraLauncher.launch(outputUri)
-        }.onFailure {
-            error = "بازکردن دوربین ممکن نشد؛ دسترسی دوربین را بررسی کن."
+        val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
         }
+        if (missing.isEmpty()) {
+            error = ""
+            isCameraCaptureOpen = true
+        } else {
+            permissionLauncher.launch(missing.toTypedArray())
+        }
+    }
+
+    if (isCameraCaptureOpen) {
+        VerificationCameraCaptureScreen(
+            prompt = prompt,
+            onNewPrompt = {
+                prompt = verificationPrompts.filterNot { it == prompt }.random()
+            },
+            onCancel = { isCameraCaptureOpen = false },
+            onCaptured = { uri ->
+                selectedVideoUri = uri
+                error = ""
+                isCameraCaptureOpen = false
+            },
+            onError = { message -> error = message }
+        )
+        return
     }
 
     Column(Modifier.fillMaxSize().background(DarkBg)) {
@@ -5729,7 +5837,7 @@ private fun ProfileVerificationScreen(
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
             Column(Modifier.weight(1f)) {
                 Text("تأیید هویت پروفایل", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp, fontFamily = Vazirmatn)
-                Text("یک ویدیوی کوتاه و طبیعی ضبط کن", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                Text("ویدیو را همان لحظه با دوربین ضبط کن", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
             }
         }
 
@@ -5749,7 +5857,7 @@ private fun ProfileVerificationScreen(
                     Icon(Icons.Default.Schedule, null, tint = BrandViolet, modifier = Modifier.size(56.dp))
                     Spacer(Modifier.height(15.dp))
                     Text("درخواستت ثبت شده است", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 19.sp, fontFamily = Vazirmatn)
-                    Text("ویدیوی انتخاب‌شده در فضای خصوصی این دستگاه نگهداری می‌شود. پس از اتصال سرویس بررسی به سرور، نتیجه تأیید یا رد در همین بخش نمایش داده خواهد شد.", color = TextGray, textAlign = TextAlign.Center, lineHeight = 23.sp, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Text("ویدیوی ضبط‌شده در فضای خصوصی دستگاه آماده بررسی است. اتصال به سرور بررسی، ارسال آنلاین و دریافت نتیجه را فعال می‌کند.", color = TextGray, textAlign = TextAlign.Center, lineHeight = 23.sp, fontSize = 12.sp, fontFamily = Vazirmatn)
                     Spacer(Modifier.height(20.dp))
                     Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) { Text("بازگشت", fontFamily = Vazirmatn) }
                 }
@@ -5769,12 +5877,12 @@ private fun ProfileVerificationScreen(
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text("با نشان آبی، اعتماد بیشتری جلب کن", color = TextWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-                                Text("تأیید اختیاری است و به واقعی‌بودن پروفایلت کمک می‌کند.", color = TextMuted, fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+                                Text("برای تأیید، ویدیو باید همین لحظه و با دوربین داخل برنامه ضبط شود.", color = TextMuted, fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
                             }
                         }
                     }
 
-                    Text("این جمله را در ویدیو بگو", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                    Text("جمله‌ای که باید در ویدیو بگویی", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
                     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1B2540)), shape = RoundedCornerShape(18.dp)) {
                         Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                             Text("«$prompt»", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 24.sp, fontFamily = Vazirmatn)
@@ -5787,86 +5895,373 @@ private fun ProfileVerificationScreen(
                             ) {
                                 Icon(Icons.Default.Refresh, null, tint = BrandViolet, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(5.dp))
-                                Text("جمله تصادفی جدید", color = BrandViolet, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                Text("درخواست جمله تصادفی جدید", color = BrandViolet, fontSize = 10.sp, fontFamily = Vazirmatn)
                             }
                         }
                     }
 
-                    Text("ویدیوی خودت را آماده کن", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
-                    Text("صورتت واضح باشد، نور کافی داشته باش و جمله بالا را با صدای خودت بگو.", color = TextMuted, fontSize = 10.sp, lineHeight = 18.sp, fontFamily = Vazirmatn)
+                    Text("ضبط و بازبینی ویدیو", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                    Text("دوربین سلفی و میکروفون در خود برنامه فعال می‌شوند؛ جمله هنگام ضبط روی تصویر باقی می‌ماند.", color = TextMuted, fontSize = 10.sp, lineHeight = 18.sp, fontFamily = Vazirmatn)
 
                     if (selectedVideoUri.isNotBlank()) {
                         VerificationVideoPreview(selectedVideoUri)
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = { startCameraCapture() },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(13.dp),
-                                border = BorderStroke(1.dp, BrandViolet)
-                            ) {
-                                Icon(Icons.Default.Refresh, null, tint = BrandViolet, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(5.dp))
-                                Text("ضبط مجدد", color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
-                            }
-                            OutlinedButton(
-                                onClick = { galleryLauncher.launch("video/*") },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(13.dp),
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
-                            ) {
-                                Icon(Icons.Default.VideoLibrary, null, tint = TextGray, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(5.dp))
-                                Text("انتخاب ویدیوی دیگر", color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
-                            }
-                        }
-                    } else {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                             Button(
                                 onClick = { startCameraCapture() },
-                                modifier = Modifier.weight(1f).height(50.dp),
+                                modifier = Modifier.weight(1f).height(48.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = TinderPink),
                                 shape = RoundedCornerShape(13.dp)
                             ) {
-                                Icon(Icons.Default.Videocam, null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("ضبط ویدیو", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("ضبط مجدد", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
                             }
                             OutlinedButton(
-                                onClick = { galleryLauncher.launch("video/*") },
-                                modifier = Modifier.weight(1f).height(50.dp),
+                                onClick = { selectedVideoUri = "" },
+                                modifier = Modifier.weight(1f).height(48.dp),
                                 shape = RoundedCornerShape(13.dp),
-                                border = BorderStroke(1.dp, BrandViolet)
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
                             ) {
-                                Icon(Icons.Default.VideoLibrary, null, tint = BrandViolet, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("انتخاب از گالری", color = TextWhite, fontSize = 11.sp, fontFamily = Vazirmatn)
+                                Icon(Icons.Default.DeleteOutline, null, tint = TextGray, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("حذف ویدیو", color = TextWhite, fontSize = 11.sp, fontFamily = Vazirmatn)
                             }
+                        }
+                    } else {
+                        Button(
+                            onClick = { startCameraCapture() },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = TinderPink),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.Videocam, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("بازکردن دوربین و ضبط ویدیو", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
                         }
                     }
 
-                    if (error.isNotBlank()) Text(error, color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
+                    if (error.isNotBlank()) {
+                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF3A202C)), shape = RoundedCornerShape(12.dp)) {
+                            Text(error, Modifier.fillMaxWidth().padding(11.dp), color = Color(0xFFFFA0A0), fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+                        }
+                    }
                     if (user.verificationStatus == ProfileVerificationStatus.REJECTED) {
                         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF3A202C)), shape = RoundedCornerShape(13.dp)) {
                             Column(Modifier.fillMaxWidth().padding(12.dp)) {
                                 Text("درخواست قبلی تأیید نشد", color = Color(0xFFFFA0A0), fontWeight = FontWeight.Bold, fontSize = 11.sp, fontFamily = Vazirmatn)
-                                Text(user.verificationRejectionReason.ifBlank { "ویدیوی قبلی با شرایط بررسی مطابقت نداشت. می‌توانی ویدیوی تازه‌ای بفرستی." }, color = TextGray, fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+                                Text(user.verificationRejectionReason.ifBlank { "ویدیوی قبلی با شرایط بررسی مطابقت نداشت. می‌توانی ویدیوی تازه‌ای ضبط و ارسال کنی." }, color = TextGray, fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
                             }
                         }
                     }
-                    Text("پیش از ثبت درخواست، ویدیو را همین‌جا بازبینی کن. در نسخه فعلی برنامه ویدیو در حافظه خصوصی دستگاه ذخیره می‌شود؛ ارسال به تیم بررسی پس از اتصال API سرور فعال خواهد شد.", color = TextMuted, fontSize = 9.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+
+                    if (isSubmitting) {
+                        Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(15.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CloudUpload, null, tint = BrandViolet, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("آماده‌سازی و ثبت درخواست", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, fontFamily = Vazirmatn)
+                                    Spacer(Modifier.weight(1f))
+                                    Text("${(submitProgress * 100).toInt()}٪", color = TinderPink, fontWeight = FontWeight.Bold, fontSize = 11.sp, fontFamily = Vazirmatn)
+                                }
+                                LinearProgressIndicator(
+                                    progress = submitProgress.coerceIn(0f, 1f),
+                                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(20.dp)),
+                                    color = TinderPink,
+                                    trackColor = DarkCard
+                                )
+                                Text("در حال آماده‌سازی امن فایل روی دستگاه…", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                            }
+                        }
+                    }
+
+                    Text("پیش از ثبت، ویدیو را بازبینی کن. در این نسخه درخواست و فایل به‌صورت محلی ذخیره می‌شوند؛ ارسال اینترنتی به سرویس بررسی پس از تنظیم API سرور فعال می‌شود.", color = TextMuted, fontSize = 9.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
                     Button(
-                        onClick = { onSubmit(selectedVideoUri, prompt) },
-                        enabled = selectedVideoUri.isNotBlank(),
+                        onClick = {
+                            if (!isSubmitting && selectedVideoUri.isNotBlank()) {
+                                isSubmitting = true
+                                submitProgress = 0.02f
+                                error = ""
+                                scope.launch {
+                                    try {
+                                        val sourceUri = Uri.parse(selectedVideoUri)
+                                        val sourcePath = sourceUri.path
+                                        val savedUri = withContext(Dispatchers.IO) {
+                                            val source = sourcePath?.let(::File)
+                                                ?: throw IllegalStateException("مسیر ویدیو معتبر نیست.")
+                                            if (!source.exists() || !source.isFile || !source.canRead() || source.length() <= 0L) {
+                                                throw IllegalStateException("فایل ویدیوی ضبط‌شده قابل خواندن نیست؛ دوباره ضبط کن.")
+                                            }
+                                            val directory = File(context.filesDir, "media/profile_verification").apply { mkdirs() }
+                                            val destination = File(directory, "verification_${System.currentTimeMillis()}_${UUID.randomUUID()}.mp4")
+                                            val totalBytes = source.length().coerceAtLeast(1L)
+                                            var copiedBytes = 0L
+                                            source.inputStream().buffered().use { input ->
+                                                destination.outputStream().buffered().use { output ->
+                                                    val buffer = ByteArray(64 * 1024)
+                                                    while (true) {
+                                                        val count = input.read(buffer)
+                                                        if (count < 0) break
+                                                        output.write(buffer, 0, count)
+                                                        copiedBytes += count
+                                                        val progress = (copiedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                                                        withContext(Dispatchers.Main) { submitProgress = 0.08f + progress * 0.82f }
+                                                    }
+                                                    output.flush()
+                                                }
+                                            }
+                                            if (!destination.exists() || destination.length() != source.length()) {
+                                                destination.delete()
+                                                throw IllegalStateException("ذخیره ویدیو کامل نشد؛ دوباره تلاش کن.")
+                                            }
+                                            Uri.fromFile(destination).toString()
+                                        }
+                                        submitProgress = 0.96f
+                                        onSubmit(savedUri, prompt)
+                                        submitProgress = 1f
+                                        delay(250)
+                                        onBack()
+                                    } catch (t: Throwable) {
+                                        error = t.message ?: "آماده‌سازی ویدیو ناموفق بود. دوباره تلاش کن."
+                                        isSubmitting = false
+                                        submitProgress = 0f
+                                    }
+                                }
+                            }
+                        },
+                        enabled = selectedVideoUri.isNotBlank() && !isSubmitting,
                         modifier = Modifier.fillMaxWidth().height(49.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = TinderPink),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Icon(Icons.Default.Send, null, modifier = Modifier.size(17.dp))
-                        Spacer(Modifier.width(7.dp))
-                        Text("ثبت درخواست تأیید", fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        if (isSubmitting) {
+                            CircularProgressIndicator(Modifier.size(17.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("در حال آماده‌سازی…", fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        } else {
+                            Icon(Icons.Default.Send, null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("ثبت درخواست تأیید", fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun VerificationCameraCaptureScreen(
+    prompt: String,
+    onNewPrompt: () -> Unit,
+    onCancel: () -> Unit,
+    onCaptured: (String) -> Unit,
+    onError: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val activity = remember(context) { context.findComponentActivity() }
+    var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    var videoCapture by remember { mutableStateOf<VideoCapture<Recorder>?>(null) }
+    var activeRecording by remember { mutableStateOf<Recording?>(null) }
+    var isRecording by remember { mutableStateOf(false) }
+    var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
+    var recordingSeconds by remember { mutableIntStateOf(0) }
+    var cameraReady by remember { mutableStateOf(false) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var cameraError by remember { mutableStateOf("") }
+    var userCancelled by remember { mutableStateOf(false) }
+    val latestRecording = rememberUpdatedState(activeRecording)
+    val latestCameraProvider = rememberUpdatedState(cameraProvider)
+    BackHandler(onBack = {
+        userCancelled = true
+        runCatching { activeRecording?.stop() }
+        onCancel()
+    })
+    val mainExecutor: Executor = remember(context) { ContextCompat.getMainExecutor(context) }
+
+    LaunchedEffect(previewView, lensFacing, activity) {
+        val view = previewView ?: return@LaunchedEffect
+        val host = activity ?: run {
+            cameraError = "دسترسی به دوربین دستگاه ممکن نیست."
+            onError(cameraError)
+            return@LaunchedEffect
+        }
+        cameraReady = false
+        val future = ProcessCameraProvider.getInstance(context)
+        future.addListener({
+            try {
+                val provider = future.get()
+                cameraProvider = provider
+                val preview = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
+                val recorder = Recorder.Builder()
+                    .setQualitySelector(QualitySelector.from(Quality.HD))
+                    .build()
+                val capture = VideoCapture.withOutput(recorder)
+                val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+                provider.unbindAll()
+                provider.bindToLifecycle(host, selector, preview, capture)
+                videoCapture = capture
+                cameraError = ""
+                cameraReady = true
+            } catch (t: Throwable) {
+                cameraReady = false
+                cameraError = "راه‌اندازی دوربین ناموفق بود: ${t.message ?: "خطای ناشناخته"}"
+                onError(cameraError)
+            }
+        }, mainExecutor)
+    }
+
+    LaunchedEffect(isRecording) {
+        if (isRecording) {
+            recordingSeconds = 0
+            while (isRecording) {
+                delay(1000)
+                recordingSeconds += 1
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            runCatching { latestRecording.value?.stop() }
+            runCatching { latestCameraProvider.value?.unbindAll() }
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { viewContext ->
+                PreviewView(viewContext).apply {
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    previewView = this
+                }
+            },
+            update = { previewView = it }
+        )
+
+        Column(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = {
+                    userCancelled = true
+                    if (isRecording) activeRecording?.stop()
+                    onCancel()
+                }) {
+                    Icon(Icons.Default.Close, "بستن دوربین", tint = Color.White)
+                }
+                Spacer(Modifier.weight(1f))
+                Surface(color = if (isRecording) Color(0xFFD83452) else Color.Black.copy(alpha = 0.55f), shape = RoundedCornerShape(30.dp)) {
+                    Row(Modifier.padding(horizontal = 11.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(Color.White))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (isRecording) "ضبط در حال انجام · ${persianDigits("%02d:%02d".format(Locale.US, recordingSeconds / 60, recordingSeconds % 60))}"
+                            else "آماده ضبط",
+                            color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn
+                        )
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
+                IconButton(onClick = {
+                    if (!isRecording) lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT
+                }, enabled = !isRecording) {
+                    Icon(Icons.Default.Cameraswitch, "تغییر دوربین", tint = Color.White)
+                }
+            }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xE61B2540)),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+            ) {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text("این جمله را در ویدیو بگو", color = Color(0xFFB9C8FF), fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Text("«$prompt»", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, lineHeight = 23.sp, fontFamily = Vazirmatn)
+                    TextButton(
+                        onClick = onNewPrompt,
+                        contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, null, tint = Color(0xFFB99CFF), modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("جمله تصادفی جدید", color = Color(0xFFB99CFF), fontSize = 10.sp, fontFamily = Vazirmatn)
+                    }
+                }
+            }
+        }
+
+        if (cameraError.isNotBlank()) {
+            Card(
+                Modifier.align(Alignment.Center).padding(horizontal = 18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xE63A202C)),
+                shape = RoundedCornerShape(13.dp)
+            ) {
+                Text(cameraError, Modifier.padding(13.dp), color = Color(0xFFFFB0B0), fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+            }
+        }
+
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                .padding(horizontal = 18.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (!cameraReady) {
+                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(25.dp))
+                Text("در حال آماده‌سازی دوربین…", color = Color.White, fontSize = 11.sp, fontFamily = Vazirmatn)
+            }
+            Button(
+                onClick = {
+                    val capture = videoCapture
+                    if (!cameraReady || capture == null) {
+                        cameraError = "دوربین هنوز آماده نیست؛ چند لحظه دیگر دوباره امتحان کن."
+                        onError(cameraError)
+                    } else if (!isRecording) {
+                        try {
+                            val output = createPrivateVerificationVideoFile(context)
+                            val options = FileOutputOptions.Builder(output).build()
+                            val pending = capture.output.prepareRecording(context, options).withAudioEnabled()
+                            activeRecording = pending.start(mainExecutor) { event ->
+                                when (event) {
+                                    is VideoRecordEvent.Start -> isRecording = true
+                                    is VideoRecordEvent.Finalize -> {
+                                        isRecording = false
+                                        activeRecording = null
+                                        if (userCancelled) {
+                                            output.delete()
+                                        } else if (!event.hasError() && output.exists() && output.length() > 0L) {
+                                            onCaptured(Uri.fromFile(output).toString())
+                                        } else {
+                                            output.delete()
+                                            cameraError = "ذخیره ویدیو با خطا روبه‌رو شد؛ دوباره ضبط کن."
+                                            onError(cameraError)
+                                        }
+                                    }
+                                    else -> Unit
+                                }
+                            }
+                        } catch (t: Throwable) {
+                            cameraError = "شروع ضبط ویدیو ممکن نشد: ${t.message ?: "دسترسی دوربین یا میکروفون را بررسی کن."}"
+                            onError(cameraError)
+                        }
+                    } else {
+                        activeRecording?.stop()
+                    }
+                },
+                enabled = cameraReady,
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = if (isRecording) Color(0xFFE33D55) else TinderPink),
+                shape = RoundedCornerShape(17.dp)
+            ) {
+                Icon(if (isRecording) Icons.Default.Stop else Icons.Default.FiberManualRecord, null, modifier = Modifier.size(19.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(if (isRecording) "پایان ضبط و استفاده از ویدیو" else "شروع ضبط ویدیو", fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+            }
+            Text("برای ضبط، دوربین و میکروفون فعال هستند؛ متن بالای تصویر قابل مشاهده است.", color = Color.White.copy(alpha = 0.78f), fontSize = 9.sp, textAlign = TextAlign.Center, fontFamily = Vazirmatn)
         }
     }
 }
