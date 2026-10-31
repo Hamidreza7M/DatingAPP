@@ -1160,7 +1160,9 @@ private fun FastLoveApp() {
                                     )
                                     2 -> MapScreen(
                                         user = currentUser,
-                                        people = samplePeople.filter { it.id !in blockedIds && it.id !in unmatchedIds && it.id !in passedIds },
+                                        people = orientationFiltered.filter { it.id !in blockedIds && it.id !in unmatchedIds },
+                                        likedIds = likedPeople.map { it.id }.toSet(),
+                                        passedIds = passedIds.toSet(),
                                         isVisibleOnMap = showOnMap,
                                         savedCamera = mapCameraState,
                                         onToggleVisibility = { enabled ->
@@ -1255,6 +1257,7 @@ private fun FastLoveApp() {
                                     if (tutorialStep >= PRODUCT_TOUR_STEPS.lastIndex) {
                                         prefs(context).edit().putInt("tutorialVersion", 230).apply()
                                         showTutorial = false
+                                        tab = 0
                                     } else {
                                         tutorialStep += 1
                                         tab = PRODUCT_TOUR_STEPS[tutorialStep].tab
@@ -1263,6 +1266,7 @@ private fun FastLoveApp() {
                                 onSkip = {
                                     prefs(context).edit().putInt("tutorialVersion", 230).apply()
                                     showTutorial = false
+                                    tab = 0
                                 }
                             )
                         }
@@ -1661,7 +1665,7 @@ private fun UpgradeTeaserScreen(onUpgrade: () -> Unit) {
 private data class ProductTourStep(val tab: Int, val title: String, val body: String, val action: String)
 
 private val PRODUCT_TOUR_STEPS = listOf(
-    ProductTourStep(0, "کشف افراد و فیلترها", "کارت‌ها را بررسی کن؛ برای لایک به راست و برای ردکردن به چپ بکش. با لمس کارت جزئیات را می‌بینی و از آیکن فیلتر بالای صفحه می‌توانی سن، شهر و علایق را تنظیم کنی.", "دیدن لایک‌ها"),
+    ProductTourStep(0, "کشف افراد؛ سه انتخاب ساده", "برای لایک‌کردن روی قلب بزن یا کارت را به راست بکش؛ برای ردکردن، ضربدر یا کشیدن به چپ را انتخاب کن. برای مسدودکردن فرد، دکمه آیکن سپر/مسدودسازی کنار کارت را بزن؛ با این کار دیگر در پیشنهادها و نقشه نمایش داده نمی‌شود. لمس کارت، جزئیات پروفایل را باز می‌کند.", "دیدن لایک‌ها"),
     ProductTourStep(1, "بخش لایک‌ها", "در این بخش بین لایک‌هایی که فرستاده‌ای و لایک‌هایی که دریافت کرده‌ای جابه‌جا شو؛ از همین‌جا می‌توانی پروفایل‌ها را باز کنی و لایک را متقابل کنی.", "دیدن نقشه"),
     ProductTourStep(2, "نقشه کاربران", "موقعیت تقریبی افراد شهر را ببین. نمایش خودت روی نقشه اختیاری است و دسترسی موقعیت فقط با اجازه تو فعال می‌شود.", "رفتن به گفتگوها"),
     ProductTourStep(3, "مچ‌ها و گفتگوها", "وقتی علاقه دوطرفه باشد، مچ می‌شوید. از سربرگ گفتگو می‌توانی کارت پروفایل طرف مقابل را هم ببینی.", "دیدن پروفایل"),
@@ -1715,6 +1719,33 @@ private fun ProductTourOverlay(step: Int, onNext: () -> Unit, onSkip: () -> Unit
                 Text(page.title, color = TextWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
                 Spacer(Modifier.height(6.dp))
                 Text(page.body, color = TextGray, fontSize = 12.sp, lineHeight = 22.sp, fontFamily = Vazirmatn)
+                if (step == 0) {
+                    val actionPulse = rememberInfiniteTransition(label = "tourActionPulse")
+                    val actionScale by actionPulse.animateFloat(
+                        initialValue = 0.96f, targetValue = 1.06f,
+                        animationSpec = infiniteRepeatable(tween(650, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                        label = "tourActionScale"
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(
+                            Triple("♥", "لایک", TinderPink),
+                            Triple("✕", "دیسلایک", TextMuted),
+                            Triple("⊘", "بلاک", Color(0xFFFF8B8B))
+                        ).forEachIndexed { index, item ->
+                            Surface(
+                                modifier = Modifier.weight(1f).scale(actionScale),
+                                shape = RoundedCornerShape(13.dp),
+                                color = item.third.copy(alpha = 0.13f),
+                                border = BorderStroke(1.dp, item.third.copy(alpha = 0.65f))
+                            ) {
+                                Column(Modifier.padding(vertical = 9.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(item.first, color = item.third, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                    Text(item.second, color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
+                                }
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(15.dp))
                 Button(
                     onClick = onNext,
@@ -1737,23 +1768,23 @@ private fun ProductTourOverlay(step: Int, onNext: () -> Unit, onSkip: () -> Unit
 private fun AnimatedGifAuthBackground() {
     val pulse = rememberInfiniteTransition(label = "authLightEffects")
     val glowA by pulse.animateFloat(
-        initialValue = 0.30f, targetValue = 0.78f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        initialValue = 0.18f, targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(tween(1150, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "lightPulseA"
     )
     val glowB by pulse.animateFloat(
-        initialValue = 0.18f, targetValue = 0.58f,
-        animationSpec = infiniteRepeatable(tween(3400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        initialValue = 0.12f, targetValue = 0.90f,
+        animationSpec = infiniteRepeatable(tween(1450, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "lightPulseB"
     )
     val glowC by pulse.animateFloat(
-        initialValue = 0.20f, targetValue = 0.62f,
-        animationSpec = infiniteRepeatable(tween(2100, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        initialValue = 0.12f, targetValue = 0.95f,
+        animationSpec = infiniteRepeatable(tween(950, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "lightPulseC"
     )
     val heartBloom by pulse.animateFloat(
-        initialValue = 0.80f, targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(tween(2700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        initialValue = 0.72f, targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "heartBloomPulse"
     )
     Box(Modifier.fillMaxSize()) {
@@ -1773,8 +1804,8 @@ private fun AnimatedGifAuthBackground() {
             Modifier.align(Alignment.Center).offset(y = (-92).dp).size(252.dp)
                 .graphicsLayer { alpha = heartBloom }
                 .background(Brush.radialGradient(listOf(
-                    Color(0xFFFF7FA8).copy(alpha = 0.42f),
-                    TinderPink.copy(alpha = 0.24f),
+                    Color(0xFFFF7FA8).copy(alpha = 0.66f),
+                    TinderPink.copy(alpha = 0.42f),
                     Color.Transparent
                 )), CircleShape)
                 .blur(11.dp)
@@ -1783,7 +1814,7 @@ private fun AnimatedGifAuthBackground() {
             Modifier.align(Alignment.Center).offset(y = (-92).dp).size(166.dp)
                 .graphicsLayer { alpha = heartBloom }
                 .background(Brush.radialGradient(listOf(
-                    TinderOrange.copy(alpha = 0.27f), Color.Transparent
+                    TinderOrange.copy(alpha = 0.48f), Color.Transparent
                 )), CircleShape)
                 .blur(7.dp)
         )
@@ -3828,7 +3859,8 @@ private fun mapAvatarDrawable(
     isOnline: Boolean? = null,
     isCount: Boolean = false,
     label: String? = null,
-    age: Int? = null
+    age: Int? = null,
+    interactionBadge: String? = null
 ): BitmapDrawable {
     val density = context.resources.displayMetrics.density
     val hasLabel = !isCount && !label.isNullOrBlank()
@@ -3864,6 +3896,18 @@ private fun mapAvatarDrawable(
         canvas.drawCircle(statusX, statusY, 6.2f * density, paint)
         paint.color = if (isOnline) android.graphics.Color.rgb(67, 225, 166) else android.graphics.Color.rgb(147, 158, 179)
         canvas.drawCircle(statusX, statusY, 4.2f * density, paint)
+    }
+
+    if (!interactionBadge.isNullOrBlank()) {
+        val badgeX = cx - 11.5f * density
+        val badgeY = cy - 11.5f * density
+        paint.color = android.graphics.Color.rgb(18, 24, 39)
+        canvas.drawCircle(badgeX, badgeY, 7.2f * density, paint)
+        paint.color = if (interactionBadge == "♥") android.graphics.Color.rgb(255, 91, 145) else android.graphics.Color.rgb(178, 187, 204)
+        paint.textAlign = NativePaint.Align.CENTER
+        paint.textSize = 9f * density
+        paint.typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+        canvas.drawText(interactionBadge, badgeX, badgeY + 3.2f * density, paint)
     }
 
     if (hasLabel) {
@@ -3913,7 +3957,7 @@ private fun privacyRoundedPoint(point: GeoPoint): GeoPoint = GeoPoint(
 
 @Composable
 private fun MapScreen(
-    user: UserProfile, people: List<Person>, isVisibleOnMap: Boolean,
+    user: UserProfile, people: List<Person>, likedIds: Set<Int>, passedIds: Set<Int>, isVisibleOnMap: Boolean,
     savedCamera: MapCameraState?,
     onToggleVisibility: (Boolean) -> Unit,
     onOpenPerson: (Person, MapCameraState) -> Unit
@@ -3981,7 +4025,7 @@ private fun MapScreen(
                 }
         }
     }
-    val visibleUsers = remember(locatedUsers, showOnlineOnly) {
+    val visibleUsers = remember(locatedUsers, showOnlineOnly, likedIds, passedIds) {
         if (showOnlineOnly) locatedUsers.filter { it.person.isOnline && it.person.showOnlineStatus } else locatedUsers
     }
     fun closestAreaIndex(location: MapLocatedPerson): Int = areas.indices.minByOrNull { index ->
@@ -4171,12 +4215,13 @@ private fun MapScreen(
                                 position = GeoPoint(located.latitude, located.longitude)
                                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                                 title = "${person.name} · ${persianDigits(person.age.toString())} سال"
-                                snippet = "${person.job} · ${if (person.showOnlineStatus) if (person.isOnline) "آنلاین" else "آفلاین" else "وضعیت پنهان"} · موقعیت تقریبی"
+                                snippet = "${person.job} · ${when { person.id in likedIds -> "لایک‌شده توسط تو"; person.id in passedIds -> "دیسلایک‌شده توسط تو"; else -> "بدون تعامل" }} · ${if (person.showOnlineStatus) if (person.isOnline) "آنلاین" else "آفلاین" else "وضعیت پنهان"} · موقعیت تقریبی"
                                 icon = mapAvatarDrawable(
                                     map.context, person.emoji, person.tint.toArgb(),
                                     if (person.showOnlineStatus) person.isOnline else null,
                                     label = person.name,
-                                    age = person.age
+                                    age = person.age,
+                                    interactionBadge = when { person.id in likedIds -> "♥"; person.id in passedIds -> "×"; else -> null }
                                 )
                                 setOnMarkerClickListener { _, mapView ->
                                     val center = mapView.mapCenter
@@ -4227,6 +4272,10 @@ private fun MapScreen(
                     Box(Modifier.size(7.dp).background(TextMuted, CircleShape))
                     Spacer(Modifier.width(4.dp))
                     Text("آفلاین", color = TextWhite, fontSize = 8.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.width(9.dp))
+                    Text("♥ لایک‌شده", color = Color(0xFFFF5B91), fontSize = 8.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.width(7.dp))
+                    Text("× ردشده", color = TextMuted, fontSize = 8.sp, fontFamily = Vazirmatn)
                     Spacer(Modifier.weight(1f))
                     Text(
                         if (showAreaSummary) "${persianDigits(areaCounts.size.toString())} محدوده" else "${persianDigits(visibleUsers.size.toString())} کاربر",
@@ -4373,7 +4422,7 @@ private fun DateProposalDialog(
     val maxAllowedDay = remember(todayStart) {
         Calendar.getInstance().apply {
             timeInMillis = todayStart
-            add(Calendar.DAY_OF_YEAR, 14)
+            add(Calendar.DAY_OF_YEAR, 90)
             set(Calendar.HOUR_OF_DAY, 12)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
@@ -4491,7 +4540,7 @@ private fun DateProposalDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("تاریخ قرار · تقویم شمسی", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = Vazirmatn)
-                        Text("فقط تا ۱۴ روز آینده امکان انتخاب داری", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                        Text("امکان انتخاب تاریخ تا ۳ ماه آینده را داری", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
                     }
                     Surface(color = TinderPink.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp)) {
                         Text(persianDateLabel(selectedDateMillis), Modifier.padding(horizontal = 9.dp, vertical = 6.dp), color = TinderPink, fontSize = 9.sp, fontFamily = Vazirmatn)
@@ -4511,6 +4560,12 @@ private fun DateProposalDialog(
                                     onClick = { displayedMonthSerial = currentMonthSerial },
                                     contentPadding = PaddingValues(horizontal = 5.dp, vertical = 2.dp)
                                 ) { Text("ماه جاری", color = TextGray, fontSize = 9.sp, fontFamily = Vazirmatn) }
+                            }
+                            if (displayedMonthSerial > currentMonthSerial) {
+                                IconButton(
+                                    onClick = { displayedMonthSerial = (displayedMonthSerial - 1).coerceAtLeast(currentMonthSerial) },
+                                    modifier = Modifier.size(31.dp)
+                                ) { Icon(Icons.Default.ChevronRight, "ماه قبل", tint = TextMuted) }
                             }
                             if (displayedMonthSerial < maxMonthSerial) {
                                 IconButton(
@@ -4582,6 +4637,21 @@ private fun DateProposalDialog(
                         )
                     }
                 }
+                Text("پیشنهاد سریع ساعت", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    listOf(17 to "۵ عصر", 18 to "۶ عصر", 19 to "۷ شب", 20 to "۸ شب", 21 to "۹ شب").forEach { (hour, label) ->
+                        val active = selectedHour == hour && selectedMinute == 0
+                        Surface(
+                            onClick = { selectedHour = hour; selectedMinute = 0 },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (active) BrandViolet.copy(alpha = 0.28f) else DarkCard,
+                            border = BorderStroke(1.dp, if (active) BrandViolet else Color.White.copy(alpha = 0.07f))
+                        ) {
+                            Text(label, Modifier.padding(vertical = 8.dp), color = if (active) TextWhite else TextGray, fontSize = 9.sp, textAlign = TextAlign.Center, fontFamily = Vazirmatn)
+                        }
+                    }
+                }
                 AnalogTimePicker(
                     hour = selectedHour,
                     minute = selectedMinute,
@@ -4589,7 +4659,7 @@ private fun DateProposalDialog(
                     onMinuteChange = { selectedMinute = it }
                 )
                 if (!isDateWithinWindow) {
-                    Text("تاریخ باید بین امروز و ۱۴ روز آینده باشد.", color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
+                    Text("تاریخ باید بین امروز و ۳ ماه آینده باشد.", color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
                 } else if (proposedDateTime <= System.currentTimeMillis()) {
                     Text("این ساعت گذشته است؛ ساعت دیگری انتخاب کن.", color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
                 }
@@ -6014,6 +6084,41 @@ private fun ScheduledDateDetailsScreen(person: Person, proposal: DateProposal, o
                                 Text("موقعیت مکانی روی نقشه انتخاب نشده است", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
                             }
                         }
+                    }
+                }
+            }
+            if (proposal.locationLatitude != null && proposal.locationLongitude != null) {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(18.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Map, null, tint = TinderPink, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text("موقعیت محل قرار روی نقشه", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                        }
+                        AndroidView(
+                            modifier = Modifier.fillMaxWidth().height(210.dp).clip(RoundedCornerShape(13.dp)),
+                            factory = { ctx ->
+                                Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
+                                Configuration.getInstance().userAgentValue = "FastLove-Android/2.19.0 (ir.fastlove.demo)"
+                                MapView(ctx).apply {
+                                    setTileSource(TileSourceFactory.MAPNIK)
+                                    setMultiTouchControls(true)
+                                    controller.setZoom(16.0)
+                                    controller.setCenter(GeoPoint(proposal.locationLatitude!!, proposal.locationLongitude!!))
+                                    overlays.add(Marker(this).apply {
+                                        position = GeoPoint(proposal.locationLatitude!!, proposal.locationLongitude!!)
+                                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                        title = proposal.place.ifBlank { "محل قرار" }
+                                        snippet = "موقعیت انتخاب‌شده برای دیت"
+                                    })
+                                }
+                            },
+                            update = { map ->
+                                map.controller.setCenter(GeoPoint(proposal.locationLatitude!!, proposal.locationLongitude!!))
+                                map.invalidate()
+                            }
+                        )
+                        Text("برای مشاهده جزئیات خیابان‌ها نقشه را لمس و بزرگ‌نمایی کن.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
                     }
                 }
             }
