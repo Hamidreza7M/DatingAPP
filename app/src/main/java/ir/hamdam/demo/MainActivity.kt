@@ -16,6 +16,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.widget.NumberPicker
 import android.os.Bundle
 import android.os.Environment
 import androidx.activity.ComponentActivity
@@ -137,6 +138,7 @@ enum class LookingForGender(val title: String) {
     FEMALE("دختر"), MALE("پسر"), BOTH("هر دو جنس")
 }
 enum class MsgType { TEXT, IMAGE, VOICE }
+enum class ProfileVerificationStatus { NOT_VERIFIED, PENDING, VERIFIED, REJECTED }
 enum class RelationGoal(val title: String) {
     MARRIAGE("ازدواج"),
     FRIENDSHIP("دوستی ساده"),
@@ -177,7 +179,11 @@ data class UserProfile(
     val showOnlineStatus: Boolean = true,
     val showLastSeen: Boolean = true,
     val referralCode: String = "",
-    val referredByCode: String = ""
+    val referredByCode: String = "",
+    val verificationStatus: ProfileVerificationStatus? = ProfileVerificationStatus.NOT_VERIFIED,
+    val verificationVideoUri: String = "",
+    val verificationPrompt: String = "",
+    val verificationRejectionReason: String = ""
 ) {
     val age: Int get() = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
 }
@@ -202,7 +208,8 @@ data class Person(
     val isOnline: Boolean = ((id * 37) % 10) < 4,
     val showOnlineStatus: Boolean = true,
     val showLastSeen: Boolean = true,
-    val lastSeenMinutesAgo: Int = 7 + ((id * 29) % 420)
+    val lastSeenMinutesAgo: Int = 7 + ((id * 29) % 420),
+    val isVerified: Boolean = false
 )
 
 data class ChatMessage(
@@ -332,7 +339,8 @@ private val samplePeople: List<Person> = buildList {
             distanceKm = 1 + (i * 3) % 45,
             likedYou = i % 3 == 0,
             instagram = if (i % 3 != 0) "fastlove_${id - 1}" else "",
-            spotify = if (i % 4 == 0) "fastlove_user${id - 1}" else ""
+            spotify = if (i % 4 == 0) "fastlove_user${id - 1}" else "",
+            isVerified = i % 7 == 1
         ))
     }
     // 40 male
@@ -358,7 +366,8 @@ private val samplePeople: List<Person> = buildList {
             distanceKm = 2 + (i * 5) % 48,
             likedYou = i % 4 == 0,
             instagram = if (i % 4 != 1) "fastlove_${id - 1}" else "",
-            spotify = if (i % 3 == 0) "fastlove_user${id - 1}" else ""
+            spotify = if (i % 3 == 0) "fastlove_user${id - 1}" else "",
+            isVerified = i % 8 == 2
         ))
     }
     // 5 other
@@ -378,7 +387,8 @@ private val samplePeople: List<Person> = buildList {
             distanceKm = 5 + i * 4,
             likedYou = i % 2 == 0,
             instagram = if (i % 2 == 0) "fastlove_${id - 1}" else "",
-            spotify = if (i % 2 == 1) "fastlove_user${id - 1}" else ""
+            spotify = if (i % 2 == 1) "fastlove_user${id - 1}" else "",
+            isVerified = i == 1 || i == 4
         ))
     }
 }
@@ -479,7 +489,11 @@ private fun loadUser(ctx: Context): UserProfile {
             instagram = loaded.instagram.orEmpty(),
             spotify = loaded.spotify.orEmpty(),
             showOnlineStatus = if (hasOnlinePreference) loaded.showOnlineStatus else true,
-            showLastSeen = if (hasLastSeenPreference) loaded.showLastSeen else true
+            showLastSeen = if (hasLastSeenPreference) loaded.showLastSeen else true,
+            verificationStatus = loaded.verificationStatus ?: ProfileVerificationStatus.NOT_VERIFIED,
+            verificationVideoUri = loaded.verificationVideoUri.orEmpty(),
+            verificationPrompt = loaded.verificationPrompt.orEmpty(),
+            verificationRejectionReason = loaded.verificationRejectionReason.orEmpty()
         )
         prefs(ctx).edit().putString("user", gson.toJson(normalized)).apply()
         normalized
@@ -527,6 +541,10 @@ private fun storeUriInAppFiles(context: Context, source: Uri, bucket: String): S
             mime.contains("webp", true) -> ".webp"
             mime.contains("jpeg", true) || mime.contains("jpg", true) -> ".jpg"
             mime.startsWith("image/") -> ".img"
+            mime.contains("video/mp4", true) -> ".mp4"
+            mime.contains("video/3gpp", true) -> ".3gp"
+            mime.contains("video/webm", true) -> ".webm"
+            mime.startsWith("video/") -> ".mp4"
             bucket.contains("photo") || bucket.contains("image") -> ".jpg"
             else -> ".bin"
         }
@@ -693,6 +711,7 @@ private fun FastLoveApp() {
     var tutorialStep by remember { mutableIntStateOf(0) }
     var chatRefreshVersion by remember { mutableIntStateOf(0) }
     var showEditProfile by remember { mutableStateOf(false) }
+    var showProfileVerification by remember { mutableStateOf(false) }
     var showPaymentHistoryPage by remember { mutableStateOf(false) }
     var showPrivacySettingsPage by remember { mutableStateOf(false) }
     var showScheduledDatesPage by remember { mutableStateOf(false) }
@@ -863,6 +882,20 @@ private fun FastLoveApp() {
                             tutorialStep = 0
                             tab = 0
                             persist()
+                        }
+                    )
+                    showProfileVerification -> ProfileVerificationScreen(
+                        user = currentUser,
+                        onBack = { showProfileVerification = false },
+                        onSubmit = { videoUri, prompt ->
+                            currentUser = currentUser.copy(
+                                verificationStatus = ProfileVerificationStatus.PENDING,
+                                verificationVideoUri = videoUri,
+                                verificationPrompt = prompt,
+                                verificationRejectionReason = ""
+                            )
+                            persist()
+                            showProfileVerification = false
                         }
                     )
                     showPaymentHistoryPage -> PaymentHistoryScreen(
@@ -1207,6 +1240,7 @@ private fun FastLoveApp() {
                                         likeCount = likedPeople.size,
                                         onUpgrade = { showSubscription = true },
                                         onEdit = { showEditProfile = true },
+                                        onVerify = { showProfileVerification = true },
                                         onPreview = { showPublicProfilePreview = true },
                                         onPaymentHistory = { showPaymentHistoryPage = true },
                                         onPrivacySettings = { showPrivacySettingsPage = true },
@@ -3583,7 +3617,10 @@ private fun DiscoverScreen(
                                 }
                                 Spacer(Modifier.height(8.dp))
                             }
-                            Text("${person.name}, ${persianDigits(person.age.toString())}", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("${person.name}, ${persianDigits(person.age.toString())}", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                                if (person.isVerified) VerifiedBadge(size = 19.dp)
+                            }
                             Text("${person.job} · ${person.distanceKm} کیلومتر · ${person.city}", color = TextGray, fontSize = 14.sp, fontFamily = Vazirmatn)
                             Spacer(Modifier.height(6.dp))
                             Text(person.about, color = TextWhite.copy(alpha = 0.9f), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
@@ -4627,32 +4664,17 @@ private fun DateProposalDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("ساعت قرار", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, fontFamily = Vazirmatn)
-                        Text("برای تنظیم، انگشت را روی صفحه ساعت بکش", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                        Text("ساعت و دقیقه را به فرمت ۲۴ساعته انتخاب کن", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
                     }
                     Surface(color = BrandViolet.copy(alpha = 0.14f), shape = RoundedCornerShape(12.dp)) {
                         Text(
-                            "${persianDigits("%02d:%02d".format(if (selectedHour % 12 == 0) 12 else selectedHour % 12, selectedMinute))} ${if (selectedHour >= 12) "ب.ظ" else "ق.ظ"}",
+                            persianDigits("%02d:%02d".format(Locale.US, selectedHour, selectedMinute)),
                             Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = BrandViolet,
                             fontWeight = FontWeight.Bold, fontSize = 15.sp, fontFamily = Vazirmatn
                         )
                     }
                 }
-                Text("پیشنهاد سریع ساعت", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    listOf(17 to "۵ عصر", 18 to "۶ عصر", 19 to "۷ شب", 20 to "۸ شب", 21 to "۹ شب").forEach { (hour, label) ->
-                        val active = selectedHour == hour && selectedMinute == 0
-                        Surface(
-                            onClick = { selectedHour = hour; selectedMinute = 0 },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (active) BrandViolet.copy(alpha = 0.28f) else DarkCard,
-                            border = BorderStroke(1.dp, if (active) BrandViolet else Color.White.copy(alpha = 0.07f))
-                        ) {
-                            Text(label, Modifier.padding(vertical = 8.dp), color = if (active) TextWhite else TextGray, fontSize = 9.sp, textAlign = TextAlign.Center, fontFamily = Vazirmatn)
-                        }
-                    }
-                }
-                AnalogTimePicker(
+                DateTimeWheelPicker(
                     hour = selectedHour,
                     minute = selectedMinute,
                     onHourChange = { selectedHour = it },
@@ -4703,148 +4725,67 @@ private fun DateProposalDialog(
 }
 
 @Composable
-private fun AnalogTimePicker(
+private fun DateTimeWheelPicker(
     hour: Int,
     minute: Int,
     onHourChange: (Int) -> Unit,
     onMinuteChange: (Int) -> Unit
 ) {
-    var selectingHour by remember { mutableStateOf(true) }
-    val isPm = hour >= 12
-    val displayHour = if (hour % 12 == 0) 12 else hour % 12
-    val latestSelectingHour by rememberUpdatedState(selectingHour)
-    val latestIsPm by rememberUpdatedState(isPm)
-    val latestOnHourChange by rememberUpdatedState(onHourChange)
-    val latestOnMinuteChange by rememberUpdatedState(onMinuteChange)
-
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                onClick = { selectingHour = true },
-                color = if (selectingHour) BrandViolet else DarkCard,
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, if (selectingHour) BrandViolet else Color.White.copy(alpha = 0.07f))
-            ) {
-                Text(persianDigits("ساعت %02d".format(displayHour)), Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-            }
-            Surface(
-                onClick = { selectingHour = false },
-                color = if (!selectingHour) BrandViolet else DarkCard,
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, if (!selectingHour) BrandViolet else Color.White.copy(alpha = 0.07f))
-            ) {
-                Text(persianDigits("دقیقه %02d".format(minute)), Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = TextWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-            }
-            Spacer(Modifier.weight(1f))
-            // Explicit segmented AM/PM selection is easier to understand than a single toggle.
-            Surface(
-                onClick = { onHourChange(displayHour % 12) },
-                color = if (!isPm) TinderPink else DarkCard,
-                shape = RoundedCornerShape(9.dp),
-                border = BorderStroke(1.dp, if (!isPm) TinderPink else Color.White.copy(alpha = 0.08f))
-            ) {
-                Text("ق.ظ", Modifier.padding(horizontal = 11.dp, vertical = 7.dp), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-            }
-            Surface(
-                onClick = { onHourChange(displayHour % 12 + 12) },
-                color = if (isPm) TinderPink else DarkCard,
-                shape = RoundedCornerShape(9.dp),
-                border = BorderStroke(1.dp, if (isPm) TinderPink else Color.White.copy(alpha = 0.08f))
-            ) {
-                Text("ب.ظ", Modifier.padding(horizontal = 11.dp, vertical = 7.dp), color = TextWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-            }
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Row(
+            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TimeWheelColumn(label = "ساعت", value = hour, range = 0..23, onValueChange = onHourChange)
+            Text(":", color = TextWhite, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp))
+            TimeWheelColumn(label = "دقیقه", value = minute, range = 0..59, onValueChange = onMinuteChange)
         }
-        BoxWithConstraints(Modifier.size(226.dp)) {
-            val dialSize = maxWidth
-            val center = dialSize / 2
-            val labelRadius = dialSize * 0.355f
-            Canvas(
-                Modifier.fillMaxSize().pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val hourModeForGesture = latestSelectingHour
-                        val pmForGesture = latestIsPm
-                        fun updateFromPointer(position: Offset) {
-                            val dx = position.x - size.width / 2f
-                            val dy = position.y - size.height / 2f
-                            val rawDegrees = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())) + 90.0
-                            val normalized = (rawDegrees + 360.0) % 360.0
-                            if (hourModeForGesture) {
-                                val index = kotlin.math.round(normalized / 30.0).toInt() % 12
-                                val hour12 = if (index == 0) 12 else index
-                                val nextHour = if (pmForGesture) hour12 % 12 + 12 else hour12 % 12
-                                latestOnHourChange(nextHour)
-                            } else {
-                                // Minute mode resolves every one-minute increment, not only five-minute labels.
-                                latestOnMinuteChange(kotlin.math.round(normalized / 6.0).toInt() % 60)
+    }
+}
+
+@Composable
+private fun TimeWheelColumn(
+    label: String,
+    value: Int,
+    range: IntRange,
+    onValueChange: (Int) -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+        Surface(
+            color = Color(0xFF171E31),
+            shape = RoundedCornerShape(15.dp),
+            border = BorderStroke(1.dp, BrandViolet.copy(alpha = 0.22f))
+        ) {
+            AndroidView(
+                modifier = Modifier.width(104.dp).height(142.dp),
+                factory = { viewContext ->
+                    NumberPicker(viewContext).apply {
+                        minValue = range.first
+                        maxValue = range.last
+                        wrapSelectorWheel = true
+                        descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
+                        setFormatter { number -> persianDigits("%02d".format(Locale.US, number)) }
+                        setOnValueChangedListener { _, _, newValue -> onValueChange(newValue) }
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        contentDescription = label
+                        for (childIndex in 0 until childCount) {
+                            (getChildAt(childIndex) as? android.widget.EditText)?.apply {
+                                setTextColor(android.graphics.Color.WHITE)
+                                textSize = 20f
+                                gravity = android.view.Gravity.CENTER
                             }
                         }
-                        updateFromPointer(down.position)
-                        down.consume()
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) break
-                            updateFromPointer(change.position)
-                            change.consume()
-                        }
-                        if (hourModeForGesture) selectingHour = false
+                        this.value = value
                     }
+                },
+                update = { picker ->
+                    if (picker.value != value) picker.value = value
+                    picker.setOnValueChangedListener { _, _, newValue -> onValueChange(newValue) }
                 }
-            ) {
-                val cx = size.width / 2f
-                val cy = size.height / 2f
-                val outer = size.minDimension * 0.475f
-                val selectorIndex = if (selectingHour) hour % 12 else minute
-                val selectorDegrees = (if (selectingHour) selectorIndex * 30.0 else selectorIndex * 6.0) - 90.0
-                val selectorRadians = selectorDegrees * PI / 180.0
-                val selectorRadius = if (selectingHour) outer * 0.76f else outer * 0.9f
-                val end = Offset(cx + cos(selectorRadians).toFloat() * selectorRadius, cy + sin(selectorRadians).toFloat() * selectorRadius)
-
-                drawCircle(Color(0xFF171E31), radius = outer, center = Offset(cx, cy))
-                drawCircle(BrandViolet.copy(alpha = 0.32f), radius = outer, center = Offset(cx, cy), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx()))
-                for (tick in 0 until 60) {
-                    val angle = (tick * 6.0 - 90.0) * PI / 180.0
-                    val major = tick % 5 == 0
-                    val r1 = outer * if (major) 0.91f else 0.95f
-                    val r2 = outer * 0.985f
-                    drawLine(
-                        color = if (major) TextGray.copy(alpha = 0.65f) else TextMuted.copy(alpha = 0.28f),
-                        start = Offset(cx + cos(angle).toFloat() * r1, cy + sin(angle).toFloat() * r1),
-                        end = Offset(cx + cos(angle).toFloat() * r2, cy + sin(angle).toFloat() * r2),
-                        strokeWidth = if (major) 1.5.dp.toPx() else 0.7.dp.toPx()
-                    )
-                }
-                drawLine(BrandViolet, Offset(cx, cy), end, strokeWidth = 3.dp.toPx())
-                drawCircle(BrandViolet, radius = 13.dp.toPx(), center = end)
-                drawCircle(TextWhite, radius = 4.dp.toPx(), center = Offset(cx, cy))
-            }
-            Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(persianDigits("%02d:%02d".format(displayHour, minute)), color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp, fontFamily = Vazirmatn)
-                Text(if (isPm) "بعدازظهر" else "قبل‌ازظهر", color = TextMuted, fontSize = 8.sp, fontFamily = Vazirmatn)
-            }
-            for (index in 0 until 12) {
-                val angle = (index * 30.0 - 90.0) * PI / 180.0
-                val dx = labelRadius * cos(angle).toFloat()
-                val dy = labelRadius * sin(angle).toFloat()
-                val labelValue = if (selectingHour) {
-                    if (index == 0) "۱۲" else persianDigits(index.toString())
-                } else {
-                    persianDigits("%02d".format(index * 5))
-                }
-                val selected = if (selectingHour) hour % 12 == index else minute / 5 == index && minute % 5 == 0
-                Box(
-                    Modifier.offset(x = center + dx - 14.dp, y = center + dy - 14.dp).size(28.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(labelValue, color = if (selected) TextWhite else TextGray, fontSize = if (selectingHour) 10.sp else 8.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontFamily = Vazirmatn)
-                }
-            }
+            )
         }
-        Text(
-            if (selectingHour) "انگشتت را روی ساعت بکش؛ با رهاکردن وارد انتخاب دقیقه می‌شوی." else "عقربه را روی دقیقه دلخواه بکش؛ دقت انتخاب یک دقیقه است.",
-            color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, textAlign = TextAlign.Center
-        )
     }
 }
 
@@ -5497,10 +5438,13 @@ private fun PersonDetailScreen(
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.84f))))
                 )
                 Column(Modifier.align(Alignment.BottomStart).padding(19.dp)) {
-                    Text(
-                        "${person.name}, ${persianDigits(person.age.toString())}",
-                        color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 25.sp, fontFamily = Vazirmatn
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text(
+                            "${person.name}, ${persianDigits(person.age.toString())}",
+                            color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 25.sp, fontFamily = Vazirmatn
+                        )
+                        if (person.isVerified) VerifiedBadge(size = 19.dp)
+                    }
                     Text(
                         "${person.job} · ${person.city} · ${persianDigits(person.distanceKm.toString())} کیلومتر",
                         color = TextWhite.copy(alpha = 0.9f), fontSize = 12.sp, fontFamily = Vazirmatn
@@ -5678,6 +5622,256 @@ private fun SocialProfileBadges(
 }
 
 @Composable
+private fun VerifiedBadge(modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 18.dp) {
+    Box(
+        modifier.size(size).clip(CircleShape).background(Color(0xFF268DFF)).border(1.dp, Color.White.copy(alpha = 0.88f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(Icons.Default.Check, contentDescription = "پروفایل تأییدشده", tint = Color.White, modifier = Modifier.size(size * 0.68f))
+    }
+}
+
+private val verificationPrompts = listOf(
+    "من برای آشنایی واقعی و محترمانه اینجا هستم.",
+    "امروز تصمیم گرفتم خودم باشم و صادقانه معرفی کنم.",
+    "اعتماد با صداقت شروع می‌شود؛ این پروفایل متعلق به من است.",
+    "من آماده‌ام یک آشنایی تازه و واقعی را تجربه کنم.",
+    "در فست‌لاو، احترام و صداقت برای من مهم است."
+)
+
+private fun createPrivateVerificationVideoFile(context: Context): File {
+    val directory = File(context.filesDir, "media/profile_verification").apply { mkdirs() }
+    return File(directory, "verification_${System.currentTimeMillis()}_${UUID.randomUUID()}.mp4")
+}
+
+@Composable
+private fun VerificationVideoPreview(videoUri: String) {
+    val context = LocalContext.current
+    AndroidView(
+        modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(18.dp)),
+        factory = { viewContext ->
+            android.widget.VideoView(viewContext).apply {
+                val controller = android.widget.MediaController(viewContext)
+                controller.setAnchorView(this)
+                setMediaController(controller)
+                tag = videoUri
+                setVideoURI(Uri.parse(videoUri))
+                setOnPreparedListener { player ->
+                    player.isLooping = true
+                    start()
+                }
+            }
+        },
+        update = { playerView ->
+            if (playerView.tag != videoUri) {
+                playerView.tag = videoUri
+                playerView.setVideoURI(Uri.parse(videoUri))
+                playerView.setOnPreparedListener { player ->
+                    player.isLooping = true
+                    playerView.start()
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun ProfileVerificationScreen(
+    user: UserProfile,
+    onBack: () -> Unit,
+    onSubmit: (videoUri: String, prompt: String) -> Unit
+) {
+    val context = LocalContext.current
+    BackHandler(onBack = onBack)
+    var prompt by remember { mutableStateOf(verificationPrompts.random()) }
+    var selectedVideoUri by remember { mutableStateOf("") }
+    var captureFile by remember { mutableStateOf<File?>(null) }
+    var error by remember { mutableStateOf("") }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { selected ->
+            val saved = storeUriInAppFiles(context, selected, "profile_verification")
+            if (saved != null) {
+                selectedVideoUri = saved
+                error = ""
+            } else {
+                error = "خواندن ویدیو ممکن نشد؛ فایل دیگری را انتخاب کن."
+            }
+        }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { success ->
+        val file = captureFile
+        if (success && file != null && file.exists() && file.length() > 0L) {
+            selectedVideoUri = Uri.fromFile(file).toString()
+            error = ""
+        } else if (!success) {
+            error = "ضبط ویدیو کامل نشد؛ دوباره تلاش کن."
+            file?.takeIf { it.exists() }?.delete()
+        }
+    }
+
+    fun startCameraCapture() {
+        runCatching {
+            val output = createPrivateVerificationVideoFile(context)
+            captureFile = output
+            val outputUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", output)
+            cameraLauncher.launch(outputUri)
+        }.onFailure {
+            error = "بازکردن دوربین ممکن نشد؛ دسترسی دوربین را بررسی کن."
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(
+            Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Column(Modifier.weight(1f)) {
+                Text("تأیید هویت پروفایل", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp, fontFamily = Vazirmatn)
+                Text("یک ویدیوی کوتاه و طبیعی ضبط کن", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+            }
+        }
+
+        when (user.verificationStatus) {
+            ProfileVerificationStatus.VERIFIED -> {
+                Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    VerifiedBadge(size = 62.dp)
+                    Spacer(Modifier.height(16.dp))
+                    Text("پروفایلت تأیید شده است", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp, fontFamily = Vazirmatn)
+                    Text("نشان آبی تأیید کنار عکس پروفایلت برای دیگران نمایش داده می‌شود.", color = TextGray, textAlign = TextAlign.Center, lineHeight = 22.sp, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(20.dp))
+                    Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) { Text("بازگشت به پروفایل", fontFamily = Vazirmatn) }
+                }
+            }
+            ProfileVerificationStatus.PENDING -> {
+                Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Icon(Icons.Default.Schedule, null, tint = BrandViolet, modifier = Modifier.size(56.dp))
+                    Spacer(Modifier.height(15.dp))
+                    Text("درخواستت ثبت شده است", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 19.sp, fontFamily = Vazirmatn)
+                    Text("ویدیوی انتخاب‌شده در فضای خصوصی این دستگاه نگهداری می‌شود. پس از اتصال سرویس بررسی به سرور، نتیجه تأیید یا رد در همین بخش نمایش داده خواهد شد.", color = TextGray, textAlign = TextAlign.Center, lineHeight = 23.sp, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(20.dp))
+                    Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) { Text("بازگشت", fontFamily = Vazirmatn) }
+                }
+            }
+            else -> {
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(13.dp)
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, Color(0xFF268DFF).copy(alpha = 0.24f))
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.VerifiedUser, null, tint = Color(0xFF56AFFF), modifier = Modifier.size(27.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text("با نشان آبی، اعتماد بیشتری جلب کن", color = TextWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                                Text("تأیید اختیاری است و به واقعی‌بودن پروفایلت کمک می‌کند.", color = TextMuted, fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+                            }
+                        }
+                    }
+
+                    Text("این جمله را در ویدیو بگو", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1B2540)), shape = RoundedCornerShape(18.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Text("«$prompt»", color = TextWhite, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 24.sp, fontFamily = Vazirmatn)
+                            TextButton(
+                                onClick = {
+                                    prompt = verificationPrompts.filterNot { it == prompt }.random()
+                                    selectedVideoUri = ""
+                                },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, null, tint = BrandViolet, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("جمله تصادفی جدید", color = BrandViolet, fontSize = 10.sp, fontFamily = Vazirmatn)
+                            }
+                        }
+                    }
+
+                    Text("ویدیوی خودت را آماده کن", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                    Text("صورتت واضح باشد، نور کافی داشته باش و جمله بالا را با صدای خودت بگو.", color = TextMuted, fontSize = 10.sp, lineHeight = 18.sp, fontFamily = Vazirmatn)
+
+                    if (selectedVideoUri.isNotBlank()) {
+                        VerificationVideoPreview(selectedVideoUri)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { startCameraCapture() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(13.dp),
+                                border = BorderStroke(1.dp, BrandViolet)
+                            ) {
+                                Icon(Icons.Default.Refresh, null, tint = BrandViolet, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("ضبط مجدد", color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
+                            }
+                            OutlinedButton(
+                                onClick = { galleryLauncher.launch("video/*") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(13.dp),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f))
+                            ) {
+                                Icon(Icons.Default.VideoLibrary, null, tint = TextGray, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("انتخاب ویدیوی دیگر", color = TextWhite, fontSize = 10.sp, fontFamily = Vazirmatn)
+                            }
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Button(
+                                onClick = { startCameraCapture() },
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = TinderPink),
+                                shape = RoundedCornerShape(13.dp)
+                            ) {
+                                Icon(Icons.Default.Videocam, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("ضبط ویدیو", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                            }
+                            OutlinedButton(
+                                onClick = { galleryLauncher.launch("video/*") },
+                                modifier = Modifier.weight(1f).height(50.dp),
+                                shape = RoundedCornerShape(13.dp),
+                                border = BorderStroke(1.dp, BrandViolet)
+                            ) {
+                                Icon(Icons.Default.VideoLibrary, null, tint = BrandViolet, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("انتخاب از گالری", color = TextWhite, fontSize = 11.sp, fontFamily = Vazirmatn)
+                            }
+                        }
+                    }
+
+                    if (error.isNotBlank()) Text(error, color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
+                    if (user.verificationStatus == ProfileVerificationStatus.REJECTED) {
+                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF3A202C)), shape = RoundedCornerShape(13.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                Text("درخواست قبلی تأیید نشد", color = Color(0xFFFFA0A0), fontWeight = FontWeight.Bold, fontSize = 11.sp, fontFamily = Vazirmatn)
+                                Text(user.verificationRejectionReason.ifBlank { "ویدیوی قبلی با شرایط بررسی مطابقت نداشت. می‌توانی ویدیوی تازه‌ای بفرستی." }, color = TextGray, fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+                            }
+                        }
+                    }
+                    Text("پیش از ثبت درخواست، ویدیو را همین‌جا بازبینی کن. در نسخه فعلی برنامه ویدیو در حافظه خصوصی دستگاه ذخیره می‌شود؛ ارسال به تیم بررسی پس از اتصال API سرور فعال خواهد شد.", color = TextMuted, fontSize = 9.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+                    Button(
+                        onClick = { onSubmit(selectedVideoUri, prompt) },
+                        enabled = selectedVideoUri.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth().height(49.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = TinderPink),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.Send, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("ثبت درخواست تأیید", fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun MyProfileScreen(
     user: UserProfile,
     upcomingDates: List<Pair<Person, DateProposal>>,
@@ -5688,6 +5882,7 @@ private fun MyProfileScreen(
     likeCount: Int,
     onUpgrade: () -> Unit,
     onEdit: () -> Unit,
+    onVerify: () -> Unit,
     onPreview: () -> Unit,
     onPaymentHistory: () -> Unit,
     onPrivacySettings: () -> Unit,
@@ -5716,10 +5911,16 @@ private fun MyProfileScreen(
                                 contentScale = ContentScale.Crop
                             )
                         } else Text(user.name.take(1).ifEmpty { "♡" }, fontSize = 32.sp, color = TextWhite, fontWeight = FontWeight.Bold)
+                        if (user.verificationStatus == ProfileVerificationStatus.VERIFIED) {
+                            VerifiedBadge(Modifier.align(Alignment.BottomEnd), size = 21.dp)
+                        }
                     }
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(user.name.ifBlank { "پروفایل من" }, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(user.name.ifBlank { "پروفایل من" }, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = TextWhite, fontFamily = Vazirmatn)
+                            if (user.verificationStatus == ProfileVerificationStatus.VERIFIED) VerifiedBadge(size = 17.dp)
+                        }
                         Text("${persianDigits(user.age.toString())} ساله · ${user.city.ifBlank { "شهر ثبت نشده" }}", color = TextGray, fontSize = 12.sp, fontFamily = Vazirmatn)
                         Spacer(Modifier.height(7.dp))
                         Text("${user.photos.size} عکس · ${user.interests.size} علاقه‌مندی", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
@@ -5746,6 +5947,56 @@ private fun MyProfileScreen(
             }
         }
 
+        Card(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, when (user.verificationStatus) {
+                ProfileVerificationStatus.VERIFIED -> Color(0xFF2D9CFF).copy(alpha = 0.42f)
+                ProfileVerificationStatus.PENDING -> BrandViolet.copy(alpha = 0.35f)
+                ProfileVerificationStatus.REJECTED -> Color(0xFFFF8B8B).copy(alpha = 0.36f)
+                else -> Color(0xFF2D9CFF).copy(alpha = 0.25f)
+            })
+        ) {
+            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(Color(0xFF2D9CFF).copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (user.verificationStatus) {
+                        ProfileVerificationStatus.VERIFIED -> VerifiedBadge(size = 23.dp)
+                        ProfileVerificationStatus.PENDING -> Icon(Icons.Default.Schedule, null, tint = BrandViolet, modifier = Modifier.size(22.dp))
+                        ProfileVerificationStatus.REJECTED -> Icon(Icons.Default.ErrorOutline, null, tint = Color(0xFFFF8B8B), modifier = Modifier.size(22.dp))
+                        else -> Icon(Icons.Default.VerifiedUser, null, tint = Color(0xFF2D9CFF), modifier = Modifier.size(22.dp))
+                    }
+                }
+                Spacer(Modifier.width(11.dp))
+                Column(Modifier.weight(1f)) {
+                    val title = when (user.verificationStatus) {
+                        ProfileVerificationStatus.VERIFIED -> "پروفایلت تأیید شده است"
+                        ProfileVerificationStatus.PENDING -> "درخواست تأیید در انتظار بررسی است"
+                        ProfileVerificationStatus.REJECTED -> "درخواست تأیید نیاز به اصلاح دارد"
+                        else -> "پروفایلت را تأیید کن و اعتماد بیشتری بساز"
+                    }
+                    val subtitle = when (user.verificationStatus) {
+                        ProfileVerificationStatus.VERIFIED -> "نشان آبی کنار عکس تو برای دیگران نمایش داده می‌شود."
+                        ProfileVerificationStatus.PENDING -> "پس از بررسی، نتیجه در همین بخش نمایش داده می‌شود."
+                        ProfileVerificationStatus.REJECTED -> user.verificationRejectionReason.ifBlank { "ویدیوی قبلی تأیید نشد؛ می‌توانی دوباره تلاش کنی." }
+                        else -> "با یک ویدیوی کوتاه، واقعی‌بودن پروفایلت را به دیگران نشان بده."
+                    }
+                    Text(title, color = TextWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(3.dp))
+                    Text(subtitle, color = TextMuted, fontSize = 9.sp, lineHeight = 16.sp, fontFamily = Vazirmatn)
+                }
+                if (user.verificationStatus != ProfileVerificationStatus.VERIFIED && user.verificationStatus != ProfileVerificationStatus.PENDING) {
+                    TextButton(onClick = onVerify, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                        Text(if (user.verificationStatus == ProfileVerificationStatus.REJECTED) "تلاش دوباره" else "تأیید پروفایل", color = Color(0xFF56AFFF), fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
         Card(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             colors = CardDefaults.cardColors(containerColor = DarkCard),
@@ -6261,7 +6512,10 @@ private fun PublicProfilePreviewScreen(user: UserProfile, onBack: () -> Unit, on
                 }
                 Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.80f)))))
                 Column(Modifier.align(Alignment.BottomStart).padding(19.dp)) {
-                    Text("${user.name.ifBlank { "نام کاربر" }}, ${persianDigits(user.age.toString())}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 25.sp, fontFamily = Vazirmatn)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Text("${user.name.ifBlank { "نام کاربر" }}, ${persianDigits(user.age.toString())}", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 25.sp, fontFamily = Vazirmatn)
+                        if (user.verificationStatus == ProfileVerificationStatus.VERIFIED) VerifiedBadge(size = 19.dp)
+                    }
                     Text("${user.job.ifBlank { "" }}${if (user.job.isNotBlank() && user.city.isNotBlank()) " · " else ""}${user.city}", color = TextWhite.copy(alpha = 0.9f), fontSize = 12.sp, fontFamily = Vazirmatn)
                 }
                 Surface(Modifier.align(Alignment.TopEnd).padding(12.dp), shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.55f)) {
