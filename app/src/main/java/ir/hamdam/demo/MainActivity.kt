@@ -17,6 +17,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.media.MediaMetadataRetriever
 import android.widget.NumberPicker
 import android.os.Bundle
 import android.os.Environment
@@ -206,7 +207,8 @@ data class UserProfile(
     val verificationStatus: ProfileVerificationStatus? = ProfileVerificationStatus.NOT_VERIFIED,
     val verificationVideoUri: String = "",
     val verificationPrompt: String = "",
-    val verificationRejectionReason: String = ""
+    val verificationRejectionReason: String = "",
+    val verificationSubmittedAtMillis: Long = 0L
 ) {
     val age: Int get() = (currentPersianYear() - birthYearPersian).coerceAtLeast(18)
 }
@@ -762,6 +764,33 @@ private fun FastLoveApp() {
         )
     }
 
+    LaunchedEffect(
+        currentUser.verificationStatus,
+        currentUser.verificationVideoUri,
+        currentUser.verificationSubmittedAtMillis
+    ) {
+        if (currentUser.verificationStatus == ProfileVerificationStatus.PENDING &&
+            currentUser.verificationVideoUri.isNotBlank()) {
+            val submittedAt = currentUser.verificationSubmittedAtMillis.takeIf { it > 0L }
+                ?: System.currentTimeMillis().also { timestamp ->
+                    currentUser = currentUser.copy(verificationSubmittedAtMillis = timestamp)
+                    persist()
+                }
+            val videoUri = currentUser.verificationVideoUri
+            val remainingMillis = (submittedAt + 120_000L - System.currentTimeMillis()).coerceAtLeast(0L)
+            if (remainingMillis > 0L) delay(remainingMillis)
+            if (currentUser.verificationStatus == ProfileVerificationStatus.PENDING &&
+                currentUser.verificationVideoUri == videoUri &&
+                currentUser.verificationSubmittedAtMillis == submittedAt) {
+                currentUser = currentUser.copy(
+                    verificationStatus = ProfileVerificationStatus.VERIFIED,
+                    verificationRejectionReason = ""
+                )
+                persist()
+            }
+        }
+    }
+
     fun refreshDailySwipes() {
         val nowKey = currentDayKey()
         if (swipeDay != nowKey) { swipeDay = nowKey; dailySwipes = 0; persist() }
@@ -912,15 +941,26 @@ private fun FastLoveApp() {
                     showProfileVerification -> ProfileVerificationScreen(
                         user = currentUser,
                         onBack = { showProfileVerification = false },
-                        onSubmit = { videoUri, prompt ->
-                            currentUser = currentUser.copy(
-                                verificationStatus = ProfileVerificationStatus.PENDING,
-                                verificationVideoUri = videoUri,
-                                verificationPrompt = prompt,
-                                verificationRejectionReason = ""
-                            )
+                        onSubmit = { videoUri, prompt, durationMillis ->
+                            val submittedAt = System.currentTimeMillis()
+                            currentUser = if (durationMillis < 5_000L) {
+                                currentUser.copy(
+                                    verificationStatus = ProfileVerificationStatus.REJECTED,
+                                    verificationVideoUri = videoUri,
+                                    verificationPrompt = prompt,
+                                    verificationRejectionReason = "ویدیوی ارسالی کمتر از ۵ ثانیه بود. این درخواست در بررسی آزمایشی رد شد؛ لطفاً ویدیوی جدیدی با مدت حداقل ۵ ثانیه ضبط کن.",
+                                    verificationSubmittedAtMillis = 0L
+                                )
+                            } else {
+                                currentUser.copy(
+                                    verificationStatus = ProfileVerificationStatus.PENDING,
+                                    verificationVideoUri = videoUri,
+                                    verificationPrompt = prompt,
+                                    verificationRejectionReason = "",
+                                    verificationSubmittedAtMillis = submittedAt
+                                )
+                            }
                             persist()
-                            showProfileVerification = false
                         }
                     )
                     showPaymentHistoryPage -> PaymentHistoryScreen(
@@ -4505,6 +4545,7 @@ private fun DateProposalDialog(
     onDismiss: () -> Unit,
     onSubmit: (place: String, scheduledAtMillis: Long, latitude: Double?, longitude: Double?) -> Unit
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
     val todayStart = remember { monthStartDay(System.currentTimeMillis()) }
     val maxAllowedDay = remember(todayStart) {
         Calendar.getInstance().apply {
@@ -4525,17 +4566,10 @@ private fun DateProposalDialog(
             set(Calendar.MILLISECOND, 999)
         }.timeInMillis
     }
-    val initialDate = remember(todayStart) {
-        Calendar.getInstance().apply {
-            timeInMillis = todayStart
-            add(Calendar.DAY_OF_YEAR, 1)
-            set(Calendar.HOUR_OF_DAY, 12)
-        }.timeInMillis
-    }
-    var selectedDateMillis by remember { mutableLongStateOf(initialDate) }
-    var displayedMonthSerial by remember { mutableIntStateOf(persianMonthSerial(initialDate)) }
-    var selectedHour by remember { mutableIntStateOf(19) }
-    var selectedMinute by remember { mutableIntStateOf(0) }
+    var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+    var displayedMonthSerial by remember { mutableIntStateOf(persianMonthSerial(todayStart)) }
+    var selectedHour by remember { mutableStateOf<Int?>(null) }
+    var selectedMinute by remember { mutableStateOf<Int?>(null) }
     var place by remember { mutableStateOf("") }
     var placeConfirmed by remember { mutableStateOf(false) }
     var selectedLatitude by remember { mutableStateOf<Double?>(null) }
@@ -4554,19 +4588,24 @@ private fun DateProposalDialog(
     val firstDayOffset = firstDayCalendar.get(Calendar.DAY_OF_WEEK) % 7 // Saturday is column zero.
     val daysInMonth = jalaliDaysInMonth(displayedYear, displayedMonth)
     val weekLabels = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
-    val selectedDayStart = monthStartDay(selectedDateMillis)
+    val selectedDayStart = selectedDateMillis?.let(::monthStartDay)
     val proposedDateTime = remember(selectedDateMillis, selectedHour, selectedMinute) {
-        Calendar.getInstance().apply {
-            timeInMillis = selectedDateMillis
-            set(Calendar.HOUR_OF_DAY, selectedHour)
-            set(Calendar.MINUTE, selectedMinute)
+        val dateMillis = selectedDateMillis
+        val hour = selectedHour
+        val minute = selectedMinute
+        if (dateMillis == null || hour == null || minute == null) null else Calendar.getInstance().apply {
+            timeInMillis = dateMillis
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
     }
-    val isDateWithinWindow = selectedDayStart >= todayStart && selectedDateMillis <= maxAllowedEnd
+    val isDateWithinWindow = selectedDayStart != null && selectedDayStart >= todayStart &&
+        selectedDateMillis != null && selectedDateMillis!! <= maxAllowedEnd
     val canSubmit = (placeConfirmed || selectedLatitude != null) &&
-        isDateWithinWindow && proposedDateTime > System.currentTimeMillis()
+        selectedDateMillis != null && selectedHour != null && selectedMinute != null &&
+        isDateWithinWindow && proposedDateTime != null && proposedDateTime > System.currentTimeMillis()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -4591,32 +4630,27 @@ private fun DateProposalDialog(
                         selectedLongitude = null
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (place.trim().length >= 3) {
+                            placeConfirmed = true
+                            keyboardController?.hide()
+                        }
+                    }),
                     label = { Text("مکان قرار", fontFamily = Vazirmatn) },
                     placeholder = { Text("مثلاً کافه‌ای در خیابان ولیعصر", fontFamily = Vazirmatn, fontSize = 11.sp) },
                     leadingIcon = { Icon(Icons.Default.Place, null, tint = TinderPink) },
                     singleLine = true,
                     colors = fieldColors()
                 )
-                if (place.trim().length >= 3 && selectedLatitude == null) {
-                    if (!placeConfirmed) {
-                        Button(
-                            onClick = { placeConfirmed = true },
-                            modifier = Modifier.fillMaxWidth().height(40.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25364A)),
-                            shape = RoundedCornerShape(11.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(7.dp))
-                            Text("تأیید مکان واردشده", color = Color.White, fontSize = 10.sp, fontFamily = Vazirmatn)
-                        }
-                    } else {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("مکان واردشده تأیید شد", color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
-                        }
+                if (placeConfirmed && selectedLatitude == null) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("مکان واردشده تأیید شد", color = SuccessGreen, fontSize = 10.sp, fontFamily = Vazirmatn)
                     }
+                } else if (place.trim().length >= 3 && selectedLatitude == null) {
+                    Text("برای تأیید مکان، کلید ✓ روی صفحه‌کلید را بزن.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
                 }
                 OutlinedButton(
                     onClick = { showMapPicker = true },
@@ -4666,7 +4700,7 @@ private fun DateProposalDialog(
                         Spacer(Modifier.width(9.dp))
                         Column(Modifier.weight(1f)) {
                             Text("تاریخ دیت", color = TextWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-                            Text(persianDateLabel(selectedDateMillis), color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                            Text(selectedDateMillis?.let(::persianDateLabel) ?: "روز انتخاب نشده", color = if (selectedDateMillis != null) TextMuted else Color(0xFFFFB66B), fontSize = 9.sp, fontFamily = Vazirmatn)
                         }
                         Text(if (showCalendar) "بستن تقویم" else "تغییر تاریخ", color = TinderPink, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = Vazirmatn)
                         Spacer(Modifier.width(4.dp))
@@ -4719,7 +4753,7 @@ private fun DateProposalDialog(
                                         val dayMillis = persianDateToMillis(displayedYear, displayedMonth, day)
                                         val dayStart = monthStartDay(dayMillis)
                                         val enabled = dayStart >= todayStart && dayMillis <= maxAllowedDay
-                                        val selected = monthStartDay(selectedDateMillis) == dayStart
+                                        val selected = selectedDateMillis?.let { monthStartDay(it) == dayStart } == true
                                         Surface(
                                             onClick = { selectedDateMillis = dayMillis; showCalendar = false },
                                             enabled = enabled,
@@ -4761,21 +4795,27 @@ private fun DateProposalDialog(
                     }
                     Surface(color = BrandViolet.copy(alpha = 0.14f), shape = RoundedCornerShape(12.dp)) {
                         Text(
-                            persianDigits("%02d:%02d".format(Locale.US, selectedHour, selectedMinute)),
-                            Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = BrandViolet,
+                            if (selectedHour != null && selectedMinute != null)
+                                persianDigits("%02d:%02d".format(Locale.US, selectedHour!!, selectedMinute!!)) else "--:--",
+                            Modifier.padding(horizontal = 12.dp, vertical = 7.dp), color = if (selectedHour != null && selectedMinute != null) BrandViolet else Color(0xFFFFB66B),
                             fontWeight = FontWeight.Bold, fontSize = 15.sp, fontFamily = Vazirmatn
                         )
                     }
                 }
                 DateTimeWheelPicker(
-                    hour = selectedHour,
-                    minute = selectedMinute,
-                    onHourChange = { selectedHour = it },
-                    onMinuteChange = { selectedMinute = it }
+                    hour = selectedHour ?: -1,
+                    minute = selectedMinute ?: -1,
+                    onHourChange = { selectedHour = it.takeIf { value -> value >= 0 } },
+                    onMinuteChange = { selectedMinute = it.takeIf { value -> value >= 0 } }
                 )
-                if (!isDateWithinWindow) {
+                if (selectedDateMillis == null) {
+                    Text("روز قرار را خودت از تقویم انتخاب کن.", color = Color(0xFFFFB66B), fontSize = 10.sp, fontFamily = Vazirmatn)
+                } else if (!isDateWithinWindow) {
                     Text("تاریخ باید بین امروز و ۳ ماه آینده باشد.", color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
-                } else if (proposedDateTime <= System.currentTimeMillis()) {
+                }
+                if (selectedHour == null || selectedMinute == null) {
+                    Text("ساعت و دقیقه را هر دو از انتخابگر مشخص کن.", color = Color(0xFFFFB66B), fontSize = 10.sp, fontFamily = Vazirmatn)
+                } else if (proposedDateTime != null && proposedDateTime <= System.currentTimeMillis()) {
                     Text("این ساعت گذشته است؛ ساعت دیگری انتخاب کن.", color = Color(0xFFFF8B8B), fontSize = 10.sp, fontFamily = Vazirmatn)
                 }
                 Text("قرار پس از تأیید طرف مقابل نهایی و در بالای چت سنجاق می‌شود.", color = TextMuted, fontSize = 10.sp, lineHeight = 18.sp, fontFamily = Vazirmatn)
@@ -4785,14 +4825,20 @@ private fun DateProposalDialog(
             Button(
                 onClick = {
                     val now = System.currentTimeMillis()
-                    val selectedDate = Calendar.getInstance().apply {
-                        timeInMillis = selectedDateMillis
-                        set(Calendar.HOUR_OF_DAY, selectedHour)
-                        set(Calendar.MINUTE, selectedMinute)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }.timeInMillis
-                    if (selectedDate > now && selectedDate <= maxAllowedEnd && (placeConfirmed || selectedLatitude != null)) {
+                    val dateMillis = selectedDateMillis
+                    val hour = selectedHour
+                    val minute = selectedMinute
+                    val selectedDate = if (dateMillis != null && hour != null && minute != null) {
+                        Calendar.getInstance().apply {
+                            timeInMillis = dateMillis
+                            set(Calendar.HOUR_OF_DAY, hour)
+                            set(Calendar.MINUTE, minute)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }.timeInMillis
+                    } else null
+                    if (selectedDate != null && selectedDate > now && selectedDate <= maxAllowedEnd &&
+                        dateMillis != null && (placeConfirmed || selectedLatitude != null)) {
                         val finalPlace = place.trim().ifBlank { "موقعیت انتخاب‌شده روی نقشه" }
                         onSubmit(finalPlace, selectedDate, selectedLatitude, selectedLongitude)
                     }
@@ -4860,7 +4906,7 @@ private fun TimeWheelColumn(
                         maxValue = range.last
                         wrapSelectorWheel = true
                         descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
-                        setFormatter { number -> persianDigits("%02d".format(Locale.US, number)) }
+                        setFormatter { number -> if (number < 0) "--" else persianDigits("%02d".format(Locale.US, number)) }
                         setOnValueChangedListener { _, _, newValue -> onValueChange(newValue) }
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
                         contentDescription = label
@@ -5773,7 +5819,7 @@ private fun VerificationVideoPreview(videoUri: String) {
 private fun ProfileVerificationScreen(
     user: UserProfile,
     onBack: () -> Unit,
-    onSubmit: (videoUri: String, prompt: String) -> Unit
+    onSubmit: (videoUri: String, prompt: String, durationMillis: Long) -> Unit
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findComponentActivity() }
@@ -5857,7 +5903,7 @@ private fun ProfileVerificationScreen(
                     Icon(Icons.Default.Schedule, null, tint = BrandViolet, modifier = Modifier.size(56.dp))
                     Spacer(Modifier.height(15.dp))
                     Text("درخواستت ثبت شده است", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 19.sp, fontFamily = Vazirmatn)
-                    Text("ویدیوی ضبط‌شده در فضای خصوصی دستگاه آماده بررسی است. اتصال به سرور بررسی، ارسال آنلاین و دریافت نتیجه را فعال می‌کند.", color = TextGray, textAlign = TextAlign.Center, lineHeight = 23.sp, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Text("ویدیوی حداقل ۵ ثانیه‌ای ثبت شد. در این نسخه، تأیید آزمایشی پروفایل دقیقاً ۲ دقیقه پس از ارسال انجام می‌شود.", color = TextGray, textAlign = TextAlign.Center, lineHeight = 23.sp, fontSize = 12.sp, fontFamily = Vazirmatn)
                     Spacer(Modifier.height(20.dp))
                     Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) { Text("بازگشت", fontFamily = Vazirmatn) }
                 }
@@ -5877,7 +5923,7 @@ private fun ProfileVerificationScreen(
                             Spacer(Modifier.width(10.dp))
                             Column {
                                 Text("با نشان آبی، اعتماد بیشتری جلب کن", color = TextWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
-                                Text("برای تأیید، ویدیو باید همین لحظه و با دوربین داخل برنامه ضبط شود.", color = TextMuted, fontSize = 10.sp, lineHeight = 17.sp, fontFamily = Vazirmatn)
+                                Text("ویدیو باید همین لحظه با دوربین داخل برنامه ضبط شود. ویدیوی کمتر از ۵ ثانیه در بررسی آزمایشی رد می‌شود؛ ویدیوی بیشتر از ۵ ثانیه پس از ۲ دقیقه تأیید خواهد شد.", color = TextMuted, fontSize = 10.sp, lineHeight = 18.sp, fontFamily = Vazirmatn)
                             }
                         }
                     }
@@ -5986,11 +6032,21 @@ private fun ProfileVerificationScreen(
                                     try {
                                         val sourceUri = Uri.parse(selectedVideoUri)
                                         val sourcePath = sourceUri.path
-                                        val savedUri = withContext(Dispatchers.IO) {
+                                        val (savedUri, durationMillis) = withContext(Dispatchers.IO) {
                                             val source = sourcePath?.let(::File)
                                                 ?: throw IllegalStateException("مسیر ویدیو معتبر نیست.")
                                             if (!source.exists() || !source.isFile || !source.canRead() || source.length() <= 0L) {
                                                 throw IllegalStateException("فایل ویدیوی ضبط‌شده قابل خواندن نیست؛ دوباره ضبط کن.")
+                                            }
+                                            val retriever = MediaMetadataRetriever()
+                                            val duration = try {
+                                                retriever.setDataSource(source.absolutePath)
+                                                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                                            } finally {
+                                                runCatching { retriever.release() }
+                                            }
+                                            if (duration <= 0L) {
+                                                throw IllegalStateException("مدت ویدیو قابل تشخیص نیست؛ لطفاً دوباره ضبط کن.")
                                             }
                                             val directory = File(context.filesDir, "media/profile_verification").apply { mkdirs() }
                                             val destination = File(directory, "verification_${System.currentTimeMillis()}_${UUID.randomUUID()}.mp4")
@@ -6014,13 +6070,13 @@ private fun ProfileVerificationScreen(
                                                 destination.delete()
                                                 throw IllegalStateException("ذخیره ویدیو کامل نشد؛ دوباره تلاش کن.")
                                             }
-                                            Uri.fromFile(destination).toString()
+                                            Uri.fromFile(destination).toString() to duration
                                         }
                                         submitProgress = 0.96f
-                                        onSubmit(savedUri, prompt)
+                                        onSubmit(savedUri, prompt, durationMillis)
+                                        selectedVideoUri = ""
                                         submitProgress = 1f
-                                        delay(250)
-                                        onBack()
+                                        isSubmitting = false
                                     } catch (t: Throwable) {
                                         error = t.message ?: "آماده‌سازی ویدیو ناموفق بود. دوباره تلاش کن."
                                         isSubmitting = false
