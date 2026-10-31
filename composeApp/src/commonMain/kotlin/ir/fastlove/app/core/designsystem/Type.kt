@@ -3,11 +3,11 @@ package ir.fastlove.app.core.designsystem
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import ir.fastlove.app.resources.Res
+import org.jetbrains.compose.resources.Font
 import ir.fastlove.app.resources.vazirmatn_bold
 import ir.fastlove.app.resources.vazirmatn_medium
 import ir.fastlove.app.resources.vazirmatn_regular

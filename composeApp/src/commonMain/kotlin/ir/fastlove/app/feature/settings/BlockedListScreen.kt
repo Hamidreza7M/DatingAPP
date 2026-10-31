@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import ir.fastlove.app.app.navigator
 import ir.fastlove.app.app.repository
 import ir.fastlove.app.core.designsystem.EmojiAvatar
