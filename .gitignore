@@ -1,0 +1,20 @@
+# Gradle / build
+.gradle/
+build/
+**/build/
+local.properties
+
+# IDEA / Android Studio
+.idea/
+*.iml
+.kotlin/
+
+# Xcode
+iosApp/build/
+xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# OS
+.DS_Store
+Thumbs.db

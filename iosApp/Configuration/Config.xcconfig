@@ -1,0 +1,5 @@
+// Set your Apple Developer TEAM_ID here to build/sign for a real device.
+// For Simulator builds this can stay empty.
+TEAM_ID=
+BUNDLE_ID=ir.fastlove.demo
+APP_NAME=FastLove
