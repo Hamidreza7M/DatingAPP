@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   android-quality-gate:
-    name: Android tests, quality checks and APK
+    name: Android tests, detailed reports and APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
@@ -38,11 +38,44 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Run unit tests, lint, coverage and build APK
+      # Keep stages independent so one failure does not hide the results of later checks.
+      - name: Run JVM unit tests
+        id: unit
+        continue-on-error: true
         working-directory: apps/android
-        run: gradle --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug jacocoTestReport
+        run: |
+          mkdir -p ci-report/logs
+          gradle --no-daemon --stacktrace --console=plain testDebugUnitTest 2>&1 | tee ci-report/logs/unit-tests.log
+
+      - name: Run Android Lint
+        id: lint
+        continue-on-error: true
+        working-directory: apps/android
+        run: |
+          mkdir -p ci-report/logs
+          gradle --no-daemon --stacktrace --console=plain lintDebug 2>&1 | tee ci-report/logs/lint.log
+
+      - name: Build debug APK
+        id: apk
+        continue-on-error: true
+        working-directory: apps/android
+        run: |
+          mkdir -p ci-report/logs
+          gradle --no-daemon --stacktrace --console=plain assembleDebug 2>&1 | tee ci-report/logs/apk-build.log
+
+      - name: Generate JaCoCo unit-test coverage
+        id: coverage
+        if: always()
+        continue-on-error: true
+        working-directory: apps/android
+        run: |
+          mkdir -p ci-report/logs
+          gradle --no-daemon --stacktrace --console=plain jacocoTestReport 2>&1 | tee ci-report/logs/coverage.log
 
       - name: Run Compose UI smoke tests on Android Emulator
+        id: ui
+        if: always()
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -50,27 +83,67 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: cd apps/android && gradle --no-daemon --stacktrace connectedDebugAndroidTest createDebugAndroidTestCoverageReport
+          script: |
+            cd apps/android
+            mkdir -p ci-report/logs
+            gradle --no-daemon --stacktrace --console=plain connectedDebugAndroidTest createDebugAndroidTestCoverageReport 2>&1 | tee ci-report/logs/instrumented-ui-tests.log
 
-      - name: Create build and test summary
+      - name: Create detailed build and test report
+        id: report
         if: always()
+        env:
+          UNIT_OUTCOME: ${{ steps.unit.outcome }}
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          APK_OUTCOME: ${{ steps.apk.outcome }}
+          COVERAGE_OUTCOME: ${{ steps.coverage.outcome }}
+          UI_OUTCOME: ${{ steps.ui.outcome }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: python3 apps/android/scripts/write-ci-summary.py
 
-      - name: Publish test, lint and coverage reports
+      - name: Upload detailed test and quality reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fastlove-android-reports-${{ github.run_number }}
+          name: fastlove-android-detailed-report-${{ github.run_number }}
           path: |
+            apps/android/ci-report/
             apps/android/app/build/test-results/
             apps/android/app/build/reports/tests/
             apps/android/app/build/reports/jacoco/
             apps/android/app/build/reports/coverage/
             apps/android/app/build/reports/lint-results-debug.html
+            apps/android/app/build/reports/lint-results-debug.xml
+            apps/android/app/build/intermediates/lint_intermediate_text_report/
             apps/android/app/build/outputs/androidTest-results/
             apps/android/app/build/outputs/logs/
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Enforce Android quality gate
+        if: always()
+        env:
+          UNIT_OUTCOME: ${{ steps.unit.outcome }}
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          APK_OUTCOME: ${{ steps.apk.outcome }}
+          COVERAGE_OUTCOME: ${{ steps.coverage.outcome }}
+          UI_OUTCOME: ${{ steps.ui.outcome }}
+        run: |
+          failed=0
+          for stage in UNIT LINT APK COVERAGE UI; do
+            outcome="$(printenv "${stage}_OUTCOME" || true)"
+            echo "${stage}: ${outcome:-unknown}"
+            if [ "$outcome" != "success" ]; then failed=1; fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "Android quality gate failed. See the detailed report artifact and workflow summary."
+            exit 1
+          fi
 
       - name: Publish debug APK
         if: success()

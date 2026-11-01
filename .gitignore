@@ -14,3 +14,4 @@ apps/admin-web/dist/
 # OS
 .DS_Store
 Thumbs.db
+apps/android/ci-report/
