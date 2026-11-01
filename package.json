@@ -1,32 +1,16 @@
 {
   "name": "fastlove-monorepo",
   "private": true,
-  "version": "1.1.0",
-  "type": "module",
-  "description": "FastLove multi-client product monorepository: Android, Responsive Web, PWA and Admin Web",
-  "workspaces": [
-    "packages/*",
-    "apps/web-user",
-    "apps/pwa",
-    "apps/admin-web"
-  ],
+  "version": "1.0.4",
+  "description": "FastLove multi-platform product repository",
   "scripts": {
     "admin:dev": "npm --prefix apps/admin-web run dev",
     "admin:start": "npm --prefix apps/admin-web run start",
     "admin:build": "npm --prefix apps/admin-web run build",
-    "admin:test": "npm --prefix apps/admin-web test",
-    "web:dev": "npm --prefix apps/web-user run dev",
-    "web:build": "npm --prefix apps/web-user run build",
-    "web:preview": "npm --prefix apps/web-user run preview",
-    "web:test": "npm --prefix apps/web-user test",
-    "pwa:dev": "npm --prefix apps/pwa run dev",
-    "pwa:build": "npm --prefix apps/pwa run build",
-    "pwa:preview": "npm --prefix apps/pwa run preview",
-    "pwa:test": "npm --prefix apps/pwa test",
-    "user:build": "npm run web:build && npm run pwa:build",
-    "user:test": "npm run web:test && npm run pwa:test",
-    "test": "npm run user:test && npm run admin:test",
-    "android:build": "cd apps/android && gradle --no-daemon assembleDebug"
+    "android:build": "cd apps/android && gradle --no-daemon assembleDebug",
+    "admin:test": "npm --prefix apps/admin-web test"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

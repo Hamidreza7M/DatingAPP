@@ -14,5 +14,3 @@ apps/admin-web/dist/
 # OS
 .DS_Store
 Thumbs.db
-apps/web-user/dist/
-apps/pwa/dist/
