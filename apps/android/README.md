@@ -234,3 +234,7 @@
 
 - رفع خطای Kotlin در `AnalogTimePicker`: مقادیر `dx` و `dy` از نوع `Dp` بودند و پسوند `.dp` دوباره به آن‌ها اعمال می‌شد. در محاسبهٔ موقعیت برچسب‌های ساعت، از همان مقادیر `Dp` استفاده می‌شود.
 - `versionName` به `2.18.1` و `versionCode` به `25` افزایش یافت.
+
+## Multi-client architecture note (Monorepo v1.1.0)
+
+Responsive Web and PWA now share the user product inventory and browser interaction core in `packages/user-core`. Android remains a native Kotlin implementation. To provide truly identical accounts, messages, likes, dates, purchases, support and privacy settings across all three clients, Android and both browser clients must be migrated to the central endpoints in `contracts/openapi/user-api.yaml`. The current Android demo still uses on-device persistence; do not interpret the browser demo's localStorage as a shared user database.

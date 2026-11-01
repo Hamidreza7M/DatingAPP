@@ -1,0 +1,13 @@
+{
+  "name": "@fastlove/user-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./app": "./src/app.js",
+    "./data": "./src/data.js",
+    "./repository": "./src/repository.js",
+    "./api-client": "./src/api-client.js",
+    "./styles.css": "./src/styles.css"
+  }
+}

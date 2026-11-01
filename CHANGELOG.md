@@ -1,13 +1,23 @@
-# FastLove Admin changelog
+# Changelog
 
-## 1.0.4 — 2026-11-01
+## 1.1.0 — 2026-11-01
 
-- Added a referral report that groups registered members under the owner of each referral code.
-- Expanded demo records to at least 20 entries for every operational list, with 40 demo users split between 20 non-deleted and 20 deleted accounts.
-- Added a local-demo upgrade migration that preserves current records and fills missing demo records from the expanded seed.
-- Added planned-date detail view with meeting address, meeting point, latitude/longitude and a map link. DAT-1 includes a sample Tehran location.
-- Added dynamic subscription and direct-message package creation; package prices are explicitly stored/displayed in Toman.
-- Added package price editing, activate/deactivate controls, permanent catalog deletion and audit events.
-- Updated the admin web assets, API contract and documentation to version 1.0.4.
+### User Web and PWA clients
+- Implemented Responsive Web user client in `apps/web-user`.
+- Implemented installable PWA client in `apps/pwa` with manifest, icons, service worker and offline app shell.
+- Added shared user product core in `packages/user-core`; both browser clients now mount the same application code.
+- Added user feature/API contract in `contracts/openapi/user-api.yaml` and monorepo architecture documentation.
+- Added independent Web/PWA build, preview and test scripts plus GitHub Actions workflow.
+- Browser demo includes OTP flow, profile setup/edit, discovery filters, likes/matches, map, text/image/voice chat, date proposals/details, subscription and direct-message packages, payment history, privacy, blocking, video verification, support tickets and account deletion.
 
-> Demo records and sample meeting locations are synthetic. Production use still requires connecting the admin API to the central application backend and receiving the real referral attribution and date location from that backend.
+### Important integration boundary
+- Browser user flows currently use a local demo repository. Central API implementation and Android migration are still required for real cross-device synchronization and Production payments/chat/authentication/media.
+
+## 1.0.4
+- Admin referral reports, scheduled-date location details, dynamic packages and expanded demo seed data.
+
+## 1.0.3
+- Improved admin navigation, BI metrics, user photo detail, chat moderation view and deleted-user archive.
+
+## 1.0.2
+- Fixed admin login state and navigation rendering.
