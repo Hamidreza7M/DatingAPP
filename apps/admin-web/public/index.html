@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#101426" />
   <meta name="description" content="پنل مدیریت FastLove" />
   <title>پنل مدیریت | FastLove</title>
-  <link rel="stylesheet" href="/styles.css" />
-  <script type="module" src="/app.js"></script>
+  <link rel="stylesheet" href="/styles.css?v=1.0.4" />
+  <script type="module" src="/app.js?v=1.0.4"></script>
 </head>
 <body>
   <div id="loginView" class="login-screen" hidden>
@@ -46,18 +46,22 @@
         <div class="nav-caption">نمای کلی</div>
         <button class="nav-link active" data-page="dashboard"><span class="nav-icon">▦</span><span>داشبورد BI</span></button>
         <div class="nav-caption">مدیریت کاربران</div>
-        <button class="nav-link" data-page="users"><span class="nav-icon">♙</span><span>کاربران</span><span class="nav-count">8</span></button>
+        <button class="nav-link" data-page="users"><span class="nav-icon">♙</span><span>کاربران</span></button>
+        <button class="nav-link" data-page="referrals"><span class="nav-icon">⌁</span><span>گزارش کدهای معرف</span></button>
         <button class="nav-link" data-page="payments"><span class="nav-icon">▤</span><span>پرداخت‌ها</span></button>
         <button class="nav-link" data-page="reports"><span class="nav-icon">⚑</span><span>گزارش تخلف</span><span class="nav-count warning" id="reportsBadge">2</span></button>
         <button class="nav-link" data-page="verification"><span class="nav-icon">◉</span><span>احراز هویت ویدئویی</span><span class="nav-count warning" id="verificationBadge">2</span></button>
         <div class="nav-caption">تعاملات محصول</div>
+        <button class="nav-link" data-page="chats"><span class="nav-icon">▤</span><span>گفت‌وگوی کاربران</span></button>
         <button class="nav-link" data-page="engagement"><span class="nav-icon">♡</span><span>لایک، مچ و دیت</span></button>
         <button class="nav-link" data-page="tickets"><span class="nav-icon">▣</span><span>تیکت‌های پشتیبانی</span><span class="nav-count" id="ticketsBadge">2</span></button>
-        <div class="nav-caption">درآمد و تنظیمات</div>
+        <div class="nav-caption">سوابق و تنظیمات</div>
+        <button class="nav-link" data-page="deletedUsers"><span class="nav-icon">▧</span><span>بایگانی کاربران حذف‌شده</span></button>
+        <div class="nav-caption">درآمد و راهنما</div>
         <button class="nav-link" data-page="packages"><span class="nav-icon">◇</span><span>بسته‌ها و قیمت‌گذاری</span></button>
+        <button class="nav-link" data-page="help"><span class="nav-icon">✧</span><span>راهنمای پنل</span></button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="help-card"><div class="help-icon">✧</div><b>به راهنمایی نیاز داری؟</b><p>مستندات پنل و API را بررسی کن.</p><a href="/guide.html" target="_blank">مشاهده راهنما <span>←</span></a></div>
         <div class="admin-mini"><div class="avatar avatar-admin">A</div><div class="admin-meta"><b id="adminName">مدیر سیستم</b><small>دسترسی مدیر</small></div><button class="logout-mini" data-action="logout" title="خروج">⇥</button></div>
       </div>
     </aside>
@@ -73,7 +77,7 @@
         </div>
       </header>
       <section class="page-container" id="pageContainer" tabindex="-1"></section>
-      <footer class="app-footer"><span>© 2026 FastLove</span><span>نسخه پنل 1.0.0 <i></i> ساخته‌شده برای مدیریت امن محصول</span></footer>
+      <footer class="app-footer"><span>© 2026 FastLove</span><span>نسخه پنل 1.0.4 <i></i> ساخته‌شده برای مدیریت امن محصول</span></footer>
     </main>
   </div>
 

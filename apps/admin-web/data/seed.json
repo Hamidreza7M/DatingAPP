@@ -1,71 +1,4589 @@
 {
   "users": [
-    {"id":"USR-1001","name":"سارا احمدی","phone":"09121234567","email":"sara.a@example.com","city":"تهران","gender":"زن","age":27,"job":"طراح گرافیک","goal":"رابطه جدی","plan":"VIP","status":"active","verification":"verified","joinedAt":"2026-09-14T09:20:00.000Z","lastSeenAt":"2026-11-01T16:42:00.000Z","bio":"علاقه‌مند به سفر، کتاب و کافه‌های دنج. عاشق تجربه‌های تازه و گفت‌وگوهای عمیق.","interests":["سفر","کتاب","کافه","عکاسی"],"instagram":"sara.design","photos":4,"online":true,"referralCode":"FL-SARA27","subscriptionExpiresAt":"2026-12-14T09:20:00.000Z"},
-    {"id":"USR-1002","name":"آرمان رضایی","phone":"09123334455","email":"arman.r@example.com","city":"اصفهان","gender":"مرد","age":30,"job":"مهندس نرم‌افزار","goal":"ازدواج","plan":"Pro","status":"active","verification":"pending","joinedAt":"2026-09-22T11:10:00.000Z","lastSeenAt":"2026-11-01T15:18:00.000Z","bio":"برنامه‌نویس، اهل کوهنوردی و موسیقی زنده.","interests":["کدنویسی","کوهنوردی","موسیقی"],"instagram":"arman.codes","photos":3,"online":false,"referralCode":"FL-ARMAN30","subscriptionExpiresAt":"2026-11-22T11:10:00.000Z"},
-    {"id":"USR-1003","name":"نیلوفر محمدی","phone":"09351234567","email":"nilo.m@example.com","city":"شیراز","gender":"زن","age":25,"job":"روانشناس","goal":"دوستی ساده","plan":"Free","status":"active","verification":"rejected","joinedAt":"2026-10-02T08:00:00.000Z","lastSeenAt":"2026-10-31T19:20:00.000Z","bio":"طبیعت‌گردی و فیلم دیدن را دوست دارم.","interests":["طبیعت","فیلم","یوگا"],"instagram":"nilo.mood","photos":5,"online":false,"referralCode":"FL-NILO25","subscriptionExpiresAt":null},
-    {"id":"USR-1004","name":"مازیار کریمی","phone":"09125556677","email":"maziar.k@example.com","city":"تهران","gender":"مرد","age":32,"job":"معمار","goal":"رابطه جدی","plan":"Pro","status":"active","verification":"verified","joinedAt":"2026-08-19T13:30:00.000Z","lastSeenAt":"2026-11-01T16:05:00.000Z","bio":"معماری، دوچرخه‌سواری و سفرهای جاده‌ای.","interests":["معماری","دوچرخه‌سواری","سفر"],"instagram":"maziar.arch","photos":6,"online":true,"referralCode":"FL-MAZ32","subscriptionExpiresAt":"2026-11-19T13:30:00.000Z"},
-    {"id":"USR-1005","name":"الهام موسوی","phone":"09901234567","email":"elham.m@example.com","city":"تبریز","gender":"زن","age":29,"job":"پزشک","goal":"ازدواج","plan":"VIP","status":"active","verification":"pending","joinedAt":"2026-10-05T10:45:00.000Z","lastSeenAt":"2026-10-30T20:02:00.000Z","bio":"اهل کتاب، آشپزی و طبیعت.","interests":["کتاب","آشپزی","طبیعت"],"instagram":"elham.md","photos":4,"online":false,"referralCode":"FL-ELH29","subscriptionExpiresAt":"2026-12-05T10:45:00.000Z"},
-    {"id":"USR-1006","name":"پارسا نادری","phone":"09127778899","email":"parsa.n@example.com","city":"کرج","gender":"مرد","age":26,"job":"دانشجو","goal":"دوستی ساده","plan":"Free","status":"active","verification":"not_verified","joinedAt":"2026-10-21T12:05:00.000Z","lastSeenAt":"2026-11-01T14:01:00.000Z","bio":"بازی، فیلم و ورزش.","interests":["بازی","فیلم","ورزش"],"instagram":"","photos":2,"online":true,"referralCode":"FL-PAR26","subscriptionExpiresAt":null},
-    {"id":"USR-1007","name":"مهسا جعفری","phone":"09129990011","email":"mahsa.j@example.com","city":"رشت","gender":"زن","age":28,"job":"عکاس","goal":"رابطه جدی","plan":"Pro","status":"suspended","verification":"verified","joinedAt":"2026-07-11T07:15:00.000Z","lastSeenAt":"2026-10-28T11:10:00.000Z","bio":"عکاسی خیابانی و سفر.","interests":["عکاسی","سفر","هنر"],"instagram":"mahsa.frames","photos":7,"online":false,"referralCode":"FL-MAH28","subscriptionExpiresAt":"2026-11-11T07:15:00.000Z"},
-    {"id":"USR-1008","name":"کیان شریفی","phone":"09360001122","email":"kian.s@example.com","city":"مشهد","gender":"مرد","age":31,"job":"وکیل","goal":"رابطه جدی","plan":"Free","status":"active","verification":"not_verified","joinedAt":"2026-10-26T15:35:00.000Z","lastSeenAt":"2026-11-01T12:50:00.000Z","bio":"علاقه‌مند به سفر و موسیقی.","interests":["موسیقی","سفر","کتاب"],"instagram":"kian.law","photos":3,"online":false,"referralCode":"FL-KIAN31","subscriptionExpiresAt":null}
+    {
+      "id": "USR-1001",
+      "name": "سارا احمدی",
+      "phone": "09121234567",
+      "email": "sara.a@example.com",
+      "city": "تهران",
+      "gender": "زن",
+      "age": 27,
+      "job": "طراح گرافیک",
+      "goal": "رابطه جدی",
+      "plan": "VIP",
+      "status": "active",
+      "verification": "verified",
+      "joinedAt": "2026-09-14T09:20:00.000Z",
+      "lastSeenAt": "2026-11-01T16:42:00.000Z",
+      "bio": "علاقه‌مند به سفر، کتاب و کافه‌های دنج. عاشق تجربه‌های تازه و گفت‌وگوهای عمیق.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "کافه",
+        "عکاسی"
+      ],
+      "instagram": "sara.design",
+      "photos": 4,
+      "online": true,
+      "referralCode": "FL-SARA27",
+      "subscriptionExpiresAt": "2026-12-14T09:20:00.000Z",
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=47",
+        "https://i.pravatar.cc/480?img=44"
+      ],
+      "referredByCode": null,
+      "deletedBy": null
+    },
+    {
+      "id": "USR-1002",
+      "name": "آرمان رضایی",
+      "phone": "09123334455",
+      "email": "arman.r@example.com",
+      "city": "اصفهان",
+      "gender": "مرد",
+      "age": 30,
+      "job": "مهندس نرم‌افزار",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "active",
+      "verification": "pending",
+      "joinedAt": "2026-09-22T11:10:00.000Z",
+      "lastSeenAt": "2026-11-01T15:18:00.000Z",
+      "bio": "برنامه‌نویس، اهل کوهنوردی و موسیقی زنده.",
+      "interests": [
+        "کدنویسی",
+        "کوهنوردی",
+        "موسیقی"
+      ],
+      "instagram": "arman.codes",
+      "photos": 3,
+      "online": false,
+      "referralCode": "FL-ARMAN30",
+      "subscriptionExpiresAt": "2026-11-22T11:10:00.000Z",
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=12",
+        "https://i.pravatar.cc/480?img=13"
+      ],
+      "referredByCode": null,
+      "deletedBy": null
+    },
+    {
+      "id": "USR-1003",
+      "name": "نیلوفر محمدی",
+      "phone": "09351234567",
+      "email": "nilo.m@example.com",
+      "city": "شیراز",
+      "gender": "زن",
+      "age": 25,
+      "job": "روانشناس",
+      "goal": "دوستی ساده",
+      "plan": "Free",
+      "status": "active",
+      "verification": "rejected",
+      "joinedAt": "2026-10-02T08:00:00.000Z",
+      "lastSeenAt": "2026-10-31T19:20:00.000Z",
+      "bio": "طبیعت‌گردی و فیلم دیدن را دوست دارم.",
+      "interests": [
+        "طبیعت",
+        "فیلم",
+        "یوگا"
+      ],
+      "instagram": "nilo.mood",
+      "photos": 5,
+      "online": false,
+      "referralCode": "FL-NILO25",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=44",
+        "https://i.pravatar.cc/480?img=49"
+      ],
+      "referredByCode": null,
+      "deletedBy": null
+    },
+    {
+      "id": "USR-1004",
+      "name": "مازیار کریمی",
+      "phone": "09125556677",
+      "email": "maziar.k@example.com",
+      "city": "تهران",
+      "gender": "مرد",
+      "age": 32,
+      "job": "معمار",
+      "goal": "رابطه جدی",
+      "plan": "Pro",
+      "status": "active",
+      "verification": "verified",
+      "joinedAt": "2026-08-19T13:30:00.000Z",
+      "lastSeenAt": "2026-11-01T16:05:00.000Z",
+      "bio": "معماری، دوچرخه‌سواری و سفرهای جاده‌ای.",
+      "interests": [
+        "معماری",
+        "دوچرخه‌سواری",
+        "سفر"
+      ],
+      "instagram": "maziar.arch",
+      "photos": 6,
+      "online": true,
+      "referralCode": "FL-MAZ32",
+      "subscriptionExpiresAt": "2026-11-19T13:30:00.000Z",
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=13",
+        "https://i.pravatar.cc/480?img=15"
+      ],
+      "referredByCode": null,
+      "deletedBy": null
+    },
+    {
+      "id": "USR-1005",
+      "name": "الهام موسوی",
+      "phone": "09901234567",
+      "email": "elham.m@example.com",
+      "city": "تبریز",
+      "gender": "زن",
+      "age": 29,
+      "job": "پزشک",
+      "goal": "ازدواج",
+      "plan": "VIP",
+      "status": "active",
+      "verification": "pending",
+      "joinedAt": "2026-10-05T10:45:00.000Z",
+      "lastSeenAt": "2026-10-30T20:02:00.000Z",
+      "bio": "اهل کتاب، آشپزی و طبیعت.",
+      "interests": [
+        "کتاب",
+        "آشپزی",
+        "طبیعت"
+      ],
+      "instagram": "elham.md",
+      "photos": 4,
+      "online": false,
+      "referralCode": "FL-ELH29",
+      "subscriptionExpiresAt": "2026-12-05T10:45:00.000Z",
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=49",
+        "https://i.pravatar.cc/480?img=32"
+      ],
+      "referredByCode": null,
+      "deletedBy": null
+    },
+    {
+      "id": "USR-1006",
+      "name": "پارسا نادری",
+      "phone": "09127778899",
+      "email": "parsa.n@example.com",
+      "city": "کرج",
+      "gender": "مرد",
+      "age": 26,
+      "job": "دانشجو",
+      "goal": "دوستی ساده",
+      "plan": "Free",
+      "status": "active",
+      "verification": "not_verified",
+      "joinedAt": "2026-10-21T12:05:00.000Z",
+      "lastSeenAt": "2026-11-01T14:01:00.000Z",
+      "bio": "بازی، فیلم و ورزش.",
+      "interests": [
+        "بازی",
+        "فیلم",
+        "ورزش"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": true,
+      "referralCode": "FL-PAR26",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=15",
+        "https://i.pravatar.cc/480?img=5"
+      ],
+      "referredByCode": null,
+      "deletedBy": null
+    },
+    {
+      "id": "USR-1007",
+      "name": "مهسا جعفری",
+      "phone": "09129990011",
+      "email": "mahsa.j@example.com",
+      "city": "رشت",
+      "gender": "زن",
+      "age": 28,
+      "job": "عکاس",
+      "goal": "رابطه جدی",
+      "plan": "Pro",
+      "status": "suspended",
+      "verification": "verified",
+      "joinedAt": "2026-07-11T07:15:00.000Z",
+      "lastSeenAt": "2026-10-28T11:10:00.000Z",
+      "bio": "عکاسی خیابانی و سفر.",
+      "interests": [
+        "عکاسی",
+        "سفر",
+        "هنر"
+      ],
+      "instagram": "mahsa.frames",
+      "photos": 7,
+      "online": false,
+      "referralCode": "FL-MAH28",
+      "subscriptionExpiresAt": "2026-11-11T07:15:00.000Z",
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=32",
+        "https://i.pravatar.cc/480?img=47"
+      ],
+      "referredByCode": null,
+      "deletedBy": null
+    },
+    {
+      "id": "USR-1008",
+      "name": "کیان شریفی",
+      "phone": "09360001122",
+      "email": "kian.s@example.com",
+      "city": "مشهد",
+      "gender": "مرد",
+      "age": 31,
+      "job": "وکیل",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "active",
+      "verification": "not_verified",
+      "joinedAt": "2026-10-26T15:35:00.000Z",
+      "lastSeenAt": "2026-11-01T12:50:00.000Z",
+      "bio": "علاقه‌مند به سفر و موسیقی.",
+      "interests": [
+        "موسیقی",
+        "سفر",
+        "کتاب"
+      ],
+      "instagram": "kian.law",
+      "photos": 3,
+      "online": false,
+      "referralCode": "FL-KIAN31",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=5",
+        "https://i.pravatar.cc/480?img=12"
+      ],
+      "referredByCode": null,
+      "deletedBy": null
+    },
+    {
+      "id": "USR-1009",
+      "name": "آوا کریمی",
+      "phone": "09266858661",
+      "email": "user1009@example.com",
+      "city": "تهران",
+      "gender": "زن",
+      "age": 22,
+      "job": "طراح محصول",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "active",
+      "verification": "verified",
+      "joinedAt": "2026-08-01T00:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1009-REF",
+      "referredByCode": null,
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=30",
+        "https://i.pravatar.cc/480?img=45"
+      ]
+    },
+    {
+      "id": "USR-1010",
+      "name": "امیرحسین رستگار",
+      "phone": "09388294258",
+      "email": "user1010@example.com",
+      "city": "اصفهان",
+      "gender": "مرد",
+      "age": 23,
+      "job": "مهندس نرم‌افزار",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "active",
+      "verification": "pending",
+      "joinedAt": "2026-08-03T01:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": true,
+      "referralCode": "FL-1010-REF",
+      "referredByCode": "FL-ARMAN30",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=31",
+        "https://i.pravatar.cc/480?img=46"
+      ]
+    },
+    {
+      "id": "USR-1011",
+      "name": "ترانه شریفی",
+      "phone": "09763678759",
+      "email": "user1011@example.com",
+      "city": "شیراز",
+      "gender": "زن",
+      "age": 24,
+      "job": "پزشک",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "active",
+      "verification": "not_verified",
+      "joinedAt": "2026-08-05T02:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1011-REF",
+      "referredByCode": "FL-NILO25",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=32",
+        "https://i.pravatar.cc/480?img=47"
+      ]
+    },
+    {
+      "id": "USR-1012",
+      "name": "محمد پارسا",
+      "phone": "09254223553",
+      "email": "user1012@example.com",
+      "city": "تبریز",
+      "gender": "مرد",
+      "age": 25,
+      "job": "دانشجو",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "active",
+      "verification": "rejected",
+      "joinedAt": "2026-08-07T03:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": true,
+      "referralCode": "FL-1012-REF",
+      "referredByCode": "FL-MAZ32",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=33",
+        "https://i.pravatar.cc/480?img=48"
+      ]
+    },
+    {
+      "id": "USR-1013",
+      "name": "هستی نادری",
+      "phone": "09295527566",
+      "email": "user1013@example.com",
+      "city": "مشهد",
+      "gender": "زن",
+      "age": 26,
+      "job": "معمار",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "active",
+      "verification": "verified",
+      "joinedAt": "2026-08-09T04:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1013-REF",
+      "referredByCode": null,
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=34",
+        "https://i.pravatar.cc/480?img=49"
+      ]
+    },
+    {
+      "id": "USR-1014",
+      "name": "سامان اکبری",
+      "phone": "09164346762",
+      "email": "user1014@example.com",
+      "city": "کرج",
+      "gender": "مرد",
+      "age": 27,
+      "job": "مدیر بازاریابی",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "active",
+      "verification": "pending",
+      "joinedAt": "2026-08-11T05:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": true,
+      "referralCode": "FL-1014-REF",
+      "referredByCode": "FL-PAR26",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=35",
+        "https://i.pravatar.cc/480?img=50"
+      ]
+    },
+    {
+      "id": "USR-1015",
+      "name": "نازنین رفیعی",
+      "phone": "09886499816",
+      "email": "user1015@example.com",
+      "city": "رشت",
+      "gender": "زن",
+      "age": 28,
+      "job": "عکاس",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "suspended",
+      "verification": "not_verified",
+      "joinedAt": "2026-08-13T06:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1015-REF",
+      "referredByCode": "FL-MAH28",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=36",
+        "https://i.pravatar.cc/480?img=51"
+      ]
+    },
+    {
+      "id": "USR-1016",
+      "name": "بردیا سلیمانی",
+      "phone": "09209992859",
+      "email": "user1016@example.com",
+      "city": "یزد",
+      "gender": "مرد",
+      "age": 29,
+      "job": "وکیل",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "active",
+      "verification": "rejected",
+      "joinedAt": "2026-08-15T07:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": true,
+      "referralCode": "FL-1016-REF",
+      "referredByCode": "FL-KIAN31",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=37",
+        "https://i.pravatar.cc/480?img=52"
+      ]
+    },
+    {
+      "id": "USR-1017",
+      "name": "روژان مرادی",
+      "phone": "09416895659",
+      "email": "user1017@example.com",
+      "city": "قم",
+      "gender": "زن",
+      "age": 30,
+      "job": "مدرس",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "active",
+      "verification": "verified",
+      "joinedAt": "2026-08-17T00:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1017-REF",
+      "referredByCode": null,
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=38",
+        "https://i.pravatar.cc/480?img=53"
+      ]
+    },
+    {
+      "id": "USR-1018",
+      "name": "یاسین قاسمی",
+      "phone": "09564164821",
+      "email": "user1018@example.com",
+      "city": "اهواز",
+      "gender": "مرد",
+      "age": 31,
+      "job": "تحلیلگر داده",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "active",
+      "verification": "pending",
+      "joinedAt": "2026-08-19T01:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": true,
+      "referralCode": "FL-1018-REF",
+      "referredByCode": "FL-1010-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=39",
+        "https://i.pravatar.cc/480?img=54"
+      ]
+    },
+    {
+      "id": "USR-1019",
+      "name": "غزل صادقی",
+      "phone": "09635494059",
+      "email": "user1019@example.com",
+      "city": "تهران",
+      "gender": "زن",
+      "age": 32,
+      "job": "طراح محصول",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "suspended",
+      "verification": "not_verified",
+      "joinedAt": "2026-08-21T02:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1019-REF",
+      "referredByCode": "FL-1011-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=40",
+        "https://i.pravatar.cc/480?img=55"
+      ]
+    },
+    {
+      "id": "USR-1020",
+      "name": "اشکان یوسفی",
+      "phone": "09169378964",
+      "email": "user1020@example.com",
+      "city": "اصفهان",
+      "gender": "مرد",
+      "age": 33,
+      "job": "مهندس نرم‌افزار",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "suspended",
+      "verification": "rejected",
+      "joinedAt": "2026-08-23T03:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": true,
+      "referralCode": "FL-1020-REF",
+      "referredByCode": "FL-1012-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=41",
+        "https://i.pravatar.cc/480?img=56"
+      ]
+    },
+    {
+      "id": "USR-1021",
+      "name": "ملیکا حیدری",
+      "phone": "09525986419",
+      "email": "user1021@example.com",
+      "city": "شیراز",
+      "gender": "زن",
+      "age": 34,
+      "job": "پزشک",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "deleted",
+      "verification": "verified",
+      "joinedAt": "2026-08-25T04:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1021-REF",
+      "referredByCode": null,
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=42",
+        "https://i.pravatar.cc/480?img=57"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1022",
+      "name": "شایان محمودی",
+      "phone": "09365646486",
+      "email": "user1022@example.com",
+      "city": "تبریز",
+      "gender": "مرد",
+      "age": 35,
+      "job": "دانشجو",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "deleted",
+      "verification": "pending",
+      "joinedAt": "2026-08-27T05:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1022-REF",
+      "referredByCode": "FL-1014-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=43",
+        "https://i.pravatar.cc/480?img=58"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1023",
+      "name": "سحر فلاح",
+      "phone": "09721231011",
+      "email": "user1023@example.com",
+      "city": "مشهد",
+      "gender": "زن",
+      "age": 36,
+      "job": "معمار",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "deleted",
+      "verification": "not_verified",
+      "joinedAt": "2026-08-29T06:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1023-REF",
+      "referredByCode": "FL-1015-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=44",
+        "https://i.pravatar.cc/480?img=59"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1024",
+      "name": "پارسا فراهانی",
+      "phone": "09423691052",
+      "email": "user1024@example.com",
+      "city": "کرج",
+      "gender": "مرد",
+      "age": 22,
+      "job": "مدیر بازاریابی",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "deleted",
+      "verification": "rejected",
+      "joinedAt": "2026-08-31T07:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1024-REF",
+      "referredByCode": "FL-1016-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=45",
+        "https://i.pravatar.cc/480?img=60"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1025",
+      "name": "ریحانه کاظمی",
+      "phone": "09944448312",
+      "email": "user1025@example.com",
+      "city": "رشت",
+      "gender": "زن",
+      "age": 23,
+      "job": "عکاس",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "deleted",
+      "verification": "verified",
+      "joinedAt": "2026-09-02T00:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1025-REF",
+      "referredByCode": null,
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=46",
+        "https://i.pravatar.cc/480?img=61"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1026",
+      "name": "کیارش امینی",
+      "phone": "09657617758",
+      "email": "user1026@example.com",
+      "city": "یزد",
+      "gender": "مرد",
+      "age": 24,
+      "job": "وکیل",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "deleted",
+      "verification": "pending",
+      "joinedAt": "2026-09-04T01:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1026-REF",
+      "referredByCode": "FL-1018-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=47",
+        "https://i.pravatar.cc/480?img=62"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1027",
+      "name": "مهتاب جعفری",
+      "phone": "09428146580",
+      "email": "user1027@example.com",
+      "city": "قم",
+      "gender": "زن",
+      "age": 25,
+      "job": "مدرس",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "deleted",
+      "verification": "not_verified",
+      "joinedAt": "2026-09-06T02:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1027-REF",
+      "referredByCode": "FL-1019-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=48",
+        "https://i.pravatar.cc/480?img=63"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1028",
+      "name": "مبین شمس",
+      "phone": "09926619100",
+      "email": "user1028@example.com",
+      "city": "اهواز",
+      "gender": "مرد",
+      "age": 26,
+      "job": "تحلیلگر داده",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "deleted",
+      "verification": "rejected",
+      "joinedAt": "2026-09-08T03:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1028-REF",
+      "referredByCode": "FL-1020-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=49",
+        "https://i.pravatar.cc/480?img=64"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1029",
+      "name": "الناز موسوی",
+      "phone": "09171469809",
+      "email": "user1029@example.com",
+      "city": "تهران",
+      "gender": "زن",
+      "age": 27,
+      "job": "طراح محصول",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "deleted",
+      "verification": "verified",
+      "joinedAt": "2026-09-10T04:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1029-REF",
+      "referredByCode": null,
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=50",
+        "https://i.pravatar.cc/480?img=65"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1030",
+      "name": "مانی رضوانی",
+      "phone": "09839122770",
+      "email": "user1030@example.com",
+      "city": "اصفهان",
+      "gender": "مرد",
+      "age": 28,
+      "job": "مهندس نرم‌افزار",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "deleted",
+      "verification": "pending",
+      "joinedAt": "2026-09-12T05:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1030-REF",
+      "referredByCode": "FL-1022-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=51",
+        "https://i.pravatar.cc/480?img=66"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1031",
+      "name": "نیایش عباسی",
+      "phone": "09307241590",
+      "email": "user1031@example.com",
+      "city": "شیراز",
+      "gender": "زن",
+      "age": 29,
+      "job": "پزشک",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "deleted",
+      "verification": "not_verified",
+      "joinedAt": "2026-09-14T06:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1031-REF",
+      "referredByCode": "FL-1023-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=52",
+        "https://i.pravatar.cc/480?img=67"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1032",
+      "name": "آراد صالحی",
+      "phone": "09584522828",
+      "email": "user1032@example.com",
+      "city": "تبریز",
+      "gender": "مرد",
+      "age": 30,
+      "job": "دانشجو",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "deleted",
+      "verification": "rejected",
+      "joinedAt": "2026-09-16T07:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1032-REF",
+      "referredByCode": "FL-1024-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=53",
+        "https://i.pravatar.cc/480?img=68"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1033",
+      "name": "دلارام احمدی",
+      "phone": "09841689199",
+      "email": "user1033@example.com",
+      "city": "مشهد",
+      "gender": "زن",
+      "age": 31,
+      "job": "معمار",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "deleted",
+      "verification": "verified",
+      "joinedAt": "2026-09-18T00:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1033-REF",
+      "referredByCode": null,
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=54",
+        "https://i.pravatar.cc/480?img=69"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1034",
+      "name": "بهنام بابایی",
+      "phone": "09866712117",
+      "email": "user1034@example.com",
+      "city": "کرج",
+      "gender": "مرد",
+      "age": 32,
+      "job": "مدیر بازاریابی",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "deleted",
+      "verification": "pending",
+      "joinedAt": "2026-09-20T01:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1034-REF",
+      "referredByCode": "FL-1026-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=55",
+        "https://i.pravatar.cc/480?img=70"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1035",
+      "name": "هلیا زمانی",
+      "phone": "09181948481",
+      "email": "user1035@example.com",
+      "city": "رشت",
+      "gender": "زن",
+      "age": 33,
+      "job": "عکاس",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "deleted",
+      "verification": "not_verified",
+      "joinedAt": "2026-09-22T02:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1035-REF",
+      "referredByCode": "FL-1027-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=56",
+        "https://i.pravatar.cc/480?img=2"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1036",
+      "name": "سپهر حاتمی",
+      "phone": "09440780853",
+      "email": "user1036@example.com",
+      "city": "یزد",
+      "gender": "مرد",
+      "age": 34,
+      "job": "وکیل",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "deleted",
+      "verification": "rejected",
+      "joinedAt": "2026-09-24T03:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1036-REF",
+      "referredByCode": "FL-1028-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=57",
+        "https://i.pravatar.cc/480?img=3"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1037",
+      "name": "نگار رجبی",
+      "phone": "09263160439",
+      "email": "user1037@example.com",
+      "city": "قم",
+      "gender": "زن",
+      "age": 35,
+      "job": "مدرس",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "deleted",
+      "verification": "verified",
+      "joinedAt": "2026-09-26T04:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1037-REF",
+      "referredByCode": null,
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=58",
+        "https://i.pravatar.cc/480?img=4"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1038",
+      "name": "عرفان میرزایی",
+      "phone": "09968945075",
+      "email": "user1038@example.com",
+      "city": "اهواز",
+      "gender": "مرد",
+      "age": 36,
+      "job": "تحلیلگر داده",
+      "goal": "دوستی ساده",
+      "plan": "VIP",
+      "status": "deleted",
+      "verification": "pending",
+      "joinedAt": "2026-09-28T05:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1038-REF",
+      "referredByCode": "FL-1030-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=59",
+        "https://i.pravatar.cc/480?img=5"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    },
+    {
+      "id": "USR-1039",
+      "name": "رها اسدی",
+      "phone": "09253192145",
+      "email": "user1039@example.com",
+      "city": "تهران",
+      "gender": "زن",
+      "age": 22,
+      "job": "طراح محصول",
+      "goal": "رابطه جدی",
+      "plan": "Free",
+      "status": "deleted",
+      "verification": "not_verified",
+      "joinedAt": "2026-09-30T06:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1039-REF",
+      "referredByCode": "FL-1031-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=60",
+        "https://i.pravatar.cc/480?img=6"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "admin",
+      "deletionReason": "حذف آزمایشی توسط مدیر"
+    },
+    {
+      "id": "USR-1040",
+      "name": "طاها نوری",
+      "phone": "09247950082",
+      "email": "user1040@example.com",
+      "city": "اصفهان",
+      "gender": "مرد",
+      "age": 23,
+      "job": "مهندس نرم‌افزار",
+      "goal": "ازدواج",
+      "plan": "Pro",
+      "status": "deleted",
+      "verification": "rejected",
+      "joinedAt": "2026-10-02T07:00:00Z",
+      "lastSeenAt": "2026-11-01T12:00:00.000Z",
+      "bio": "این پروفایل برای تست امکانات پنل مدیریت ایجاد شده است.",
+      "interests": [
+        "سفر",
+        "کتاب",
+        "موسیقی"
+      ],
+      "instagram": "",
+      "photos": 2,
+      "online": false,
+      "referralCode": "FL-1040-REF",
+      "referredByCode": "FL-1032-REF",
+      "subscriptionExpiresAt": null,
+      "photoUrls": [
+        "https://i.pravatar.cc/480?img=61",
+        "https://i.pravatar.cc/480?img=7"
+      ],
+      "deletedAt": "2026-10-25T10:00:00.000Z",
+      "deletedBy": "user",
+      "deletionReason": "درخواست حذف حساب"
+    }
   ],
   "payments": [
-    {"id":"PAY-8001","userId":"USR-1001","userName":"سارا احمدی","packageId":"vip-monthly","packageTitle":"اشتراک VIP یک‌ماهه","amount":790000,"currency":"IRR","status":"success","gateway":"زرین‌پال","transactionId":"ZP-83192001","createdAt":"2026-10-28T08:30:00.000Z","description":"خرید اشتراک VIP"},
-    {"id":"PAY-8002","userId":"USR-1002","userName":"آرمان رضایی","packageId":"pro-monthly","packageTitle":"اشتراک Pro یک‌ماهه","amount":390000,"currency":"IRR","status":"success","gateway":"زرین‌پال","transactionId":"ZP-83192002","createdAt":"2026-10-27T11:15:00.000Z","description":"خرید اشتراک Pro"},
-    {"id":"PAY-8003","userId":"USR-1004","userName":"مازیار کریمی","packageId":"credit-10","packageTitle":"۱۰ اعتبار پیام","amount":220000,"currency":"IRR","status":"failed","gateway":"آیدی‌پی","transactionId":"IDP-FAIL-003","createdAt":"2026-10-26T09:12:00.000Z","description":"خرید اعتبار پیام مستقیم"},
-    {"id":"PAY-8004","userId":"USR-1005","userName":"الهام موسوی","packageId":"vip-monthly","packageTitle":"اشتراک VIP یک‌ماهه","amount":790000,"currency":"IRR","status":"success","gateway":"زرین‌پال","transactionId":"ZP-83192004","createdAt":"2026-10-25T14:00:00.000Z","description":"خرید اشتراک VIP"},
-    {"id":"PAY-8005","userId":"USR-1007","userName":"مهسا جعفری","packageId":"pro-monthly","packageTitle":"اشتراک Pro یک‌ماهه","amount":390000,"currency":"IRR","status":"pending","gateway":"زرین‌پال","transactionId":"ZP-PENDING-005","createdAt":"2026-11-01T10:10:00.000Z","description":"خرید اشتراک Pro"},
-    {"id":"PAY-8006","userId":"USR-1006","userName":"پارسا نادری","packageId":"credit-5","packageTitle":"۵ اعتبار پیام","amount":125000,"currency":"IRR","status":"success","gateway":"زیبال","transactionId":"ZB-83192006","createdAt":"2026-10-23T16:40:00.000Z","description":"خرید اعتبار پیام مستقیم"}
+    {
+      "id": "PAY-8001",
+      "userId": "USR-1001",
+      "userName": "سارا احمدی",
+      "packageId": "vip-monthly",
+      "packageTitle": "اشتراک VIP یک‌ماهه",
+      "amount": 790000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-83192001",
+      "createdAt": "2026-10-28T08:30:00.000Z",
+      "description": "خرید اشتراک VIP"
+    },
+    {
+      "id": "PAY-8002",
+      "userId": "USR-1002",
+      "userName": "آرمان رضایی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 390000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-83192002",
+      "createdAt": "2026-10-27T11:15:00.000Z",
+      "description": "خرید اشتراک Pro"
+    },
+    {
+      "id": "PAY-8003",
+      "userId": "USR-1004",
+      "userName": "مازیار کریمی",
+      "packageId": "credit-10",
+      "packageTitle": "۱۰ اعتبار پیام",
+      "amount": 220000,
+      "currency": "IRR",
+      "status": "failed",
+      "gateway": "آیدی‌پی",
+      "transactionId": "IDP-FAIL-003",
+      "createdAt": "2026-10-26T09:12:00.000Z",
+      "description": "خرید اعتبار پیام مستقیم"
+    },
+    {
+      "id": "PAY-8004",
+      "userId": "USR-1005",
+      "userName": "الهام موسوی",
+      "packageId": "vip-monthly",
+      "packageTitle": "اشتراک VIP یک‌ماهه",
+      "amount": 790000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-83192004",
+      "createdAt": "2026-10-25T14:00:00.000Z",
+      "description": "خرید اشتراک VIP"
+    },
+    {
+      "id": "PAY-8005",
+      "userId": "USR-1007",
+      "userName": "مهسا جعفری",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 390000,
+      "currency": "IRR",
+      "status": "pending",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-PENDING-005",
+      "createdAt": "2026-11-01T10:10:00.000Z",
+      "description": "خرید اشتراک Pro"
+    },
+    {
+      "id": "PAY-8006",
+      "userId": "USR-1006",
+      "userName": "پارسا نادری",
+      "packageId": "credit-5",
+      "packageTitle": "۵ اعتبار پیام",
+      "amount": 125000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زیبال",
+      "transactionId": "ZB-83192006",
+      "createdAt": "2026-10-23T16:40:00.000Z",
+      "description": "خرید اعتبار پیام مستقیم"
+    },
+    {
+      "id": "PAY-8007",
+      "userId": "USR-1007",
+      "userName": "مهسا جعفری",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 490000,
+      "currency": "IRR",
+      "status": "pending",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8007",
+      "createdAt": "2026-10-07T15:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8008",
+      "userId": "USR-1008",
+      "userName": "کیان شریفی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 540000,
+      "currency": "IRR",
+      "status": "failed",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8008",
+      "createdAt": "2026-10-08T16:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8009",
+      "userId": "USR-1009",
+      "userName": "آوا کریمی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 390000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8009",
+      "createdAt": "2026-10-09T17:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8010",
+      "userId": "USR-1010",
+      "userName": "امیرحسین رستگار",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 440000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8010",
+      "createdAt": "2026-10-10T18:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8011",
+      "userId": "USR-1011",
+      "userName": "ترانه شریفی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 490000,
+      "currency": "IRR",
+      "status": "pending",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8011",
+      "createdAt": "2026-10-11T09:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8012",
+      "userId": "USR-1012",
+      "userName": "محمد پارسا",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 540000,
+      "currency": "IRR",
+      "status": "failed",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8012",
+      "createdAt": "2026-10-12T10:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8013",
+      "userId": "USR-1013",
+      "userName": "هستی نادری",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 390000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8013",
+      "createdAt": "2026-10-13T11:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8014",
+      "userId": "USR-1014",
+      "userName": "سامان اکبری",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 440000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8014",
+      "createdAt": "2026-10-14T12:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8015",
+      "userId": "USR-1015",
+      "userName": "نازنین رفیعی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 490000,
+      "currency": "IRR",
+      "status": "pending",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8015",
+      "createdAt": "2026-10-15T13:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8016",
+      "userId": "USR-1016",
+      "userName": "بردیا سلیمانی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 540000,
+      "currency": "IRR",
+      "status": "failed",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8016",
+      "createdAt": "2026-10-16T14:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8017",
+      "userId": "USR-1017",
+      "userName": "روژان مرادی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 390000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8017",
+      "createdAt": "2026-10-17T15:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8018",
+      "userId": "USR-1018",
+      "userName": "یاسین قاسمی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 440000,
+      "currency": "IRR",
+      "status": "success",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8018",
+      "createdAt": "2026-10-18T16:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8019",
+      "userId": "USR-1019",
+      "userName": "غزل صادقی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 490000,
+      "currency": "IRR",
+      "status": "pending",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8019",
+      "createdAt": "2026-10-19T17:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    },
+    {
+      "id": "PAY-8020",
+      "userId": "USR-1020",
+      "userName": "اشکان یوسفی",
+      "packageId": "pro-monthly",
+      "packageTitle": "اشتراک Pro یک‌ماهه",
+      "amount": 540000,
+      "currency": "IRR",
+      "status": "failed",
+      "gateway": "زرین‌پال",
+      "transactionId": "ZP-TEST-8020",
+      "createdAt": "2026-10-20T18:00:00.000Z",
+      "description": "تراکنش نمونه برای تست پنل"
+    }
   ],
   "reports": [
-    {"id":"RPT-5001","reporterId":"USR-1001","reporterName":"سارا احمدی","targetId":"USR-1007","targetName":"مهسا جعفری","reason":"آزار و اذیت یا پیام نامناسب","description":"بعد از رد درخواست، پیام‌های توهین‌آمیز و مکرر ارسال شده است.","status":"pending","createdAt":"2026-11-01T09:15:00.000Z","evidenceCount":2},
-    {"id":"RPT-5002","reporterId":"USR-1006","reporterName":"پارسا نادری","targetId":"USR-1003","targetName":"نیلوفر محمدی","reason":"پروفایل جعلی / عکس دیگران","description":"به نظر می‌رسد تصاویر این پروفایل متعلق به شخص دیگری است.","status":"pending","createdAt":"2026-10-31T13:00:00.000Z","evidenceCount":1},
-    {"id":"RPT-5003","reporterId":"USR-1008","reporterName":"کیان شریفی","targetId":"USR-1007","targetName":"مهسا جعفری","reason":"اسپم یا تبلیغات","description":"ارسال لینک تبلیغاتی در چند گفت‌وگوی مختلف.","status":"approved","createdAt":"2026-10-29T17:30:00.000Z","evidenceCount":0},
-    {"id":"RPT-5004","reporterId":"USR-1004","reporterName":"مازیار کریمی","targetId":"USR-1006","targetName":"پارسا نادری","reason":"سایر موارد","description":"گزارش آزمایشی برای نمایش وضعیت رد شده.","status":"rejected","createdAt":"2026-10-27T10:00:00.000Z","evidenceCount":0}
+    {
+      "id": "RPT-5001",
+      "reporterId": "USR-1001",
+      "reporterName": "سارا احمدی",
+      "targetId": "USR-1007",
+      "targetName": "مهسا جعفری",
+      "reason": "آزار و اذیت یا پیام نامناسب",
+      "description": "بعد از رد درخواست، پیام‌های توهین‌آمیز و مکرر ارسال شده است.",
+      "status": "pending",
+      "createdAt": "2026-11-01T09:15:00.000Z",
+      "evidenceCount": 2
+    },
+    {
+      "id": "RPT-5002",
+      "reporterId": "USR-1006",
+      "reporterName": "پارسا نادری",
+      "targetId": "USR-1003",
+      "targetName": "نیلوفر محمدی",
+      "reason": "پروفایل جعلی / عکس دیگران",
+      "description": "به نظر می‌رسد تصاویر این پروفایل متعلق به شخص دیگری است.",
+      "status": "pending",
+      "createdAt": "2026-10-31T13:00:00.000Z",
+      "evidenceCount": 1
+    },
+    {
+      "id": "RPT-5003",
+      "reporterId": "USR-1008",
+      "reporterName": "کیان شریفی",
+      "targetId": "USR-1007",
+      "targetName": "مهسا جعفری",
+      "reason": "اسپم یا تبلیغات",
+      "description": "ارسال لینک تبلیغاتی در چند گفت‌وگوی مختلف.",
+      "status": "approved",
+      "createdAt": "2026-10-29T17:30:00.000Z",
+      "evidenceCount": 0
+    },
+    {
+      "id": "RPT-5004",
+      "reporterId": "USR-1004",
+      "reporterName": "مازیار کریمی",
+      "targetId": "USR-1006",
+      "targetName": "پارسا نادری",
+      "reason": "سایر موارد",
+      "description": "گزارش آزمایشی برای نمایش وضعیت رد شده.",
+      "status": "rejected",
+      "createdAt": "2026-10-27T10:00:00.000Z",
+      "evidenceCount": 0
+    },
+    {
+      "id": "RPT-5005",
+      "reporterId": "USR-1005",
+      "reporterName": "الهام موسوی",
+      "targetId": "USR-1008",
+      "targetName": "کیان شریفی",
+      "reason": "حساب جعلی",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "approved",
+      "createdAt": "2026-10-05T10:00:00.000Z",
+      "evidenceCount": 1
+    },
+    {
+      "id": "RPT-5006",
+      "reporterId": "USR-1006",
+      "reporterName": "پارسا نادری",
+      "targetId": "USR-1009",
+      "targetName": "آوا کریمی",
+      "reason": "محتوای نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "rejected",
+      "createdAt": "2026-10-06T10:00:00.000Z",
+      "evidenceCount": 2
+    },
+    {
+      "id": "RPT-5007",
+      "reporterId": "USR-1007",
+      "reporterName": "مهسا جعفری",
+      "targetId": "USR-1010",
+      "targetName": "امیرحسین رستگار",
+      "reason": "رفتار نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "pending",
+      "createdAt": "2026-10-07T10:00:00.000Z",
+      "evidenceCount": 0
+    },
+    {
+      "id": "RPT-5008",
+      "reporterId": "USR-1008",
+      "reporterName": "کیان شریفی",
+      "targetId": "USR-1011",
+      "targetName": "ترانه شریفی",
+      "reason": "حساب جعلی",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "approved",
+      "createdAt": "2026-10-08T10:00:00.000Z",
+      "evidenceCount": 1
+    },
+    {
+      "id": "RPT-5009",
+      "reporterId": "USR-1009",
+      "reporterName": "آوا کریمی",
+      "targetId": "USR-1012",
+      "targetName": "محمد پارسا",
+      "reason": "محتوای نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "rejected",
+      "createdAt": "2026-10-09T10:00:00.000Z",
+      "evidenceCount": 2
+    },
+    {
+      "id": "RPT-5010",
+      "reporterId": "USR-1010",
+      "reporterName": "امیرحسین رستگار",
+      "targetId": "USR-1013",
+      "targetName": "هستی نادری",
+      "reason": "رفتار نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "pending",
+      "createdAt": "2026-10-10T10:00:00.000Z",
+      "evidenceCount": 0
+    },
+    {
+      "id": "RPT-5011",
+      "reporterId": "USR-1011",
+      "reporterName": "ترانه شریفی",
+      "targetId": "USR-1014",
+      "targetName": "سامان اکبری",
+      "reason": "حساب جعلی",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "approved",
+      "createdAt": "2026-10-11T10:00:00.000Z",
+      "evidenceCount": 1
+    },
+    {
+      "id": "RPT-5012",
+      "reporterId": "USR-1012",
+      "reporterName": "محمد پارسا",
+      "targetId": "USR-1015",
+      "targetName": "نازنین رفیعی",
+      "reason": "محتوای نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "rejected",
+      "createdAt": "2026-10-12T10:00:00.000Z",
+      "evidenceCount": 2
+    },
+    {
+      "id": "RPT-5013",
+      "reporterId": "USR-1013",
+      "reporterName": "هستی نادری",
+      "targetId": "USR-1016",
+      "targetName": "بردیا سلیمانی",
+      "reason": "رفتار نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "pending",
+      "createdAt": "2026-10-13T10:00:00.000Z",
+      "evidenceCount": 0
+    },
+    {
+      "id": "RPT-5014",
+      "reporterId": "USR-1014",
+      "reporterName": "سامان اکبری",
+      "targetId": "USR-1017",
+      "targetName": "روژان مرادی",
+      "reason": "حساب جعلی",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "approved",
+      "createdAt": "2026-10-14T10:00:00.000Z",
+      "evidenceCount": 1
+    },
+    {
+      "id": "RPT-5015",
+      "reporterId": "USR-1015",
+      "reporterName": "نازنین رفیعی",
+      "targetId": "USR-1018",
+      "targetName": "یاسین قاسمی",
+      "reason": "محتوای نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "rejected",
+      "createdAt": "2026-10-15T10:00:00.000Z",
+      "evidenceCount": 2
+    },
+    {
+      "id": "RPT-5016",
+      "reporterId": "USR-1016",
+      "reporterName": "بردیا سلیمانی",
+      "targetId": "USR-1019",
+      "targetName": "غزل صادقی",
+      "reason": "رفتار نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "pending",
+      "createdAt": "2026-10-16T10:00:00.000Z",
+      "evidenceCount": 0
+    },
+    {
+      "id": "RPT-5017",
+      "reporterId": "USR-1017",
+      "reporterName": "روژان مرادی",
+      "targetId": "USR-1020",
+      "targetName": "اشکان یوسفی",
+      "reason": "حساب جعلی",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "approved",
+      "createdAt": "2026-10-17T10:00:00.000Z",
+      "evidenceCount": 1
+    },
+    {
+      "id": "RPT-5018",
+      "reporterId": "USR-1018",
+      "reporterName": "یاسین قاسمی",
+      "targetId": "USR-1021",
+      "targetName": "ملیکا حیدری",
+      "reason": "محتوای نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "rejected",
+      "createdAt": "2026-10-18T10:00:00.000Z",
+      "evidenceCount": 2
+    },
+    {
+      "id": "RPT-5019",
+      "reporterId": "USR-1019",
+      "reporterName": "غزل صادقی",
+      "targetId": "USR-1001",
+      "targetName": "سارا احمدی",
+      "reason": "رفتار نامناسب",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "pending",
+      "createdAt": "2026-10-19T10:00:00.000Z",
+      "evidenceCount": 0
+    },
+    {
+      "id": "RPT-5020",
+      "reporterId": "USR-1020",
+      "reporterName": "اشکان یوسفی",
+      "targetId": "USR-1002",
+      "targetName": "آرمان رضایی",
+      "reason": "حساب جعلی",
+      "description": "گزارش آزمایشی برای بررسی گردش کار مدیر.",
+      "status": "approved",
+      "createdAt": "2026-10-20T10:00:00.000Z",
+      "evidenceCount": 1
+    }
   ],
   "verifications": [
-    {"id":"VER-3001","userId":"USR-1002","userName":"آرمان رضایی","submittedAt":"2026-10-31T10:00:00.000Z","status":"pending","videoLabel":"ویدیوی احراز هویت ۱","durationSeconds":12,"prompt":"امروز چه تاریخی است و نام کاربری شما چیست؟","notes":"ویدیو در محیط خصوصی ذخیره شده است؛ نسخه دمو فقط فراداده را نمایش می‌دهد."},
-    {"id":"VER-3002","userId":"USR-1005","userName":"الهام موسوی","submittedAt":"2026-10-30T08:45:00.000Z","status":"pending","videoLabel":"ویدیوی احراز هویت ۲","durationSeconds":8,"prompt":"نام کاربری و عبارت نمایش‌داده‌شده را بیان کنید.","notes":"فایل ویدیویی واقعی در دیتاست نمونه وجود ندارد."},
-    {"id":"VER-3003","userId":"USR-1003","userName":"نیلوفر محمدی","submittedAt":"2026-10-20T08:00:00.000Z","status":"rejected","durationSeconds":3,"videoLabel":"ویدیوی احراز هویت قبلی","prompt":"","reviewReason":"مدت ویدیو برای بررسی کافی نبود."}
+    {
+      "id": "VER-3001",
+      "userId": "USR-1002",
+      "userName": "آرمان رضایی",
+      "submittedAt": "2026-10-31T10:00:00.000Z",
+      "status": "pending",
+      "videoLabel": "ویدیوی احراز هویت ۱",
+      "durationSeconds": 12,
+      "prompt": "امروز چه تاریخی است و نام کاربری شما چیست؟",
+      "notes": "ویدیو در محیط خصوصی ذخیره شده است؛ نسخه دمو فقط فراداده را نمایش می‌دهد."
+    },
+    {
+      "id": "VER-3002",
+      "userId": "USR-1005",
+      "userName": "الهام موسوی",
+      "submittedAt": "2026-10-30T08:45:00.000Z",
+      "status": "pending",
+      "videoLabel": "ویدیوی احراز هویت ۲",
+      "durationSeconds": 8,
+      "prompt": "نام کاربری و عبارت نمایش‌داده‌شده را بیان کنید.",
+      "notes": "فایل ویدیویی واقعی در دیتاست نمونه وجود ندارد."
+    },
+    {
+      "id": "VER-3003",
+      "userId": "USR-1003",
+      "userName": "نیلوفر محمدی",
+      "submittedAt": "2026-10-20T08:00:00.000Z",
+      "status": "rejected",
+      "durationSeconds": 3,
+      "videoLabel": "ویدیوی احراز هویت قبلی",
+      "prompt": "",
+      "reviewReason": "مدت ویدیو برای بررسی کافی نبود."
+    },
+    {
+      "id": "VER-3004",
+      "userId": "USR-1004",
+      "userName": "مازیار کریمی",
+      "submittedAt": "2026-10-04T11:00:00.000Z",
+      "status": "pending",
+      "videoLabel": "ویدیوی تست 4",
+      "durationSeconds": 13,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3005",
+      "userId": "USR-1005",
+      "userName": "الهام موسوی",
+      "submittedAt": "2026-10-05T11:00:00.000Z",
+      "status": "verified",
+      "videoLabel": "ویدیوی تست 5",
+      "durationSeconds": 14,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3006",
+      "userId": "USR-1006",
+      "userName": "پارسا نادری",
+      "submittedAt": "2026-10-06T11:00:00.000Z",
+      "status": "rejected",
+      "videoLabel": "ویدیوی تست 6",
+      "durationSeconds": 15,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3007",
+      "userId": "USR-1007",
+      "userName": "مهسا جعفری",
+      "submittedAt": "2026-10-07T11:00:00.000Z",
+      "status": "pending",
+      "videoLabel": "ویدیوی تست 7",
+      "durationSeconds": 16,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3008",
+      "userId": "USR-1008",
+      "userName": "کیان شریفی",
+      "submittedAt": "2026-10-08T11:00:00.000Z",
+      "status": "verified",
+      "videoLabel": "ویدیوی تست 8",
+      "durationSeconds": 17,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3009",
+      "userId": "USR-1009",
+      "userName": "آوا کریمی",
+      "submittedAt": "2026-10-09T11:00:00.000Z",
+      "status": "rejected",
+      "videoLabel": "ویدیوی تست 9",
+      "durationSeconds": 18,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3010",
+      "userId": "USR-1010",
+      "userName": "امیرحسین رستگار",
+      "submittedAt": "2026-10-10T11:00:00.000Z",
+      "status": "pending",
+      "videoLabel": "ویدیوی تست 10",
+      "durationSeconds": 19,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3011",
+      "userId": "USR-1011",
+      "userName": "ترانه شریفی",
+      "submittedAt": "2026-10-11T11:00:00.000Z",
+      "status": "verified",
+      "videoLabel": "ویدیوی تست 11",
+      "durationSeconds": 20,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3012",
+      "userId": "USR-1012",
+      "userName": "محمد پارسا",
+      "submittedAt": "2026-10-12T11:00:00.000Z",
+      "status": "rejected",
+      "videoLabel": "ویدیوی تست 12",
+      "durationSeconds": 21,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3013",
+      "userId": "USR-1013",
+      "userName": "هستی نادری",
+      "submittedAt": "2026-10-13T11:00:00.000Z",
+      "status": "pending",
+      "videoLabel": "ویدیوی تست 13",
+      "durationSeconds": 22,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3014",
+      "userId": "USR-1014",
+      "userName": "سامان اکبری",
+      "submittedAt": "2026-10-14T11:00:00.000Z",
+      "status": "verified",
+      "videoLabel": "ویدیوی تست 14",
+      "durationSeconds": 23,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3015",
+      "userId": "USR-1015",
+      "userName": "نازنین رفیعی",
+      "submittedAt": "2026-10-15T11:00:00.000Z",
+      "status": "rejected",
+      "videoLabel": "ویدیوی تست 15",
+      "durationSeconds": 24,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3016",
+      "userId": "USR-1016",
+      "userName": "بردیا سلیمانی",
+      "submittedAt": "2026-10-16T11:00:00.000Z",
+      "status": "pending",
+      "videoLabel": "ویدیوی تست 16",
+      "durationSeconds": 10,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3017",
+      "userId": "USR-1017",
+      "userName": "روژان مرادی",
+      "submittedAt": "2026-10-17T11:00:00.000Z",
+      "status": "verified",
+      "videoLabel": "ویدیوی تست 17",
+      "durationSeconds": 11,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3018",
+      "userId": "USR-1018",
+      "userName": "یاسین قاسمی",
+      "submittedAt": "2026-10-18T11:00:00.000Z",
+      "status": "rejected",
+      "videoLabel": "ویدیوی تست 18",
+      "durationSeconds": 12,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3019",
+      "userId": "USR-1019",
+      "userName": "غزل صادقی",
+      "submittedAt": "2026-10-19T11:00:00.000Z",
+      "status": "pending",
+      "videoLabel": "ویدیوی تست 19",
+      "durationSeconds": 13,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    },
+    {
+      "id": "VER-3020",
+      "userId": "USR-1020",
+      "userName": "اشکان یوسفی",
+      "submittedAt": "2026-10-20T11:00:00.000Z",
+      "status": "verified",
+      "videoLabel": "ویدیوی تست 20",
+      "durationSeconds": 14,
+      "prompt": "معرفی کوتاه برای احراز هویت",
+      "notes": "فراداده نمونه؛ ویدیوی واقعی ذخیره نشده است."
+    }
   ],
   "tickets": [
-    {"id":"TKT-2001","userId":"USR-1001","userName":"سارا احمدی","category":"اشتراک و پرداخت","subject":"مشکل در فعال‌سازی اشتراک VIP","status":"open","priority":"high","createdAt":"2026-10-30T11:20:00.000Z","updatedAt":"2026-11-01T12:10:00.000Z","messages":[{"id":"MSG-1","author":"user","authorName":"سارا احمدی","text":"هزینه اشتراک از حسابم کسر شده اما امکانات VIP فعال نشده است.","createdAt":"2026-10-30T11:20:00.000Z"},{"id":"MSG-2","author":"admin","authorName":"پشتیبانی FastLove","text":"سلام، پرداخت شما را بررسی می‌کنیم. لطفاً شناسه تراکنش را ارسال کنید.","createdAt":"2026-10-30T12:00:00.000Z"},{"id":"MSG-3","author":"user","authorName":"سارا احمدی","text":"شناسه تراکنش ZP-83192001 است.","createdAt":"2026-11-01T12:10:00.000Z"}],"history":[{"action":"تیکت ثبت شد","actor":"کاربر"},{"action":"پاسخ مدیر ثبت شد","actor":"پشتیبانی"}]},
-    {"id":"TKT-2002","userId":"USR-1002","userName":"آرمان رضایی","category":"پروفایل و احراز هویت","subject":"وضعیت تأیید ویدئویی","status":"open","priority":"normal","createdAt":"2026-10-29T09:10:00.000Z","updatedAt":"2026-10-29T09:10:00.000Z","messages":[{"id":"MSG-4","author":"user","authorName":"آرمان رضایی","text":"ویدیوی من چند روز است در انتظار بررسی مانده. لطفاً وضعیت را اعلام کنید.","createdAt":"2026-10-29T09:10:00.000Z"}],"history":[{"action":"تیکت ثبت شد","actor":"کاربر"}]},
-    {"id":"TKT-2003","userId":"USR-1006","userName":"پارسا نادری","category":"مشکل فنی و خطا","subject":"باز نشدن صفحه گفتگو","status":"closed","priority":"low","createdAt":"2026-10-25T16:00:00.000Z","updatedAt":"2026-10-26T08:30:00.000Z","messages":[{"id":"MSG-5","author":"user","authorName":"پارسا نادری","text":"صفحه چت باز نمی‌شود.","createdAt":"2026-10-25T16:00:00.000Z"},{"id":"MSG-6","author":"admin","authorName":"پشتیبانی FastLove","text":"با به‌روزرسانی نسخه مشکل برطرف می‌شود.","createdAt":"2026-10-26T08:00:00.000Z"}],"history":[{"action":"تیکت بسته شد","actor":"پشتیبانی"}]}
+    {
+      "id": "TKT-2001",
+      "userId": "USR-1001",
+      "userName": "سارا احمدی",
+      "category": "اشتراک و پرداخت",
+      "subject": "مشکل در فعال‌سازی اشتراک VIP",
+      "status": "open",
+      "priority": "high",
+      "createdAt": "2026-10-30T11:20:00.000Z",
+      "updatedAt": "2026-11-01T12:10:00.000Z",
+      "messages": [
+        {
+          "id": "MSG-1",
+          "author": "user",
+          "authorName": "سارا احمدی",
+          "text": "هزینه اشتراک از حسابم کسر شده اما امکانات VIP فعال نشده است.",
+          "createdAt": "2026-10-30T11:20:00.000Z"
+        },
+        {
+          "id": "MSG-2",
+          "author": "admin",
+          "authorName": "پشتیبانی FastLove",
+          "text": "سلام، پرداخت شما را بررسی می‌کنیم. لطفاً شناسه تراکنش را ارسال کنید.",
+          "createdAt": "2026-10-30T12:00:00.000Z"
+        },
+        {
+          "id": "MSG-3",
+          "author": "user",
+          "authorName": "سارا احمدی",
+          "text": "شناسه تراکنش ZP-83192001 است.",
+          "createdAt": "2026-11-01T12:10:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر"
+        },
+        {
+          "action": "پاسخ مدیر ثبت شد",
+          "actor": "پشتیبانی"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2002",
+      "userId": "USR-1002",
+      "userName": "آرمان رضایی",
+      "category": "پروفایل و احراز هویت",
+      "subject": "وضعیت تأیید ویدئویی",
+      "status": "open",
+      "priority": "normal",
+      "createdAt": "2026-10-29T09:10:00.000Z",
+      "updatedAt": "2026-10-29T09:10:00.000Z",
+      "messages": [
+        {
+          "id": "MSG-4",
+          "author": "user",
+          "authorName": "آرمان رضایی",
+          "text": "ویدیوی من چند روز است در انتظار بررسی مانده. لطفاً وضعیت را اعلام کنید.",
+          "createdAt": "2026-10-29T09:10:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2003",
+      "userId": "USR-1006",
+      "userName": "پارسا نادری",
+      "category": "مشکل فنی و خطا",
+      "subject": "باز نشدن صفحه گفتگو",
+      "status": "closed",
+      "priority": "low",
+      "createdAt": "2026-10-25T16:00:00.000Z",
+      "updatedAt": "2026-10-26T08:30:00.000Z",
+      "messages": [
+        {
+          "id": "MSG-5",
+          "author": "user",
+          "authorName": "پارسا نادری",
+          "text": "صفحه چت باز نمی‌شود.",
+          "createdAt": "2026-10-25T16:00:00.000Z"
+        },
+        {
+          "id": "MSG-6",
+          "author": "admin",
+          "authorName": "پشتیبانی FastLove",
+          "text": "با به‌روزرسانی نسخه مشکل برطرف می‌شود.",
+          "createdAt": "2026-10-26T08:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت بسته شد",
+          "actor": "پشتیبانی"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2004",
+      "userId": "USR-1004",
+      "userName": "مازیار کریمی",
+      "category": "اشتراک و پرداخت",
+      "subject": "پرسش درباره اشتراک",
+      "status": "open",
+      "priority": "normal",
+      "createdAt": "2026-10-04T12:00:00.000Z",
+      "updatedAt": "2026-10-04T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-3-1",
+          "author": "user",
+          "authorName": "مازیار کریمی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-04T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-04T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2005",
+      "userId": "USR-1005",
+      "userName": "الهام موسوی",
+      "category": "حساب کاربری",
+      "subject": "مشکل ورود به حساب",
+      "status": "closed",
+      "priority": "high",
+      "createdAt": "2026-10-05T12:00:00.000Z",
+      "updatedAt": "2026-10-05T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-4-1",
+          "author": "user",
+          "authorName": "الهام موسوی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-05T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-05T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2006",
+      "userId": "USR-1006",
+      "userName": "پارسا نادری",
+      "category": "گزارش مشکل فنی",
+      "subject": "درخواست راهنمایی",
+      "status": "open",
+      "priority": "low",
+      "createdAt": "2026-10-06T12:00:00.000Z",
+      "updatedAt": "2026-10-06T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-5-1",
+          "author": "user",
+          "authorName": "پارسا نادری",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-06T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-06T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2007",
+      "userId": "USR-1007",
+      "userName": "مهسا جعفری",
+      "category": "اشتراک و پرداخت",
+      "subject": "پرسش درباره اشتراک",
+      "status": "open",
+      "priority": "normal",
+      "createdAt": "2026-10-07T12:00:00.000Z",
+      "updatedAt": "2026-10-07T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-6-1",
+          "author": "user",
+          "authorName": "مهسا جعفری",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-07T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-07T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2008",
+      "userId": "USR-1008",
+      "userName": "کیان شریفی",
+      "category": "حساب کاربری",
+      "subject": "مشکل ورود به حساب",
+      "status": "closed",
+      "priority": "high",
+      "createdAt": "2026-10-08T12:00:00.000Z",
+      "updatedAt": "2026-10-08T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-7-1",
+          "author": "user",
+          "authorName": "کیان شریفی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-08T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-08T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2009",
+      "userId": "USR-1009",
+      "userName": "آوا کریمی",
+      "category": "گزارش مشکل فنی",
+      "subject": "درخواست راهنمایی",
+      "status": "open",
+      "priority": "low",
+      "createdAt": "2026-10-09T12:00:00.000Z",
+      "updatedAt": "2026-10-09T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-8-1",
+          "author": "user",
+          "authorName": "آوا کریمی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-09T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-09T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2010",
+      "userId": "USR-1010",
+      "userName": "امیرحسین رستگار",
+      "category": "اشتراک و پرداخت",
+      "subject": "پرسش درباره اشتراک",
+      "status": "open",
+      "priority": "normal",
+      "createdAt": "2026-10-10T12:00:00.000Z",
+      "updatedAt": "2026-10-10T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-9-1",
+          "author": "user",
+          "authorName": "امیرحسین رستگار",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-10T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-10T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2011",
+      "userId": "USR-1011",
+      "userName": "ترانه شریفی",
+      "category": "حساب کاربری",
+      "subject": "مشکل ورود به حساب",
+      "status": "closed",
+      "priority": "high",
+      "createdAt": "2026-10-11T12:00:00.000Z",
+      "updatedAt": "2026-10-11T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-10-1",
+          "author": "user",
+          "authorName": "ترانه شریفی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-11T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-11T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2012",
+      "userId": "USR-1012",
+      "userName": "محمد پارسا",
+      "category": "گزارش مشکل فنی",
+      "subject": "درخواست راهنمایی",
+      "status": "open",
+      "priority": "low",
+      "createdAt": "2026-10-12T12:00:00.000Z",
+      "updatedAt": "2026-10-12T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-11-1",
+          "author": "user",
+          "authorName": "محمد پارسا",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-12T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-12T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2013",
+      "userId": "USR-1013",
+      "userName": "هستی نادری",
+      "category": "اشتراک و پرداخت",
+      "subject": "پرسش درباره اشتراک",
+      "status": "open",
+      "priority": "normal",
+      "createdAt": "2026-10-13T12:00:00.000Z",
+      "updatedAt": "2026-10-13T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-12-1",
+          "author": "user",
+          "authorName": "هستی نادری",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-13T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-13T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2014",
+      "userId": "USR-1014",
+      "userName": "سامان اکبری",
+      "category": "حساب کاربری",
+      "subject": "مشکل ورود به حساب",
+      "status": "closed",
+      "priority": "high",
+      "createdAt": "2026-10-14T12:00:00.000Z",
+      "updatedAt": "2026-10-14T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-13-1",
+          "author": "user",
+          "authorName": "سامان اکبری",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-14T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-14T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2015",
+      "userId": "USR-1015",
+      "userName": "نازنین رفیعی",
+      "category": "گزارش مشکل فنی",
+      "subject": "درخواست راهنمایی",
+      "status": "open",
+      "priority": "low",
+      "createdAt": "2026-10-15T12:00:00.000Z",
+      "updatedAt": "2026-10-15T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-14-1",
+          "author": "user",
+          "authorName": "نازنین رفیعی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-15T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-15T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2016",
+      "userId": "USR-1016",
+      "userName": "بردیا سلیمانی",
+      "category": "اشتراک و پرداخت",
+      "subject": "پرسش درباره اشتراک",
+      "status": "open",
+      "priority": "normal",
+      "createdAt": "2026-10-16T12:00:00.000Z",
+      "updatedAt": "2026-10-16T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-15-1",
+          "author": "user",
+          "authorName": "بردیا سلیمانی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-16T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-16T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2017",
+      "userId": "USR-1017",
+      "userName": "روژان مرادی",
+      "category": "حساب کاربری",
+      "subject": "مشکل ورود به حساب",
+      "status": "closed",
+      "priority": "high",
+      "createdAt": "2026-10-17T12:00:00.000Z",
+      "updatedAt": "2026-10-17T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-16-1",
+          "author": "user",
+          "authorName": "روژان مرادی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-17T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-17T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2018",
+      "userId": "USR-1018",
+      "userName": "یاسین قاسمی",
+      "category": "گزارش مشکل فنی",
+      "subject": "درخواست راهنمایی",
+      "status": "open",
+      "priority": "low",
+      "createdAt": "2026-10-18T12:00:00.000Z",
+      "updatedAt": "2026-10-18T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-17-1",
+          "author": "user",
+          "authorName": "یاسین قاسمی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-18T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-18T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2019",
+      "userId": "USR-1019",
+      "userName": "غزل صادقی",
+      "category": "اشتراک و پرداخت",
+      "subject": "پرسش درباره اشتراک",
+      "status": "open",
+      "priority": "normal",
+      "createdAt": "2026-10-19T12:00:00.000Z",
+      "updatedAt": "2026-10-19T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-18-1",
+          "author": "user",
+          "authorName": "غزل صادقی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-19T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-19T12:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "TKT-2020",
+      "userId": "USR-1020",
+      "userName": "اشکان یوسفی",
+      "category": "حساب کاربری",
+      "subject": "مشکل ورود به حساب",
+      "status": "closed",
+      "priority": "high",
+      "createdAt": "2026-10-20T12:00:00.000Z",
+      "updatedAt": "2026-10-20T12:00:00.000Z",
+      "messages": [
+        {
+          "id": "TMSG-19-1",
+          "author": "user",
+          "authorName": "اشکان یوسفی",
+          "text": "این یک تیکت آزمایشی برای تست پنل است.",
+          "createdAt": "2026-10-20T12:00:00.000Z"
+        }
+      ],
+      "history": [
+        {
+          "action": "تیکت ثبت شد",
+          "actor": "کاربر",
+          "createdAt": "2026-10-20T12:00:00.000Z"
+        }
+      ]
+    }
   ],
   "likes": [
-    {"id":"LIK-1","fromId":"USR-1001","fromName":"سارا احمدی","toId":"USR-1004","toName":"مازیار کریمی","createdAt":"2026-10-31T14:20:00.000Z","type":"outgoing"},
-    {"id":"LIK-2","fromId":"USR-1002","fromName":"آرمان رضایی","toId":"USR-1005","toName":"الهام موسوی","createdAt":"2026-10-31T12:40:00.000Z","type":"incoming"},
-    {"id":"LIK-3","fromId":"USR-1006","fromName":"پارسا نادری","toId":"USR-1001","toName":"سارا احمدی","createdAt":"2026-10-30T18:00:00.000Z","type":"outgoing"},
-    {"id":"LIK-4","fromId":"USR-1008","fromName":"کیان شریفی","toId":"USR-1003","toName":"نیلوفر محمدی","createdAt":"2026-10-30T08:25:00.000Z","type":"incoming"},
-    {"id":"LIK-5","fromId":"USR-1004","fromName":"مازیار کریمی","toId":"USR-1001","toName":"سارا احمدی","createdAt":"2026-10-29T20:10:00.000Z","type":"outgoing"}
+    {
+      "id": "LIK-1",
+      "fromId": "USR-1001",
+      "fromName": "سارا احمدی",
+      "toId": "USR-1004",
+      "toName": "مازیار کریمی",
+      "createdAt": "2026-10-31T14:20:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-2",
+      "fromId": "USR-1002",
+      "fromName": "آرمان رضایی",
+      "toId": "USR-1005",
+      "toName": "الهام موسوی",
+      "createdAt": "2026-10-31T12:40:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-3",
+      "fromId": "USR-1006",
+      "fromName": "پارسا نادری",
+      "toId": "USR-1001",
+      "toName": "سارا احمدی",
+      "createdAt": "2026-10-30T18:00:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-4",
+      "fromId": "USR-1008",
+      "fromName": "کیان شریفی",
+      "toId": "USR-1003",
+      "toName": "نیلوفر محمدی",
+      "createdAt": "2026-10-30T08:25:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-5",
+      "fromId": "USR-1004",
+      "fromName": "مازیار کریمی",
+      "toId": "USR-1001",
+      "toName": "سارا احمدی",
+      "createdAt": "2026-10-29T20:10:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-6",
+      "fromId": "USR-1006",
+      "fromName": "پارسا نادری",
+      "toId": "USR-1007",
+      "toName": "مهسا جعفری",
+      "createdAt": "2026-10-06T13:00:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-7",
+      "fromId": "USR-1007",
+      "fromName": "مهسا جعفری",
+      "toId": "USR-1008",
+      "toName": "کیان شریفی",
+      "createdAt": "2026-10-07T13:00:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-8",
+      "fromId": "USR-1008",
+      "fromName": "کیان شریفی",
+      "toId": "USR-1009",
+      "toName": "آوا کریمی",
+      "createdAt": "2026-10-08T13:00:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-9",
+      "fromId": "USR-1009",
+      "fromName": "آوا کریمی",
+      "toId": "USR-1010",
+      "toName": "امیرحسین رستگار",
+      "createdAt": "2026-10-09T13:00:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-10",
+      "fromId": "USR-1010",
+      "fromName": "امیرحسین رستگار",
+      "toId": "USR-1011",
+      "toName": "ترانه شریفی",
+      "createdAt": "2026-10-10T13:00:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-11",
+      "fromId": "USR-1011",
+      "fromName": "ترانه شریفی",
+      "toId": "USR-1012",
+      "toName": "محمد پارسا",
+      "createdAt": "2026-10-11T13:00:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-12",
+      "fromId": "USR-1012",
+      "fromName": "محمد پارسا",
+      "toId": "USR-1013",
+      "toName": "هستی نادری",
+      "createdAt": "2026-10-12T13:00:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-13",
+      "fromId": "USR-1013",
+      "fromName": "هستی نادری",
+      "toId": "USR-1014",
+      "toName": "سامان اکبری",
+      "createdAt": "2026-10-13T13:00:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-14",
+      "fromId": "USR-1014",
+      "fromName": "سامان اکبری",
+      "toId": "USR-1015",
+      "toName": "نازنین رفیعی",
+      "createdAt": "2026-10-14T13:00:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-15",
+      "fromId": "USR-1015",
+      "fromName": "نازنین رفیعی",
+      "toId": "USR-1016",
+      "toName": "بردیا سلیمانی",
+      "createdAt": "2026-10-15T13:00:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-16",
+      "fromId": "USR-1016",
+      "fromName": "بردیا سلیمانی",
+      "toId": "USR-1017",
+      "toName": "روژان مرادی",
+      "createdAt": "2026-10-16T13:00:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-17",
+      "fromId": "USR-1017",
+      "fromName": "روژان مرادی",
+      "toId": "USR-1018",
+      "toName": "یاسین قاسمی",
+      "createdAt": "2026-10-17T13:00:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-18",
+      "fromId": "USR-1018",
+      "fromName": "یاسین قاسمی",
+      "toId": "USR-1019",
+      "toName": "غزل صادقی",
+      "createdAt": "2026-10-18T13:00:00.000Z",
+      "type": "outgoing"
+    },
+    {
+      "id": "LIK-19",
+      "fromId": "USR-1019",
+      "fromName": "غزل صادقی",
+      "toId": "USR-1020",
+      "toName": "اشکان یوسفی",
+      "createdAt": "2026-10-19T13:00:00.000Z",
+      "type": "incoming"
+    },
+    {
+      "id": "LIK-20",
+      "fromId": "USR-1020",
+      "fromName": "اشکان یوسفی",
+      "toId": "USR-1021",
+      "toName": "ملیکا حیدری",
+      "createdAt": "2026-10-20T13:00:00.000Z",
+      "type": "outgoing"
+    }
   ],
   "matches": [
-    {"id":"MAT-1","userAId":"USR-1001","userAName":"سارا احمدی","userBId":"USR-1004","userBName":"مازیار کریمی","createdAt":"2026-10-30T13:15:00.000Z","status":"active"},
-    {"id":"MAT-2","userAId":"USR-1002","userAName":"آرمان رضایی","userBId":"USR-1005","userBName":"الهام موسوی","createdAt":"2026-10-28T19:00:00.000Z","status":"active"},
-    {"id":"MAT-3","userAId":"USR-1006","userAName":"پارسا نادری","userBId":"USR-1008","userBName":"کیان شریفی","createdAt":"2026-10-25T09:40:00.000Z","status":"ended"}
+    {
+      "id": "MAT-1",
+      "userAId": "USR-1001",
+      "userAName": "سارا احمدی",
+      "userBId": "USR-1004",
+      "userBName": "مازیار کریمی",
+      "createdAt": "2026-10-30T13:15:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-2",
+      "userAId": "USR-1002",
+      "userAName": "آرمان رضایی",
+      "userBId": "USR-1005",
+      "userBName": "الهام موسوی",
+      "createdAt": "2026-10-28T19:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-3",
+      "userAId": "USR-1006",
+      "userAName": "پارسا نادری",
+      "userBId": "USR-1008",
+      "userBName": "کیان شریفی",
+      "createdAt": "2026-10-25T09:40:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-4",
+      "userAId": "USR-1004",
+      "userAName": "مازیار کریمی",
+      "userBId": "USR-1006",
+      "userBName": "پارسا نادری",
+      "createdAt": "2026-10-04T14:00:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-5",
+      "userAId": "USR-1005",
+      "userAName": "الهام موسوی",
+      "userBId": "USR-1007",
+      "userBName": "مهسا جعفری",
+      "createdAt": "2026-10-05T14:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-6",
+      "userAId": "USR-1006",
+      "userAName": "پارسا نادری",
+      "userBId": "USR-1008",
+      "userBName": "کیان شریفی",
+      "createdAt": "2026-10-06T14:00:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-7",
+      "userAId": "USR-1007",
+      "userAName": "مهسا جعفری",
+      "userBId": "USR-1009",
+      "userBName": "آوا کریمی",
+      "createdAt": "2026-10-07T14:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-8",
+      "userAId": "USR-1008",
+      "userAName": "کیان شریفی",
+      "userBId": "USR-1010",
+      "userBName": "امیرحسین رستگار",
+      "createdAt": "2026-10-08T14:00:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-9",
+      "userAId": "USR-1009",
+      "userAName": "آوا کریمی",
+      "userBId": "USR-1011",
+      "userBName": "ترانه شریفی",
+      "createdAt": "2026-10-09T14:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-10",
+      "userAId": "USR-1010",
+      "userAName": "امیرحسین رستگار",
+      "userBId": "USR-1012",
+      "userBName": "محمد پارسا",
+      "createdAt": "2026-10-10T14:00:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-11",
+      "userAId": "USR-1011",
+      "userAName": "ترانه شریفی",
+      "userBId": "USR-1013",
+      "userBName": "هستی نادری",
+      "createdAt": "2026-10-11T14:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-12",
+      "userAId": "USR-1012",
+      "userAName": "محمد پارسا",
+      "userBId": "USR-1014",
+      "userBName": "سامان اکبری",
+      "createdAt": "2026-10-12T14:00:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-13",
+      "userAId": "USR-1013",
+      "userAName": "هستی نادری",
+      "userBId": "USR-1015",
+      "userBName": "نازنین رفیعی",
+      "createdAt": "2026-10-13T14:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-14",
+      "userAId": "USR-1014",
+      "userAName": "سامان اکبری",
+      "userBId": "USR-1016",
+      "userBName": "بردیا سلیمانی",
+      "createdAt": "2026-10-14T14:00:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-15",
+      "userAId": "USR-1015",
+      "userAName": "نازنین رفیعی",
+      "userBId": "USR-1017",
+      "userBName": "روژان مرادی",
+      "createdAt": "2026-10-15T14:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-16",
+      "userAId": "USR-1016",
+      "userAName": "بردیا سلیمانی",
+      "userBId": "USR-1018",
+      "userBName": "یاسین قاسمی",
+      "createdAt": "2026-10-16T14:00:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-17",
+      "userAId": "USR-1017",
+      "userAName": "روژان مرادی",
+      "userBId": "USR-1019",
+      "userBName": "غزل صادقی",
+      "createdAt": "2026-10-17T14:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-18",
+      "userAId": "USR-1018",
+      "userAName": "یاسین قاسمی",
+      "userBId": "USR-1020",
+      "userBName": "اشکان یوسفی",
+      "createdAt": "2026-10-18T14:00:00.000Z",
+      "status": "ended"
+    },
+    {
+      "id": "MAT-19",
+      "userAId": "USR-1019",
+      "userAName": "غزل صادقی",
+      "userBId": "USR-1021",
+      "userBName": "ملیکا حیدری",
+      "createdAt": "2026-10-19T14:00:00.000Z",
+      "status": "active"
+    },
+    {
+      "id": "MAT-20",
+      "userAId": "USR-1020",
+      "userAName": "اشکان یوسفی",
+      "userBId": "USR-1001",
+      "userBName": "سارا احمدی",
+      "createdAt": "2026-10-20T14:00:00.000Z",
+      "status": "ended"
+    }
   ],
   "dates": [
-    {"id":"DAT-1","userAId":"USR-1001","userAName":"سارا احمدی","userBId":"USR-1004","userBName":"مازیار کریمی","place":"کافه ویونا، تهران","scheduledAt":"2026-11-03T16:00:00.000Z","status":"accepted","createdAt":"2026-10-30T13:30:00.000Z"},
-    {"id":"DAT-2","userAId":"USR-1002","userAName":"آرمان رضایی","userBId":"USR-1005","userBName":"الهام موسوی","place":"کافه عمارت، تبریز","scheduledAt":"2026-11-05T17:30:00.000Z","status":"pending","createdAt":"2026-10-31T11:00:00.000Z"},
-    {"id":"DAT-3","userAId":"USR-1006","userAName":"پارسا نادری","userBId":"USR-1008","userBName":"کیان شریفی","place":"پارک ملت، مشهد","scheduledAt":"2026-10-28T15:00:00.000Z","status":"completed","createdAt":"2026-10-25T10:00:00.000Z"}
+    {
+      "id": "DAT-1",
+      "userAId": "USR-1001",
+      "userAName": "سارا احمدی",
+      "userBId": "USR-1004",
+      "userBName": "مازیار کریمی",
+      "place": "کافه ویونا، تهران",
+      "scheduledAt": "2026-11-03T16:00:00.000Z",
+      "status": "accepted",
+      "createdAt": "2026-10-30T13:30:00.000Z",
+      "location": {
+        "name": "کافه ویونا",
+        "address": "تهران، خیابان ولیعصر، بالاتر از پارک ساعی، پلاک ۲۴۰",
+        "latitude": 35.7219,
+        "longitude": 51.4072,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت نمونه جهت نمایش در پنل؛ پیش از قرار با کاربران تأیید شود."
+      }
+    },
+    {
+      "id": "DAT-2",
+      "userAId": "USR-1002",
+      "userAName": "آرمان رضایی",
+      "userBId": "USR-1005",
+      "userBName": "الهام موسوی",
+      "place": "کافه عمارت، تبریز",
+      "scheduledAt": "2026-11-05T17:30:00.000Z",
+      "status": "pending",
+      "createdAt": "2026-10-31T11:00:00.000Z",
+      "location": {
+        "name": "کافه عمارت",
+        "address": "تبریز، خیابان امام، کوچه عمارت",
+        "latitude": 38.08,
+        "longitude": 46.291,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت نمونه جهت نمایش در پنل؛ پیش از قرار با کاربران تأیید شود."
+      }
+    },
+    {
+      "id": "DAT-3",
+      "userAId": "USR-1006",
+      "userAName": "پارسا نادری",
+      "userBId": "USR-1008",
+      "userBName": "کیان شریفی",
+      "place": "پارک ملت، مشهد",
+      "scheduledAt": "2026-10-28T15:00:00.000Z",
+      "status": "completed",
+      "createdAt": "2026-10-25T10:00:00.000Z",
+      "location": {
+        "name": "پارک ملت",
+        "address": "مشهد، بلوار وکیل‌آباد، ورودی اصلی",
+        "latitude": 36.314,
+        "longitude": 59.538,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت نمونه جهت نمایش در پنل؛ پیش از قرار با کاربران تأیید شود."
+      }
+    },
+    {
+      "id": "DAT-4",
+      "userAId": "USR-1004",
+      "userAName": "مازیار کریمی",
+      "userBId": "USR-1008",
+      "userBName": "کیان شریفی",
+      "place": "کافه کتاب، تبریز",
+      "scheduledAt": "2026-10-04T16:00:00.000Z",
+      "status": "pending",
+      "createdAt": "2026-10-04T09:00:00.000Z",
+      "location": {
+        "name": "کافه کتاب",
+        "address": "اصفهان، چهارباغ عباسی، خیابان سپه",
+        "latitude": 32.6546,
+        "longitude": 51.668,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-5",
+      "userAId": "USR-1005",
+      "userAName": "الهام موسوی",
+      "userBId": "USR-1009",
+      "userBName": "آوا کریمی",
+      "place": "کافه ویونا، مشهد",
+      "scheduledAt": "2026-10-05T17:00:00.000Z",
+      "status": "accepted",
+      "createdAt": "2026-10-05T09:00:00.000Z",
+      "location": {
+        "name": "کافه ویونا",
+        "address": "تهران، خیابان ولیعصر، بالاتر از پارک ساعی، پلاک ۲۴۰",
+        "latitude": 35.7219,
+        "longitude": 51.4072,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-6",
+      "userAId": "USR-1006",
+      "userAName": "پارسا نادری",
+      "userBId": "USR-1010",
+      "userBName": "امیرحسین رستگار",
+      "place": "کافه عمارت، کرج",
+      "scheduledAt": "2026-10-06T18:00:00.000Z",
+      "status": "completed",
+      "createdAt": "2026-10-06T09:00:00.000Z",
+      "location": {
+        "name": "کافه عمارت",
+        "address": "تبریز، خیابان امام، کوچه عمارت",
+        "latitude": 38.08,
+        "longitude": 46.291,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-7",
+      "userAId": "USR-1007",
+      "userAName": "مهسا جعفری",
+      "userBId": "USR-1011",
+      "userBName": "ترانه شریفی",
+      "place": "پارک ملت، رشت",
+      "scheduledAt": "2026-10-07T16:00:00.000Z",
+      "status": "pending",
+      "createdAt": "2026-10-07T09:00:00.000Z",
+      "location": {
+        "name": "پارک ملت",
+        "address": "مشهد، بلوار وکیل‌آباد، ورودی اصلی",
+        "latitude": 36.314,
+        "longitude": 59.538,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-8",
+      "userAId": "USR-1008",
+      "userAName": "کیان شریفی",
+      "userBId": "USR-1012",
+      "userBName": "محمد پارسا",
+      "place": "کافه کتاب، یزد",
+      "scheduledAt": "2026-10-08T17:00:00.000Z",
+      "status": "accepted",
+      "createdAt": "2026-10-08T09:00:00.000Z",
+      "location": {
+        "name": "کافه کتاب",
+        "address": "اصفهان، چهارباغ عباسی، خیابان سپه",
+        "latitude": 32.6546,
+        "longitude": 51.668,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-9",
+      "userAId": "USR-1009",
+      "userAName": "آوا کریمی",
+      "userBId": "USR-1013",
+      "userBName": "هستی نادری",
+      "place": "کافه ویونا، قم",
+      "scheduledAt": "2026-10-09T18:00:00.000Z",
+      "status": "completed",
+      "createdAt": "2026-10-09T09:00:00.000Z",
+      "location": {
+        "name": "کافه ویونا",
+        "address": "تهران، خیابان ولیعصر، بالاتر از پارک ساعی، پلاک ۲۴۰",
+        "latitude": 35.7219,
+        "longitude": 51.4072,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-10",
+      "userAId": "USR-1010",
+      "userAName": "امیرحسین رستگار",
+      "userBId": "USR-1014",
+      "userBName": "سامان اکبری",
+      "place": "کافه عمارت، اهواز",
+      "scheduledAt": "2026-10-10T16:00:00.000Z",
+      "status": "pending",
+      "createdAt": "2026-10-10T09:00:00.000Z",
+      "location": {
+        "name": "کافه عمارت",
+        "address": "تبریز، خیابان امام، کوچه عمارت",
+        "latitude": 38.08,
+        "longitude": 46.291,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-11",
+      "userAId": "USR-1011",
+      "userAName": "ترانه شریفی",
+      "userBId": "USR-1015",
+      "userBName": "نازنین رفیعی",
+      "place": "پارک ملت، تهران",
+      "scheduledAt": "2026-10-11T17:00:00.000Z",
+      "status": "accepted",
+      "createdAt": "2026-10-11T09:00:00.000Z",
+      "location": {
+        "name": "پارک ملت",
+        "address": "مشهد، بلوار وکیل‌آباد، ورودی اصلی",
+        "latitude": 36.314,
+        "longitude": 59.538,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-12",
+      "userAId": "USR-1012",
+      "userAName": "محمد پارسا",
+      "userBId": "USR-1016",
+      "userBName": "بردیا سلیمانی",
+      "place": "کافه کتاب، اصفهان",
+      "scheduledAt": "2026-10-12T18:00:00.000Z",
+      "status": "completed",
+      "createdAt": "2026-10-12T09:00:00.000Z",
+      "location": {
+        "name": "کافه کتاب",
+        "address": "اصفهان، چهارباغ عباسی، خیابان سپه",
+        "latitude": 32.6546,
+        "longitude": 51.668,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-13",
+      "userAId": "USR-1013",
+      "userAName": "هستی نادری",
+      "userBId": "USR-1017",
+      "userBName": "روژان مرادی",
+      "place": "کافه ویونا، شیراز",
+      "scheduledAt": "2026-10-13T16:00:00.000Z",
+      "status": "pending",
+      "createdAt": "2026-10-13T09:00:00.000Z",
+      "location": {
+        "name": "کافه ویونا",
+        "address": "تهران، خیابان ولیعصر، بالاتر از پارک ساعی، پلاک ۲۴۰",
+        "latitude": 35.7219,
+        "longitude": 51.4072,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-14",
+      "userAId": "USR-1014",
+      "userAName": "سامان اکبری",
+      "userBId": "USR-1018",
+      "userBName": "یاسین قاسمی",
+      "place": "کافه عمارت، تبریز",
+      "scheduledAt": "2026-10-14T17:00:00.000Z",
+      "status": "accepted",
+      "createdAt": "2026-10-14T09:00:00.000Z",
+      "location": {
+        "name": "کافه عمارت",
+        "address": "تبریز، خیابان امام، کوچه عمارت",
+        "latitude": 38.08,
+        "longitude": 46.291,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-15",
+      "userAId": "USR-1015",
+      "userAName": "نازنین رفیعی",
+      "userBId": "USR-1019",
+      "userBName": "غزل صادقی",
+      "place": "پارک ملت، مشهد",
+      "scheduledAt": "2026-10-15T18:00:00.000Z",
+      "status": "completed",
+      "createdAt": "2026-10-15T09:00:00.000Z",
+      "location": {
+        "name": "پارک ملت",
+        "address": "مشهد، بلوار وکیل‌آباد، ورودی اصلی",
+        "latitude": 36.314,
+        "longitude": 59.538,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-16",
+      "userAId": "USR-1016",
+      "userAName": "بردیا سلیمانی",
+      "userBId": "USR-1020",
+      "userBName": "اشکان یوسفی",
+      "place": "کافه کتاب، کرج",
+      "scheduledAt": "2026-10-16T16:00:00.000Z",
+      "status": "pending",
+      "createdAt": "2026-10-16T09:00:00.000Z",
+      "location": {
+        "name": "کافه کتاب",
+        "address": "اصفهان، چهارباغ عباسی، خیابان سپه",
+        "latitude": 32.6546,
+        "longitude": 51.668,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-17",
+      "userAId": "USR-1017",
+      "userAName": "روژان مرادی",
+      "userBId": "USR-1021",
+      "userBName": "ملیکا حیدری",
+      "place": "کافه ویونا، رشت",
+      "scheduledAt": "2026-10-17T17:00:00.000Z",
+      "status": "accepted",
+      "createdAt": "2026-10-17T09:00:00.000Z",
+      "location": {
+        "name": "کافه ویونا",
+        "address": "تهران، خیابان ولیعصر، بالاتر از پارک ساعی، پلاک ۲۴۰",
+        "latitude": 35.7219,
+        "longitude": 51.4072,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-18",
+      "userAId": "USR-1018",
+      "userAName": "یاسین قاسمی",
+      "userBId": "USR-1001",
+      "userBName": "سارا احمدی",
+      "place": "کافه عمارت، یزد",
+      "scheduledAt": "2026-10-18T18:00:00.000Z",
+      "status": "completed",
+      "createdAt": "2026-10-18T09:00:00.000Z",
+      "location": {
+        "name": "کافه عمارت",
+        "address": "تبریز، خیابان امام، کوچه عمارت",
+        "latitude": 38.08,
+        "longitude": 46.291,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-19",
+      "userAId": "USR-1019",
+      "userAName": "غزل صادقی",
+      "userBId": "USR-1002",
+      "userBName": "آرمان رضایی",
+      "place": "پارک ملت، قم",
+      "scheduledAt": "2026-10-19T16:00:00.000Z",
+      "status": "pending",
+      "createdAt": "2026-10-19T09:00:00.000Z",
+      "location": {
+        "name": "پارک ملت",
+        "address": "مشهد، بلوار وکیل‌آباد، ورودی اصلی",
+        "latitude": 36.314,
+        "longitude": 59.538,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    },
+    {
+      "id": "DAT-20",
+      "userAId": "USR-1020",
+      "userAName": "اشکان یوسفی",
+      "userBId": "USR-1003",
+      "userBName": "نیلوفر محمدی",
+      "place": "کافه کتاب، اهواز",
+      "scheduledAt": "2026-10-20T17:00:00.000Z",
+      "status": "accepted",
+      "createdAt": "2026-10-20T09:00:00.000Z",
+      "location": {
+        "name": "کافه کتاب",
+        "address": "اصفهان، چهارباغ عباسی، خیابان سپه",
+        "latitude": 32.6546,
+        "longitude": 51.668,
+        "meetPoint": "ورودی اصلی مجموعه",
+        "notes": "موقعیت آزمایشی برای نمایش جزئیات دیت"
+      }
+    }
   ],
   "packages": [
-    {"id":"pro-monthly","name":"اشتراک Pro یک‌ماهه","type":"subscription","durationDays":30,"price":390000,"currency":"IRR","active":true,"description":"۵۰ لایک روزانه و امکانات پیشرفته"},
-    {"id":"vip-monthly","name":"اشتراک VIP یک‌ماهه","type":"subscription","durationDays":30,"price":790000,"currency":"IRR","active":true,"description":"لایک نامحدود و نمایش اولویت‌دار"},
-    {"id":"credit-5","name":"۵ اعتبار پیام","type":"credit","durationDays":0,"price":125000,"currency":"IRR","active":true,"description":"شروع گفتگو با ۵ کاربر جدید"},
-    {"id":"credit-10","name":"۱۰ اعتبار پیام","type":"credit","durationDays":0,"price":220000,"currency":"IRR","active":true,"description":"شروع گفتگو با ۱۰ کاربر جدید"},
-    {"id":"credit-20","name":"۲۰ اعتبار پیام","type":"credit","durationDays":0,"price":350000,"currency":"IRR","active":false,"description":"شروع گفتگو با ۲۰ کاربر جدید"}
+    {
+      "id": "pro-monthly",
+      "name": "اشتراک Pro یک‌ماهه",
+      "type": "subscription",
+      "durationDays": 30,
+      "price": 390000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "۵۰ لایک روزانه و امکانات پیشرفته",
+      "messageCount": 0
+    },
+    {
+      "id": "vip-monthly",
+      "name": "اشتراک VIP یک‌ماهه",
+      "type": "subscription",
+      "durationDays": 30,
+      "price": 790000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "لایک نامحدود و نمایش اولویت‌دار",
+      "messageCount": 0
+    },
+    {
+      "id": "credit-5",
+      "name": "۵ اعتبار پیام",
+      "type": "direct_message",
+      "durationDays": 0,
+      "price": 125000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "شروع گفتگو با ۵ کاربر جدید",
+      "messageCount": 5
+    },
+    {
+      "id": "credit-10",
+      "name": "۱۰ اعتبار پیام",
+      "type": "direct_message",
+      "durationDays": 0,
+      "price": 220000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "شروع گفتگو با ۱۰ کاربر جدید",
+      "messageCount": 10
+    },
+    {
+      "id": "credit-20",
+      "name": "۲۰ اعتبار پیام",
+      "type": "direct_message",
+      "durationDays": 0,
+      "price": 350000,
+      "currency": "TOMAN",
+      "active": false,
+      "description": "شروع گفتگو با ۲۰ کاربر جدید",
+      "messageCount": 20
+    },
+    {
+      "id": "demo-package-6",
+      "name": "پیام مستقیم آزمایشی 6",
+      "type": "direct_message",
+      "durationDays": 0,
+      "messageCount": 30,
+      "price": 225000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-7",
+      "name": "اشتراک آزمایشی 7",
+      "type": "subscription",
+      "durationDays": 30,
+      "messageCount": 0,
+      "price": 250000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-8",
+      "name": "پیام مستقیم آزمایشی 8",
+      "type": "direct_message",
+      "durationDays": 0,
+      "messageCount": 10,
+      "price": 275000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-9",
+      "name": "اشتراک آزمایشی 9",
+      "type": "subscription",
+      "durationDays": 30,
+      "messageCount": 0,
+      "price": 300000,
+      "currency": "TOMAN",
+      "active": false,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-10",
+      "name": "پیام مستقیم آزمایشی 10",
+      "type": "direct_message",
+      "durationDays": 0,
+      "messageCount": 20,
+      "price": 325000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-11",
+      "name": "اشتراک آزمایشی 11",
+      "type": "subscription",
+      "durationDays": 30,
+      "messageCount": 0,
+      "price": 350000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-12",
+      "name": "پیام مستقیم آزمایشی 12",
+      "type": "direct_message",
+      "durationDays": 0,
+      "messageCount": 30,
+      "price": 375000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-13",
+      "name": "اشتراک آزمایشی 13",
+      "type": "subscription",
+      "durationDays": 30,
+      "messageCount": 0,
+      "price": 400000,
+      "currency": "TOMAN",
+      "active": false,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-14",
+      "name": "پیام مستقیم آزمایشی 14",
+      "type": "direct_message",
+      "durationDays": 0,
+      "messageCount": 10,
+      "price": 425000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-15",
+      "name": "اشتراک آزمایشی 15",
+      "type": "subscription",
+      "durationDays": 30,
+      "messageCount": 0,
+      "price": 450000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-16",
+      "name": "پیام مستقیم آزمایشی 16",
+      "type": "direct_message",
+      "durationDays": 0,
+      "messageCount": 20,
+      "price": 475000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-17",
+      "name": "اشتراک آزمایشی 17",
+      "type": "subscription",
+      "durationDays": 30,
+      "messageCount": 0,
+      "price": 500000,
+      "currency": "TOMAN",
+      "active": false,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-18",
+      "name": "پیام مستقیم آزمایشی 18",
+      "type": "direct_message",
+      "durationDays": 0,
+      "messageCount": 30,
+      "price": 525000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-19",
+      "name": "اشتراک آزمایشی 19",
+      "type": "subscription",
+      "durationDays": 30,
+      "messageCount": 0,
+      "price": 550000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    },
+    {
+      "id": "demo-package-20",
+      "name": "پیام مستقیم آزمایشی 20",
+      "type": "direct_message",
+      "durationDays": 0,
+      "messageCount": 10,
+      "price": 575000,
+      "currency": "TOMAN",
+      "active": true,
+      "description": "بسته آزمایشی برای بررسی مدیریت پویای قیمت‌گذاری"
+    }
   ],
   "activity": [
-    {"id":"ACT-1","userId":"USR-1001","type":"login","title":"ورود به حساب","detail":"ورود موفق از دستگاه Android","createdAt":"2026-11-01T16:42:00.000Z"},
-    {"id":"ACT-2","userId":"USR-1001","type":"like","title":"ثبت لایک","detail":"لایک به مازیار کریمی","createdAt":"2026-10-31T14:20:00.000Z"},
-    {"id":"ACT-3","userId":"USR-1001","type":"payment","title":"پرداخت موفق","detail":"خرید اشتراک VIP یک‌ماهه","createdAt":"2026-10-28T08:30:00.000Z"},
-    {"id":"ACT-4","userId":"USR-1001","type":"ticket","title":"ثبت تیکت پشتیبانی","detail":"مشکل در فعال‌سازی اشتراک VIP","createdAt":"2026-10-30T11:20:00.000Z"},
-    {"id":"ACT-5","userId":"USR-1002","type":"verification","title":"ارسال ویدیوی احراز هویت","detail":"در انتظار بررسی مدیر","createdAt":"2026-10-31T10:00:00.000Z"},
-    {"id":"ACT-6","userId":"USR-1002","type":"match","title":"ایجاد مچ","detail":"با الهام موسوی","createdAt":"2026-10-28T19:00:00.000Z"},
-    {"id":"ACT-7","userId":"USR-1004","type":"date","title":"تأیید قرار","detail":"کافه ویونا، ۳ نوامبر","createdAt":"2026-10-30T13:30:00.000Z"},
-    {"id":"ACT-8","userId":"USR-1007","type":"report","title":"دریافت گزارش تخلف","detail":"اسپم یا تبلیغات","createdAt":"2026-10-29T17:30:00.000Z"}
+    {
+      "id": "ACT-1",
+      "userId": "USR-1001",
+      "type": "login",
+      "title": "ورود به حساب",
+      "detail": "ورود موفق از دستگاه Android",
+      "createdAt": "2026-11-01T16:42:00.000Z"
+    },
+    {
+      "id": "ACT-2",
+      "userId": "USR-1001",
+      "type": "like",
+      "title": "ثبت لایک",
+      "detail": "لایک به مازیار کریمی",
+      "createdAt": "2026-10-31T14:20:00.000Z"
+    },
+    {
+      "id": "ACT-3",
+      "userId": "USR-1001",
+      "type": "payment",
+      "title": "پرداخت موفق",
+      "detail": "خرید اشتراک VIP یک‌ماهه",
+      "createdAt": "2026-10-28T08:30:00.000Z"
+    },
+    {
+      "id": "ACT-4",
+      "userId": "USR-1001",
+      "type": "ticket",
+      "title": "ثبت تیکت پشتیبانی",
+      "detail": "مشکل در فعال‌سازی اشتراک VIP",
+      "createdAt": "2026-10-30T11:20:00.000Z"
+    },
+    {
+      "id": "ACT-5",
+      "userId": "USR-1002",
+      "type": "verification",
+      "title": "ارسال ویدیوی احراز هویت",
+      "detail": "در انتظار بررسی مدیر",
+      "createdAt": "2026-10-31T10:00:00.000Z"
+    },
+    {
+      "id": "ACT-6",
+      "userId": "USR-1002",
+      "type": "match",
+      "title": "ایجاد مچ",
+      "detail": "با الهام موسوی",
+      "createdAt": "2026-10-28T19:00:00.000Z"
+    },
+    {
+      "id": "ACT-7",
+      "userId": "USR-1004",
+      "type": "date",
+      "title": "تأیید قرار",
+      "detail": "کافه ویونا، ۳ نوامبر",
+      "createdAt": "2026-10-30T13:30:00.000Z"
+    },
+    {
+      "id": "ACT-8",
+      "userId": "USR-1007",
+      "type": "report",
+      "title": "دریافت گزارش تخلف",
+      "detail": "اسپم یا تبلیغات",
+      "createdAt": "2026-10-29T17:30:00.000Z"
+    },
+    {
+      "id": "ACT-9",
+      "userId": "USR-1009",
+      "type": "login",
+      "title": "ورود به حساب",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-09T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-10",
+      "userId": "USR-1010",
+      "type": "like",
+      "title": "ثبت لایک",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-10T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-11",
+      "userId": "USR-1011",
+      "type": "payment",
+      "title": "خرید بسته",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-11T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-12",
+      "userId": "USR-1012",
+      "type": "date",
+      "title": "برنامه‌ریزی دیت",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-12T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-13",
+      "userId": "USR-1013",
+      "type": "login",
+      "title": "ورود به حساب",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-13T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-14",
+      "userId": "USR-1014",
+      "type": "like",
+      "title": "ثبت لایک",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-14T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-15",
+      "userId": "USR-1015",
+      "type": "payment",
+      "title": "خرید بسته",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-15T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-16",
+      "userId": "USR-1016",
+      "type": "date",
+      "title": "برنامه‌ریزی دیت",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-16T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-17",
+      "userId": "USR-1017",
+      "type": "login",
+      "title": "ورود به حساب",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-17T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-18",
+      "userId": "USR-1018",
+      "type": "like",
+      "title": "ثبت لایک",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-18T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-19",
+      "userId": "USR-1019",
+      "type": "payment",
+      "title": "خرید بسته",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-19T20:00:00.000Z"
+    },
+    {
+      "id": "ACT-20",
+      "userId": "USR-1020",
+      "type": "date",
+      "title": "برنامه‌ریزی دیت",
+      "detail": "رویداد آزمایشی برای تست داشبورد و سوابق کاربر",
+      "createdAt": "2026-10-20T20:00:00.000Z"
+    }
   ],
-  "audit": []
+  "audit": [
+    {
+      "id": "AUD-DEMO-1",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-1",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-01T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-2",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-2",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-02T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-3",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-3",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-03T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-4",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-4",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-04T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-5",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-5",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-05T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-6",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-6",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-06T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-7",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-7",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-07T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-8",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-8",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-08T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-9",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-9",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-09T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-10",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-10",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-10T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-11",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-11",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-11T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-12",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-12",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-12T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-13",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-13",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-13T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-14",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-14",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-14T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-15",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-15",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-15T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-16",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-16",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-16T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-17",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-17",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-17T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-18",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-18",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-18T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-19",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-19",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-19T21:00:00.000Z"
+    },
+    {
+      "id": "AUD-DEMO-20",
+      "action": "رویداد آزمایشی",
+      "entity": "demo",
+      "entityId": "DEMO-20",
+      "details": "داده نمونه برای نمایش سابقه مدیریتی",
+      "actor": "admin",
+      "createdAt": "2026-10-20T21:00:00.000Z"
+    }
+  ],
+  "chats": [
+    {
+      "id": "CHAT-9001",
+      "userAId": "USR-1001",
+      "userAName": "سارا احمدی",
+      "userBId": "USR-1002",
+      "userBName": "آرمان رضایی",
+      "status": "active",
+      "updatedAt": "2026-11-01T17:10:00.000Z",
+      "messages": [
+        {
+          "id": "CM-1",
+          "senderId": "USR-1001",
+          "senderName": "سارا احمدی",
+          "text": "سلام، خوشحالم باهات آشنا شدم.",
+          "createdAt": "2026-11-01T16:40:00.000Z"
+        },
+        {
+          "id": "CM-2",
+          "senderId": "USR-1002",
+          "senderName": "آرمان رضایی",
+          "text": "من هم همین‌طور! روزت چطور گذشت؟",
+          "createdAt": "2026-11-01T16:55:00.000Z"
+        },
+        {
+          "id": "CM-3",
+          "senderId": "USR-1001",
+          "senderName": "سارا احمدی",
+          "text": "عالی بود، ممنون که پرسیدی.",
+          "createdAt": "2026-11-01T17:10:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9002",
+      "userAId": "USR-1003",
+      "userAName": "نیلوفر محمدی",
+      "userBId": "USR-1004",
+      "userBName": "مازیار کریمی",
+      "status": "active",
+      "updatedAt": "2026-10-31T20:25:00.000Z",
+      "messages": [
+        {
+          "id": "CM-4",
+          "senderId": "USR-1003",
+          "senderName": "نیلوفر محمدی",
+          "text": "برای آخر هفته برنامه‌ای داری؟",
+          "createdAt": "2026-10-31T20:10:00.000Z"
+        },
+        {
+          "id": "CM-5",
+          "senderId": "USR-1004",
+          "senderName": "مازیار کریمی",
+          "text": "شاید یک کافه جدید را امتحان کنیم.",
+          "createdAt": "2026-10-31T20:25:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9003",
+      "userAId": "USR-1005",
+      "userAName": "الهام موسوی",
+      "userBId": "USR-1006",
+      "userBName": "پارسا نادری",
+      "status": "active",
+      "updatedAt": "2026-10-30T12:20:00.000Z",
+      "messages": [
+        {
+          "id": "CM-6",
+          "senderId": "USR-1005",
+          "senderName": "الهام موسوی",
+          "text": "علاقه‌مندی‌هات خیلی جالبه.",
+          "createdAt": "2026-10-30T12:20:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9004",
+      "userAId": "USR-1004",
+      "userAName": "مازیار کریمی",
+      "userBId": "USR-1009",
+      "userBName": "آوا کریمی",
+      "status": "active",
+      "updatedAt": "2026-10-04T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-3-0",
+          "senderId": "USR-1004",
+          "senderName": "مازیار کریمی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-04T17:00:00.000Z"
+        },
+        {
+          "id": "CM-3-1",
+          "senderId": "USR-1009",
+          "senderName": "آوا کریمی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-04T18:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9005",
+      "userAId": "USR-1005",
+      "userAName": "الهام موسوی",
+      "userBId": "USR-1010",
+      "userBName": "امیرحسین رستگار",
+      "status": "active",
+      "updatedAt": "2026-10-05T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-4-0",
+          "senderId": "USR-1005",
+          "senderName": "الهام موسوی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-05T17:00:00.000Z"
+        },
+        {
+          "id": "CM-4-1",
+          "senderId": "USR-1010",
+          "senderName": "امیرحسین رستگار",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-05T18:00:00.000Z"
+        },
+        {
+          "id": "CM-4-2",
+          "senderId": "USR-1005",
+          "senderName": "الهام موسوی",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-05T19:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9006",
+      "userAId": "USR-1006",
+      "userAName": "پارسا نادری",
+      "userBId": "USR-1011",
+      "userBName": "ترانه شریفی",
+      "status": "active",
+      "updatedAt": "2026-10-06T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-5-0",
+          "senderId": "USR-1006",
+          "senderName": "پارسا نادری",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-06T17:00:00.000Z"
+        },
+        {
+          "id": "CM-5-1",
+          "senderId": "USR-1011",
+          "senderName": "ترانه شریفی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-06T18:00:00.000Z"
+        },
+        {
+          "id": "CM-5-2",
+          "senderId": "USR-1006",
+          "senderName": "پارسا نادری",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-06T19:00:00.000Z"
+        },
+        {
+          "id": "CM-5-3",
+          "senderId": "USR-1011",
+          "senderName": "ترانه شریفی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-06T20:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9007",
+      "userAId": "USR-1007",
+      "userAName": "مهسا جعفری",
+      "userBId": "USR-1012",
+      "userBName": "محمد پارسا",
+      "status": "active",
+      "updatedAt": "2026-10-07T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-6-0",
+          "senderId": "USR-1007",
+          "senderName": "مهسا جعفری",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-07T17:00:00.000Z"
+        },
+        {
+          "id": "CM-6-1",
+          "senderId": "USR-1012",
+          "senderName": "محمد پارسا",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-07T18:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9008",
+      "userAId": "USR-1008",
+      "userAName": "کیان شریفی",
+      "userBId": "USR-1013",
+      "userBName": "هستی نادری",
+      "status": "active",
+      "updatedAt": "2026-10-08T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-7-0",
+          "senderId": "USR-1008",
+          "senderName": "کیان شریفی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-08T17:00:00.000Z"
+        },
+        {
+          "id": "CM-7-1",
+          "senderId": "USR-1013",
+          "senderName": "هستی نادری",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-08T18:00:00.000Z"
+        },
+        {
+          "id": "CM-7-2",
+          "senderId": "USR-1008",
+          "senderName": "کیان شریفی",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-08T19:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9009",
+      "userAId": "USR-1009",
+      "userAName": "آوا کریمی",
+      "userBId": "USR-1014",
+      "userBName": "سامان اکبری",
+      "status": "active",
+      "updatedAt": "2026-10-09T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-8-0",
+          "senderId": "USR-1009",
+          "senderName": "آوا کریمی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-09T17:00:00.000Z"
+        },
+        {
+          "id": "CM-8-1",
+          "senderId": "USR-1014",
+          "senderName": "سامان اکبری",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-09T18:00:00.000Z"
+        },
+        {
+          "id": "CM-8-2",
+          "senderId": "USR-1009",
+          "senderName": "آوا کریمی",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-09T19:00:00.000Z"
+        },
+        {
+          "id": "CM-8-3",
+          "senderId": "USR-1014",
+          "senderName": "سامان اکبری",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-09T20:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9010",
+      "userAId": "USR-1010",
+      "userAName": "امیرحسین رستگار",
+      "userBId": "USR-1015",
+      "userBName": "نازنین رفیعی",
+      "status": "active",
+      "updatedAt": "2026-10-10T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-9-0",
+          "senderId": "USR-1010",
+          "senderName": "امیرحسین رستگار",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-10T17:00:00.000Z"
+        },
+        {
+          "id": "CM-9-1",
+          "senderId": "USR-1015",
+          "senderName": "نازنین رفیعی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-10T18:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9011",
+      "userAId": "USR-1011",
+      "userAName": "ترانه شریفی",
+      "userBId": "USR-1016",
+      "userBName": "بردیا سلیمانی",
+      "status": "active",
+      "updatedAt": "2026-10-11T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-10-0",
+          "senderId": "USR-1011",
+          "senderName": "ترانه شریفی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-11T17:00:00.000Z"
+        },
+        {
+          "id": "CM-10-1",
+          "senderId": "USR-1016",
+          "senderName": "بردیا سلیمانی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-11T18:00:00.000Z"
+        },
+        {
+          "id": "CM-10-2",
+          "senderId": "USR-1011",
+          "senderName": "ترانه شریفی",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-11T19:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9012",
+      "userAId": "USR-1012",
+      "userAName": "محمد پارسا",
+      "userBId": "USR-1017",
+      "userBName": "روژان مرادی",
+      "status": "active",
+      "updatedAt": "2026-10-12T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-11-0",
+          "senderId": "USR-1012",
+          "senderName": "محمد پارسا",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-12T17:00:00.000Z"
+        },
+        {
+          "id": "CM-11-1",
+          "senderId": "USR-1017",
+          "senderName": "روژان مرادی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-12T18:00:00.000Z"
+        },
+        {
+          "id": "CM-11-2",
+          "senderId": "USR-1012",
+          "senderName": "محمد پارسا",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-12T19:00:00.000Z"
+        },
+        {
+          "id": "CM-11-3",
+          "senderId": "USR-1017",
+          "senderName": "روژان مرادی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-12T20:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9013",
+      "userAId": "USR-1013",
+      "userAName": "هستی نادری",
+      "userBId": "USR-1018",
+      "userBName": "یاسین قاسمی",
+      "status": "active",
+      "updatedAt": "2026-10-13T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-12-0",
+          "senderId": "USR-1013",
+          "senderName": "هستی نادری",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-13T17:00:00.000Z"
+        },
+        {
+          "id": "CM-12-1",
+          "senderId": "USR-1018",
+          "senderName": "یاسین قاسمی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-13T18:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9014",
+      "userAId": "USR-1014",
+      "userAName": "سامان اکبری",
+      "userBId": "USR-1019",
+      "userBName": "غزل صادقی",
+      "status": "active",
+      "updatedAt": "2026-10-14T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-13-0",
+          "senderId": "USR-1014",
+          "senderName": "سامان اکبری",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-14T17:00:00.000Z"
+        },
+        {
+          "id": "CM-13-1",
+          "senderId": "USR-1019",
+          "senderName": "غزل صادقی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-14T18:00:00.000Z"
+        },
+        {
+          "id": "CM-13-2",
+          "senderId": "USR-1014",
+          "senderName": "سامان اکبری",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-14T19:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9015",
+      "userAId": "USR-1015",
+      "userAName": "نازنین رفیعی",
+      "userBId": "USR-1020",
+      "userBName": "اشکان یوسفی",
+      "status": "active",
+      "updatedAt": "2026-10-15T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-14-0",
+          "senderId": "USR-1015",
+          "senderName": "نازنین رفیعی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-15T17:00:00.000Z"
+        },
+        {
+          "id": "CM-14-1",
+          "senderId": "USR-1020",
+          "senderName": "اشکان یوسفی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-15T18:00:00.000Z"
+        },
+        {
+          "id": "CM-14-2",
+          "senderId": "USR-1015",
+          "senderName": "نازنین رفیعی",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-15T19:00:00.000Z"
+        },
+        {
+          "id": "CM-14-3",
+          "senderId": "USR-1020",
+          "senderName": "اشکان یوسفی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-15T20:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9016",
+      "userAId": "USR-1016",
+      "userAName": "بردیا سلیمانی",
+      "userBId": "USR-1021",
+      "userBName": "ملیکا حیدری",
+      "status": "active",
+      "updatedAt": "2026-10-16T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-15-0",
+          "senderId": "USR-1016",
+          "senderName": "بردیا سلیمانی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-16T17:00:00.000Z"
+        },
+        {
+          "id": "CM-15-1",
+          "senderId": "USR-1021",
+          "senderName": "ملیکا حیدری",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-16T18:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9017",
+      "userAId": "USR-1017",
+      "userAName": "روژان مرادی",
+      "userBId": "USR-1001",
+      "userBName": "سارا احمدی",
+      "status": "active",
+      "updatedAt": "2026-10-17T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-16-0",
+          "senderId": "USR-1017",
+          "senderName": "روژان مرادی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-17T17:00:00.000Z"
+        },
+        {
+          "id": "CM-16-1",
+          "senderId": "USR-1001",
+          "senderName": "سارا احمدی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-17T18:00:00.000Z"
+        },
+        {
+          "id": "CM-16-2",
+          "senderId": "USR-1017",
+          "senderName": "روژان مرادی",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-17T19:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9018",
+      "userAId": "USR-1018",
+      "userAName": "یاسین قاسمی",
+      "userBId": "USR-1002",
+      "userBName": "آرمان رضایی",
+      "status": "active",
+      "updatedAt": "2026-10-18T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-17-0",
+          "senderId": "USR-1018",
+          "senderName": "یاسین قاسمی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-18T17:00:00.000Z"
+        },
+        {
+          "id": "CM-17-1",
+          "senderId": "USR-1002",
+          "senderName": "آرمان رضایی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-18T18:00:00.000Z"
+        },
+        {
+          "id": "CM-17-2",
+          "senderId": "USR-1018",
+          "senderName": "یاسین قاسمی",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-18T19:00:00.000Z"
+        },
+        {
+          "id": "CM-17-3",
+          "senderId": "USR-1002",
+          "senderName": "آرمان رضایی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-18T20:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9019",
+      "userAId": "USR-1019",
+      "userAName": "غزل صادقی",
+      "userBId": "USR-1003",
+      "userBName": "نیلوفر محمدی",
+      "status": "active",
+      "updatedAt": "2026-10-19T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-18-0",
+          "senderId": "USR-1019",
+          "senderName": "غزل صادقی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-19T17:00:00.000Z"
+        },
+        {
+          "id": "CM-18-1",
+          "senderId": "USR-1003",
+          "senderName": "نیلوفر محمدی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-19T18:00:00.000Z"
+        }
+      ]
+    },
+    {
+      "id": "CHAT-9020",
+      "userAId": "USR-1020",
+      "userAName": "اشکان یوسفی",
+      "userBId": "USR-1004",
+      "userBName": "مازیار کریمی",
+      "status": "active",
+      "updatedAt": "2026-10-20T19:00:00.000Z",
+      "messages": [
+        {
+          "id": "CM-19-0",
+          "senderId": "USR-1020",
+          "senderName": "اشکان یوسفی",
+          "text": "سلام! خوشحالم آشنا شدیم.",
+          "createdAt": "2026-10-20T17:00:00.000Z"
+        },
+        {
+          "id": "CM-19-1",
+          "senderId": "USR-1004",
+          "senderName": "مازیار کریمی",
+          "text": "من هم همین‌طور، روز خوبی داشته باشی.",
+          "createdAt": "2026-10-20T18:00:00.000Z"
+        },
+        {
+          "id": "CM-19-2",
+          "senderId": "USR-1020",
+          "senderName": "اشکان یوسفی",
+          "text": "دوست داری آخر هفته قرار بگذاریم؟",
+          "createdAt": "2026-10-20T19:00:00.000Z"
+        }
+      ]
+    }
+  ]
 }

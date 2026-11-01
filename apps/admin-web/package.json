@@ -1,6 +1,6 @@
 {
   "name": "@fastlove/admin-web",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "private": true,
   "description": "Standalone FastLove administration portal",
   "type": "module",

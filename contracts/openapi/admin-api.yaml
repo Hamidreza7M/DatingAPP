@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FastLove Admin API
-  version: 1.0.0
+  version: 1.0.4
   description: >-
     قرارداد اولیه API پنل ادمین. پیاده‌سازی فعلی apps/admin-web یک API دمو دارد؛
     این قرارداد مبنای مهاجرت به سرویس مرکزی چندکلاینتی خواهد بود.
@@ -65,8 +65,11 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
-        price: { type: integer, minimum: 0 }
-        currency: { type: string }
+        type: { type: string, enum: [subscription, direct_message] }
+        durationDays: { type: integer, minimum: 1, maximum: 3650 }
+        messageCount: { type: integer, minimum: 1, maximum: 100000 }
+        price: { type: integer, minimum: 1, description: Price in Toman }
+        currency: { type: string, example: TOMAN }
         active: { type: boolean }
 paths:
   /health:
@@ -138,6 +141,15 @@ paths:
       summary: Soft-delete user account
       responses:
         '200': { description: Account deactivated; audit history retained }
+  /referrals:
+    get:
+      summary: List referral-code owners and users registered with each code
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        '200': { description: Referral groups with owner and referred members }
   /payments:
     get:
       summary: Search payments
@@ -276,11 +288,40 @@ paths:
       summary: List scheduled dates
       responses:
         '200': { description: Scheduled dates }
+  /dates/{dateId}:
+    get:
+      summary: Read a planned date, its participants and meeting location
+      parameters:
+        - in: path
+          name: dateId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Date details including address and coordinates }
+        '404': { description: Date not found }
   /packages:
     get:
       summary: List product packages and prices
       responses:
         '200': { description: Package list }
+    post:
+      summary: Create a dynamic subscription or direct-message package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, name, price]
+              properties:
+                type: { type: string, enum: [subscription, direct_message] }
+                name: { type: string, minLength: 1, maxLength: 100 }
+                durationDays: { type: integer, minimum: 1, maximum: 3650 }
+                messageCount: { type: integer, minimum: 1, maximum: 100000 }
+                price: { type: integer, minimum: 1, description: Price in Toman }
+      responses:
+        '201': { description: Package created and activated }
+        '400': { description: Invalid package definition }
   /packages/{packageId}:
     patch:
       summary: Update package price and active state
@@ -295,12 +336,23 @@ paths:
           application/json:
             schema:
               type: object
-              required: [price]
               properties:
-                price: { type: integer, minimum: 0 }
+                name: { type: string, minLength: 1, maxLength: 100 }
+                price: { type: integer, minimum: 1, description: Price in Toman }
+                durationDays: { type: integer, minimum: 1, maximum: 3650 }
+                messageCount: { type: integer, minimum: 1, maximum: 100000 }
                 active: { type: boolean }
       responses:
         '200': { description: Package updated }
+    delete:
+      summary: Permanently remove a package from the active catalog
+      parameters:
+        - in: path
+          name: packageId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Package removed and action audited }
   /audit:
     get:
       summary: Recent admin actions

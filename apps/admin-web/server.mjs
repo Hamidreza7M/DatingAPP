@@ -28,6 +28,40 @@ try { await fs.access(DB_FILE); }
 catch { await fs.copyFile(SEED_FILE, DB_FILE); }
 
 let db = JSON.parse(await fs.readFile(DB_FILE, 'utf8'));
+// Backward-compatible schema migration for existing local databases.
+const seedData = JSON.parse(await fs.readFile(SEED_FILE, 'utf8'));
+if (!Array.isArray(db.chats)) db.chats = seedData.chats || [];
+// Local demo upgrades: preserve existing records and append missing synthetic records
+// from the expanded seed so every admin area remains useful after upgrading v1.0.3.
+if (!IS_PROD) {
+  for (const [key, seedRows] of Object.entries(seedData)) {
+    if (!Array.isArray(seedRows)) continue;
+    if (!Array.isArray(db[key])) db[key] = [];
+    const known = new Set(db[key].map(item => item?.id).filter(Boolean));
+    for (const row of seedRows) {
+      if (row?.id && !known.has(row.id)) { db[key].push(structuredClone(row)); known.add(row.id); }
+    }
+  }
+}
+for (const user of db.users || []) {
+  if (!Array.isArray(user.photoUrls)) {
+    const seedUser = seedData.users.find(item => item.id === user.id);
+    user.photoUrls = !IS_PROD && seedUser?.photoUrls ? [...seedUser.photoUrls] : [];
+  }
+  if (user.status === 'deleted' && !user.deletedBy) user.deletedBy = 'unknown';
+  if (!Object.hasOwn(user, 'referredByCode')) user.referredByCode = null;
+}
+for (const dateItem of db.dates || []) {
+  const seededDate = seedData.dates.find(item => item.id === dateItem.id);
+  if (!dateItem.location && seededDate?.location) dateItem.location = structuredClone(seededDate.location);
+}
+for (const item of db.packages || []) {
+  if (item.type === 'credit') item.type = 'direct_message';
+  item.currency = 'TOMAN';
+  if (item.type === 'direct_message' && !Number.isInteger(item.messageCount)) {
+    const count = String(item.id || '').match(/^credit-(\d+)$/) || String(item.name || '').match(/\d+/); item.messageCount = count ? Number(count[1] || count[0]) : 10;
+  }
+}
 let writeQueue = Promise.resolve();
 function persist() {
   const snapshot = JSON.stringify(db, null, 2);
@@ -99,6 +133,12 @@ function dashboard() {
   const pendingReports = db.reports.filter(r => r.status === 'pending').length;
   const pendingVerifications = db.verifications.filter(v => v.status === 'pending').length;
   const openTickets = db.tickets.filter(t => t.status === 'open').length;
+  const totalUsers = db.users.length;
+  const deletedUsers = db.users.filter(u => u.status === 'deleted').length;
+  const completedProfiles = db.users.filter(u => u.bio && (u.photoUrls?.length || u.photos)).length;
+  const payingUsers = new Set(successfulPayments.map(p => p.userId)).size;
+  const chatMessages = (db.chats || []).reduce((sum, chat) => sum + (chat.messages || []).length, 0);
+  const avgMessagesPerChat = db.chats?.length ? Math.round(chatMessages / db.chats.length * 10) / 10 : 0;
   const months = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(); d.setMonth(d.getMonth() - i); d.setDate(1);
@@ -119,7 +159,17 @@ function dashboard() {
       pendingReports, pendingVerifications, openTickets,
       likes: 928,
       matches: 214,
-      dates: 86
+      dates: 86,
+      newUsers: db.users.filter(u => Date.now() - new Date(u.joinedAt).getTime() <= 30 * 86400000).length,
+      deletedUsers,
+      profileCompletionRate: totalUsers ? Math.round(completedProfiles / totalUsers * 100) : 0,
+      payerRate: totalUsers ? Math.round(payingUsers / totalUsers * 1000) / 10 : 0,
+      avgMessagesPerChat,
+      totalChats: db.chats?.length || 0,
+      chatMessages,
+      photoCoverageRate: totalUsers ? Math.round(db.users.filter(u => (u.photoUrls || []).length > 0).length / totalUsers * 100) : 0,
+      verificationRate: totalUsers ? Math.round(db.users.filter(u => u.verification === 'verified').length / totalUsers * 100) : 0,
+      openTicketsPer100Users: totalUsers ? Math.round(openTickets / totalUsers * 1000) / 10 : 0
     },
     revenueTrend: months,
     usersByPlan,
@@ -139,7 +189,10 @@ async function staticFile(req, res, pathname) {
     const stat = await fs.stat(target);
     if (stat.isDirectory()) target = path.join(target, 'index.html');
     const content = await fs.readFile(target);
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(target)] || 'application/octet-stream', 'Cache-Control': path.extname(target) === '.html' ? 'no-cache' : 'public, max-age=3600', 'X-Content-Type-Options':'nosniff' });
+    // Admin assets must not remain stale after a deployment: an old app.js can keep the login screen visible even after a successful server-side fix.
+    const assetType = path.extname(target);
+    const cachePolicy = ['.html', '.js', '.css'].includes(assetType) ? 'no-store, no-cache, must-revalidate' : 'public, max-age=3600';
+    res.writeHead(200, { 'Content-Type': MIME[assetType] || 'application/octet-stream', 'Cache-Control': cachePolicy, 'Pragma': 'no-cache', 'X-Content-Type-Options':'nosniff' });
     res.end(content);
   } catch {
     if (!path.extname(clean)) return staticFile(req, res, '/index.html');
@@ -187,15 +240,28 @@ const server = http.createServer(async (req, res) => {
     const session = requireAdmin(req, res); if (!session) return;
     if (pathname === '/api/dashboard' && method === 'GET') return send(res, 200, dashboard());
 
+    if (pathname === '/api/referrals' && method === 'GET') {
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+      const groups = (db.users || []).filter(u => u.referralCode).map(owner => {
+        const referredUsers = (db.users || []).filter(member => member.referredByCode && member.referredByCode.toLowerCase() === String(owner.referralCode).toLowerCase()).sort((a,b) => b.joinedAt.localeCompare(a.joinedAt));
+        return { code: owner.referralCode, owner: { id: owner.id, name: owner.name, phone: owner.phone, status: owner.status, joinedAt: owner.joinedAt }, total: referredUsers.length, referredUsers };
+      }).filter(group => !q || [group.code,group.owner.name,group.owner.id,...group.referredUsers.flatMap(u => [u.name,u.id,u.phone])].some(value => String(value || '').toLowerCase().includes(q)))
+        .sort((a,b) => b.total - a.total || a.code.localeCompare(b.code));
+      return send(res, 200, { groups, totalReferrers: groups.length, totalReferred: groups.reduce((sum, group) => sum + group.total, 0) });
+    }
+
     if (pathname === '/api/users' && method === 'GET') {
       const q = (url.searchParams.get('q') || '').trim().toLowerCase();
       const status = url.searchParams.get('status') || 'all';
       const plan = url.searchParams.get('plan') || 'all';
+      const online = url.searchParams.get('online') || 'all';
       let users = [...db.users];
       if (q) users = users.filter(u => [u.name,u.phone,u.email,u.id,u.city].some(v => String(v || '').toLowerCase().includes(q)));
       if (status !== 'all') users = users.filter(u => u.status === status);
       if (plan !== 'all') users = users.filter(u => u.plan === plan);
-      return send(res, 200, { users: users.sort((a,b) => b.joinedAt.localeCompare(a.joinedAt)) });
+      if (online === 'online') users = users.filter(u => u.online === true);
+      else if (online === 'offline') users = users.filter(u => u.online !== true);
+      return send(res, 200, { users: users.sort((a,b) => b.joinedAt.localeCompare(a.joinedAt)), total: users.length, onlineCount: users.filter(u => u.online === true).length });
     }
     let match = pathname.match(/^\/api\/users\/([^/]+)$/);
     if (match && method === 'GET') {
@@ -210,12 +276,13 @@ const server = http.createServer(async (req, res) => {
         matches: db.matches.filter(x => x.userAId === userId || x.userBId === userId),
         dates: db.dates.filter(x => x.userAId === userId || x.userBId === userId),
         activity: db.activity.filter(x => x.userId === userId),
-        verifications: db.verifications.filter(x => x.userId === userId)
+        verifications: db.verifications.filter(x => x.userId === userId),
+        chats: (db.chats || []).filter(x => x.userAId === userId || x.userBId === userId)
       });
     }
     if (match && method === 'DELETE') {
       const user = userById(match[1]); if (!user) return send(res, 404, { error: 'کاربر پیدا نشد.' });
-      user.status = 'deleted'; user.deletedAt = now(); user.online = false;
+      user.status = 'deleted'; user.deletedAt = now(); user.deletedBy = 'admin'; user.deletionReason = 'حذف توسط مدیر پنل'; user.online = false;
       audit('حذف نرم حساب کاربری', 'user', user.id, user.name);
       await persist(); return send(res, 200, { user });
     }
@@ -287,19 +354,74 @@ const server = http.createServer(async (req, res) => {
       await persist(); return send(res, 200, { ticket });
     }
 
+    if (pathname === '/api/chats' && method === 'GET') {
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+      let chats = [...(db.chats || [])];
+      if (q) chats = chats.filter(c => [c.id,c.userAName,c.userBName,c.userAId,c.userBId,...(c.messages||[]).map(m=>m.text)].some(v => String(v||'').toLowerCase().includes(q)));
+      return send(res, 200, { chats: chats.sort((a,b) => String(b.updatedAt||'').localeCompare(String(a.updatedAt||''))), total: chats.length, messages: chats.reduce((n,c)=>n+(c.messages||[]).length,0) });
+    }
+    match = pathname.match(/^\/api\/chats\/([^/]+)$/);
+    if (match && method === 'GET') {
+      const chat = (db.chats || []).find(c => c.id === match[1]);
+      return chat ? send(res, 200, { chat }) : send(res, 404, { error: 'گفت‌وگو پیدا نشد.' });
+    }
     if (pathname === '/api/likes' && method === 'GET') return send(res, 200, { likes: [...db.likes].sort((a,b) => b.createdAt.localeCompare(a.createdAt)) });
     if (pathname === '/api/matches' && method === 'GET') return send(res, 200, { matches: [...db.matches].sort((a,b) => b.createdAt.localeCompare(a.createdAt)) });
     if (pathname === '/api/dates' && method === 'GET') return send(res, 200, { dates: [...db.dates].sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt)) });
-    if (pathname === '/api/packages' && method === 'GET') return send(res, 200, { packages: db.packages });
+    match = pathname.match(/^\/api\/dates\/([^/]+)$/);
+    if (match && method === 'GET') {
+      const item = db.dates.find(date => date.id === match[1]);
+      return item ? send(res, 200, { date: item, userA: userById(item.userAId) || null, userB: userById(item.userBId) || null }) : send(res, 404, { error: 'دیت پیدا نشد.' });
+    }
+
+    if (pathname === '/api/packages' && method === 'GET') return send(res, 200, { packages: [...db.packages].sort((a,b) => Number(b.active) - Number(a.active)) });
+    if (pathname === '/api/packages' && method === 'POST') {
+      const body = await readBody(req);
+      const type = String(body.type || '');
+      const name = String(body.name || body.title || '').trim().slice(0, 100);
+      const price = Number(body.price);
+      if (!['subscription','direct_message'].includes(type)) return send(res, 400, { error: 'نوع بسته را انتخاب کنید.' });
+      if (!name) return send(res, 400, { error: 'عنوان بسته الزامی است.' });
+      if (!Number.isSafeInteger(price) || price < 1 || price > 100000000000) return send(res, 400, { error: 'قیمت باید عدد صحیح مثبت به تومان باشد.' });
+      const durationDays = type === 'subscription' ? Number(body.durationDays) : 0;
+      const messageCount = type === 'direct_message' ? Number(body.messageCount) : 0;
+      if (type === 'subscription' && (!Number.isSafeInteger(durationDays) || durationDays < 1 || durationDays > 3650)) return send(res, 400, { error: 'مدت اعتبار اشتراک باید بین ۱ تا ۳۶۵۰ روز باشد.' });
+      if (type === 'direct_message' && (!Number.isSafeInteger(messageCount) || messageCount < 1 || messageCount > 100000)) return send(res, 400, { error: 'تعداد پیام باید عدد صحیح مثبت باشد.' });
+      const item = { id: randomId('PKG'), name, type, durationDays, messageCount, price, currency: 'TOMAN', active: true, description: type === 'subscription' ? `اعتبار ${durationDays} روزه اشتراک` : `امکان ارسال ${messageCount} پیام مستقیم`, createdAt: now(), updatedAt: now() };
+      db.packages.unshift(item); audit('ایجاد بسته', 'package', item.id, `${name} · ${price} تومان`);
+      await persist(); return send(res, 201, { package: item });
+    }
     match = pathname.match(/^\/api\/packages\/([^/]+)$/);
     if (match && method === 'PATCH') {
       const body = await readBody(req); const item = db.packages.find(p => p.id === match[1]);
       if (!item) return send(res, 404, { error: 'بسته پیدا نشد.' });
-      const price = Number(body.price);
-      if (!Number.isSafeInteger(price) || price < 0 || price > 100000000000) return send(res, 400, { error: 'قیمت باید یک عدد صحیح معتبر باشد.' });
-      item.price = price; if (typeof body.active === 'boolean') item.active = body.active;
-      item.updatedAt = now(); audit('ویرایش قیمت بسته', 'package', item.id, String(price));
+      if (body.price !== undefined) {
+        const price = Number(body.price);
+        if (!Number.isSafeInteger(price) || price < 1 || price > 100000000000) return send(res, 400, { error: 'قیمت باید عدد صحیح مثبت به تومان باشد.' });
+        item.price = price;
+      }
+      if (typeof body.active === 'boolean') item.active = body.active;
+      if (body.name !== undefined || body.title !== undefined) {
+        const name = String(body.name ?? body.title ?? '').trim().slice(0,100);
+        if (!name) return send(res, 400, { error: 'عنوان بسته الزامی است.' });
+        item.name = name;
+      }
+      if (body.durationDays !== undefined && item.type === 'subscription') {
+        const days = Number(body.durationDays); if (!Number.isSafeInteger(days) || days < 1 || days > 3650) return send(res, 400, { error: 'مدت اشتراک نامعتبر است.' }); item.durationDays = days;
+      }
+      if (body.messageCount !== undefined && item.type === 'direct_message') {
+        const count = Number(body.messageCount); if (!Number.isSafeInteger(count) || count < 1 || count > 100000) return send(res, 400, { error: 'تعداد پیام نامعتبر است.' }); item.messageCount = count;
+      }
+      item.description = item.type === 'subscription' ? `اعتبار ${item.durationDays} روزه اشتراک` : `امکان ارسال ${item.messageCount || 0} پیام مستقیم`;
+      item.updatedAt = now(); audit('ویرایش بسته', 'package', item.id, `${item.active ? 'فعال' : 'غیرفعال'} · ${item.price} تومان`);
       await persist(); return send(res, 200, { package: item });
+    }
+    if (match && method === 'DELETE') {
+      const index = db.packages.findIndex(p => p.id === match[1]);
+      if (index < 0) return send(res, 404, { error: 'بسته پیدا نشد.' });
+      const [item] = db.packages.splice(index, 1);
+      audit('حذف بسته', 'package', item.id, item.name);
+      await persist(); return send(res, 200, { ok: true, package: item });
     }
     if (pathname === '/api/audit' && method === 'GET') return send(res, 200, { audit: db.audit.slice(0, 100) });
     return send(res, 404, { error: 'مسیر API پیدا نشد.' });
@@ -311,5 +433,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`FastLove Admin is running at http://localhost:${PORT}`);
-  if (!IS_PROD) console.log('DEMO credentials: admin / FastLove@2026 (development only)');
+  if (!IS_PROD) console.log(`DEMO credentials: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD} (development only)`);
 });

@@ -1,7 +1,7 @@
 {
   "name": "fastlove-monorepo",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "FastLove multi-platform product repository",
   "scripts": {
     "admin:dev": "npm --prefix apps/admin-web run dev",
