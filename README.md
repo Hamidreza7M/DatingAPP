@@ -24,12 +24,12 @@ Node.js 20 یا بالاتر لازم است. از ریشه مخزن:
 npm run admin:dev
 ```
 
-سپس `http://localhost:4177` را باز کنید.
+سپس `http://localhost:4177` را باز کنید. برای ورود، سرور Node.js را اجرا کنید؛ اجرای پوشه `dist` با `npx serve` کافی نیست، چون API ورود نیز باید فعال باشد.
 
 حساب دمو در محیط توسعه:
 
 - Username: `admin`
-- Password: `FastLove@2026`
+- Password: `123456`
 
 این حساب فقط برای توسعه محلی است. برای Production متغیرهای امن را طبق `apps/admin-web/.env.example` به محیط سرور تزریق کنید.
 

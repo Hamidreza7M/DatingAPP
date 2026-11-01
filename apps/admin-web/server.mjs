@@ -13,7 +13,7 @@ const PORT = Number(process.env.PORT || 4177);
 const IS_PROD = process.env.NODE_ENV === 'production';
 const SESSION_SECRET = process.env.SESSION_SECRET || (IS_PROD ? '' : 'local-demo-session-secret-change-me');
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || (IS_PROD ? '' : 'admin');
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (IS_PROD ? '' : 'FastLove@2026');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (IS_PROD ? '' : '123456');
 const SESSION_TTL = 8 * 60 * 60 * 1000;
 const sessions = new Map();
 const loginAttempts = new Map();

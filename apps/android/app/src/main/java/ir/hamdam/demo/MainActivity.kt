@@ -310,7 +310,7 @@ data class SupportTicket(
 
 // This PIN is only for the offline demo admin inbox. Replace it with server-side
 // authentication before publishing a multi-user production app.
-private const val SUPPORT_ADMIN_DEMO_PIN = "2468"
+private const val SUPPORT_ADMIN_DEMO_PIN = "123456"
 private const val SUPPORT_TICKETS_PREF_KEY = "supportTickets"
 private const val RATING_PROMPT_ACTION_THRESHOLD = 8
 
