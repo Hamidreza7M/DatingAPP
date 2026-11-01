@@ -8,6 +8,9 @@
     "admin:start": "npm --prefix apps/admin-web run start",
     "admin:build": "npm --prefix apps/admin-web run build",
     "android:build": "cd apps/android && gradle --no-daemon assembleDebug",
+    "android:test": "cd apps/android && gradle --no-daemon testDebugUnitTest",
+    "android:device-test": "cd apps/android && gradle --no-daemon connectedDebugAndroidTest",
+    "android:verify": "cd apps/android && gradle --no-daemon testDebugUnitTest lintDebug assembleDebug jacocoTestReport",
     "admin:test": "npm --prefix apps/admin-web test"
   },
   "engines": {

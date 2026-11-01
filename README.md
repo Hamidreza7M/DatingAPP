@@ -52,13 +52,18 @@ npm run admin:build
 
 خروجی کلاینت در `apps/admin-web/dist/` است. API پنل نیز جداگانه با `npm run admin:start` اجرا می‌شود. جزئیات استقرار در `apps/admin-web/README.md` آمده است.
 
-## ساخت Android
+## ساخت، تست و گزارش Android
 
-پروژه اندروید اکنون در `apps/android/` قرار دارد. برای Build به Java 17، Android SDK و Gradle 8.9 نیاز است:
+پروژه اندروید اکنون در `apps/android/` قرار دارد. برای Build و تست به Java 17، Android SDK (API 35) و Gradle 8.9 نیاز است:
 
 ```bash
-npm run android:build
+npm run android:build       # ساخت APK دیباگ
+npm run android:test        # تست‌های JVM
+npm run android:verify      # Unit Test + Lint + Coverage + APK
+npm run android:device-test # تست UI روی Emulator متصل
 ```
+
+Workflow اندروید در `.github/workflows/build-apk.yml` روی Pull Request و Push به شاخه‌های اصلی اجرا می‌شود. گزارش‌های JUnit، JaCoCo، Lint و Instrumentation به‌صورت Artifact در هر اجرای موفق/ناموفق ذخیره می‌شوند؛ خلاصه نتایج نیز در Summary همان Workflow قرار می‌گیرد. APK فقط در صورت عبور Quality Gate آپلود می‌شود. جزئیات تست‌ها و مسیر گزارش‌ها در `apps/android/README.md` آمده است.
 
 گردش‌کار GitHub Actions اندروید فقط با تغییرات `apps/android/**` اجرا می‌شود؛ پنل مدیریت Workflow مجزای خود را دارد.
 

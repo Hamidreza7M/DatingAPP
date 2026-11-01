@@ -1,5 +1,75 @@
 # فست لاو — نسخه ۲.۲۳.۰
 
+## استاندارد تست، گزارش و Quality Gate (افزوده‌شده)
+
+### تست‌های پیاده‌سازی‌شده
+
+- **JVM Unit Tests:** تست منطق فیلتر جنسیت پروفایل‌ها، امتیاز سازگاری، تبدیل ارقام فارسی/عربی، تعداد روزهای ماه جلالی، ساخت لینک Instagram/Spotify و تشخیص موضوع پیام دمو.
+- **Compose Instrumentation Smoke Test:** اجرای `MainActivity` روی شبیه‌ساز و بررسی نمایش صفحه ورود در نصب/اجرای اولیه.
+- **Static Checks:** اجرای Android Lint در CI.
+- **Coverage:** تولید گزارش XML و HTML با JaCoCo برای تست‌های JVM.
+
+تست‌ها در مسیرهای زیر هستند:
+
+```text
+app/src/test/java/ir/hamdam/demo/AppRulesTest.kt
+app/src/androidTest/java/ir/hamdam/demo/MainActivitySmokeTest.kt
+app/src/main/java/ir/hamdam/demo/AppRules.kt
+```
+
+### اجرای محلی
+
+با Java 17، Android SDK (API 35)، و Gradle 8.9 نصب‌شده:
+
+```bash
+# تست‌های سریع JVM
+cd apps/android
+gradle --no-daemon testDebugUnitTest
+
+# گزارش Coverage به فرمت XML و HTML
+gradle --no-daemon jacocoTestReport
+
+# تحلیل Android Lint
+gradle --no-daemon lintDebug
+
+# ساخت APK دیباگ
+gradle --no-daemon assembleDebug
+
+# تست رابط کاربری روی Emulator روشن/متصل
+gradle --no-daemon connectedDebugAndroidTest
+```
+
+فرمان یک‌جای بررسی قبل از انتشار از ریشه مخزن:
+
+```bash
+npm run android:verify
+```
+
+### اجرای خودکار و دریافت گزارش پس از هر Build در GitHub Actions
+
+Workflow فایل `.github/workflows/build-apk.yml` با هر Push به `main`/`master` و هر Pull Request دارای تغییر در `apps/android/**` اجرا می‌شود؛ اجرای دستی نیز از `workflow_dispatch` ممکن است. مراحل آن عبارت‌اند از Unit Test، Lint، JaCoCo، Build APK و تست Smoke روی Emulator با Android API 35؛ Coverage تست دستگاه نیز با Task رسمی Android Gradle Plugin تولید می‌شود.
+
+در انتهای هر اجرا:
+
+- خلاصه تست‌ها و Coverage در بخش **Actions → Workflow run → Summary** ثبت می‌شود.
+- گزارش‌های JUnit XML، HTML Test، JaCoCo، Lint، Coverage دستگاه و خروجی Instrumentation به‌صورت Artifact با نام `fastlove-android-reports-*` ذخیره می‌شوند.
+- APK دیباگ فقط در صورت موفقیت همه مراحل اجباری با نام `fastlove-debug-apk-*` منتشر می‌شود.
+
+### سیاست انتشار اولیه
+
+- خطای Build یا Lint باید صفر باشد.
+- تمام تست‌های بحرانی باید Pass باشند؛ تست Fail شده نباید با نادیده‌گرفتن نتیجه به انتشار برسد.
+- برای کدهای جدید، Coverage هدف‌گذاری‌شده حداقل ۸۰٪ و برای منطق تجاری ۹۰٪ است؛ این اعداد سیاست پیشنهادی تیم هستند، نه شرط رسمی گوگل. در این تغییر Coverage کل پروژه را به ۸۰٪ اجبار نکرده‌ایم، چون بخش عمده UI و منطق قدیمی هنوز تست نشده است.
+- تست کامل UI/E2E روی ماتریس چند دستگاه و Android نسخه‌های متعدد، Security Scan عمیق و Performance Benchmark هنوز در این تغییر اضافه نشده‌اند و باید در گام بعدی تکمیل شوند.
+
+### محدودیت اجرای این بسته
+
+در محیط ساخت فعلی، Gradle و Android SDK نصب نیستند. بنابراین در این نوبت امکان اجرای واقعی Gradle، ساخت APK و اجرای تست روی Emulator وجود نداشت. Workflow برای اجرای این مراحل در GitHub Actions تنظیم شده است؛ نتایج واقعی آن پس از اجرای Workflow در مخزن GitHub تولید خواهد شد. به‌علاوه، این مخزن در وضعیت فعلی فاقد بک‌اند واقعی است؛ تست‌ها رفتار منطق محلی اپ را پوشش می‌دهند و ادعای صحت جریان واقعی ورود، پرداخت، همگام‌سازی یا شبکه ندارند.
+
+---
+
+
+
 ## تجربه کیبورد، پشتیبانی و امتیازدهی
 
 1. بهبود رفتار کیبورد در فرم‌ها با `adjustResize` و مدیریت insets/`imePadding` در سطح رابط کاربری؛ فرم‌های قابل اسکرول هنگام بازشدن کیبورد قابل استفاده می‌مانند و دکمه‌های اصلی در دسترس هستند.
