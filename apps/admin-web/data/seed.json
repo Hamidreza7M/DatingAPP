@@ -1,0 +1,71 @@
+{
+  "users": [
+    {"id":"USR-1001","name":"سارا احمدی","phone":"09121234567","email":"sara.a@example.com","city":"تهران","gender":"زن","age":27,"job":"طراح گرافیک","goal":"رابطه جدی","plan":"VIP","status":"active","verification":"verified","joinedAt":"2026-09-14T09:20:00.000Z","lastSeenAt":"2026-11-01T16:42:00.000Z","bio":"علاقه‌مند به سفر، کتاب و کافه‌های دنج. عاشق تجربه‌های تازه و گفت‌وگوهای عمیق.","interests":["سفر","کتاب","کافه","عکاسی"],"instagram":"sara.design","photos":4,"online":true,"referralCode":"FL-SARA27","subscriptionExpiresAt":"2026-12-14T09:20:00.000Z"},
+    {"id":"USR-1002","name":"آرمان رضایی","phone":"09123334455","email":"arman.r@example.com","city":"اصفهان","gender":"مرد","age":30,"job":"مهندس نرم‌افزار","goal":"ازدواج","plan":"Pro","status":"active","verification":"pending","joinedAt":"2026-09-22T11:10:00.000Z","lastSeenAt":"2026-11-01T15:18:00.000Z","bio":"برنامه‌نویس، اهل کوهنوردی و موسیقی زنده.","interests":["کدنویسی","کوهنوردی","موسیقی"],"instagram":"arman.codes","photos":3,"online":false,"referralCode":"FL-ARMAN30","subscriptionExpiresAt":"2026-11-22T11:10:00.000Z"},
+    {"id":"USR-1003","name":"نیلوفر محمدی","phone":"09351234567","email":"nilo.m@example.com","city":"شیراز","gender":"زن","age":25,"job":"روانشناس","goal":"دوستی ساده","plan":"Free","status":"active","verification":"rejected","joinedAt":"2026-10-02T08:00:00.000Z","lastSeenAt":"2026-10-31T19:20:00.000Z","bio":"طبیعت‌گردی و فیلم دیدن را دوست دارم.","interests":["طبیعت","فیلم","یوگا"],"instagram":"nilo.mood","photos":5,"online":false,"referralCode":"FL-NILO25","subscriptionExpiresAt":null},
+    {"id":"USR-1004","name":"مازیار کریمی","phone":"09125556677","email":"maziar.k@example.com","city":"تهران","gender":"مرد","age":32,"job":"معمار","goal":"رابطه جدی","plan":"Pro","status":"active","verification":"verified","joinedAt":"2026-08-19T13:30:00.000Z","lastSeenAt":"2026-11-01T16:05:00.000Z","bio":"معماری، دوچرخه‌سواری و سفرهای جاده‌ای.","interests":["معماری","دوچرخه‌سواری","سفر"],"instagram":"maziar.arch","photos":6,"online":true,"referralCode":"FL-MAZ32","subscriptionExpiresAt":"2026-11-19T13:30:00.000Z"},
+    {"id":"USR-1005","name":"الهام موسوی","phone":"09901234567","email":"elham.m@example.com","city":"تبریز","gender":"زن","age":29,"job":"پزشک","goal":"ازدواج","plan":"VIP","status":"active","verification":"pending","joinedAt":"2026-10-05T10:45:00.000Z","lastSeenAt":"2026-10-30T20:02:00.000Z","bio":"اهل کتاب، آشپزی و طبیعت.","interests":["کتاب","آشپزی","طبیعت"],"instagram":"elham.md","photos":4,"online":false,"referralCode":"FL-ELH29","subscriptionExpiresAt":"2026-12-05T10:45:00.000Z"},
+    {"id":"USR-1006","name":"پارسا نادری","phone":"09127778899","email":"parsa.n@example.com","city":"کرج","gender":"مرد","age":26,"job":"دانشجو","goal":"دوستی ساده","plan":"Free","status":"active","verification":"not_verified","joinedAt":"2026-10-21T12:05:00.000Z","lastSeenAt":"2026-11-01T14:01:00.000Z","bio":"بازی، فیلم و ورزش.","interests":["بازی","فیلم","ورزش"],"instagram":"","photos":2,"online":true,"referralCode":"FL-PAR26","subscriptionExpiresAt":null},
+    {"id":"USR-1007","name":"مهسا جعفری","phone":"09129990011","email":"mahsa.j@example.com","city":"رشت","gender":"زن","age":28,"job":"عکاس","goal":"رابطه جدی","plan":"Pro","status":"suspended","verification":"verified","joinedAt":"2026-07-11T07:15:00.000Z","lastSeenAt":"2026-10-28T11:10:00.000Z","bio":"عکاسی خیابانی و سفر.","interests":["عکاسی","سفر","هنر"],"instagram":"mahsa.frames","photos":7,"online":false,"referralCode":"FL-MAH28","subscriptionExpiresAt":"2026-11-11T07:15:00.000Z"},
+    {"id":"USR-1008","name":"کیان شریفی","phone":"09360001122","email":"kian.s@example.com","city":"مشهد","gender":"مرد","age":31,"job":"وکیل","goal":"رابطه جدی","plan":"Free","status":"active","verification":"not_verified","joinedAt":"2026-10-26T15:35:00.000Z","lastSeenAt":"2026-11-01T12:50:00.000Z","bio":"علاقه‌مند به سفر و موسیقی.","interests":["موسیقی","سفر","کتاب"],"instagram":"kian.law","photos":3,"online":false,"referralCode":"FL-KIAN31","subscriptionExpiresAt":null}
+  ],
+  "payments": [
+    {"id":"PAY-8001","userId":"USR-1001","userName":"سارا احمدی","packageId":"vip-monthly","packageTitle":"اشتراک VIP یک‌ماهه","amount":790000,"currency":"IRR","status":"success","gateway":"زرین‌پال","transactionId":"ZP-83192001","createdAt":"2026-10-28T08:30:00.000Z","description":"خرید اشتراک VIP"},
+    {"id":"PAY-8002","userId":"USR-1002","userName":"آرمان رضایی","packageId":"pro-monthly","packageTitle":"اشتراک Pro یک‌ماهه","amount":390000,"currency":"IRR","status":"success","gateway":"زرین‌پال","transactionId":"ZP-83192002","createdAt":"2026-10-27T11:15:00.000Z","description":"خرید اشتراک Pro"},
+    {"id":"PAY-8003","userId":"USR-1004","userName":"مازیار کریمی","packageId":"credit-10","packageTitle":"۱۰ اعتبار پیام","amount":220000,"currency":"IRR","status":"failed","gateway":"آیدی‌پی","transactionId":"IDP-FAIL-003","createdAt":"2026-10-26T09:12:00.000Z","description":"خرید اعتبار پیام مستقیم"},
+    {"id":"PAY-8004","userId":"USR-1005","userName":"الهام موسوی","packageId":"vip-monthly","packageTitle":"اشتراک VIP یک‌ماهه","amount":790000,"currency":"IRR","status":"success","gateway":"زرین‌پال","transactionId":"ZP-83192004","createdAt":"2026-10-25T14:00:00.000Z","description":"خرید اشتراک VIP"},
+    {"id":"PAY-8005","userId":"USR-1007","userName":"مهسا جعفری","packageId":"pro-monthly","packageTitle":"اشتراک Pro یک‌ماهه","amount":390000,"currency":"IRR","status":"pending","gateway":"زرین‌پال","transactionId":"ZP-PENDING-005","createdAt":"2026-11-01T10:10:00.000Z","description":"خرید اشتراک Pro"},
+    {"id":"PAY-8006","userId":"USR-1006","userName":"پارسا نادری","packageId":"credit-5","packageTitle":"۵ اعتبار پیام","amount":125000,"currency":"IRR","status":"success","gateway":"زیبال","transactionId":"ZB-83192006","createdAt":"2026-10-23T16:40:00.000Z","description":"خرید اعتبار پیام مستقیم"}
+  ],
+  "reports": [
+    {"id":"RPT-5001","reporterId":"USR-1001","reporterName":"سارا احمدی","targetId":"USR-1007","targetName":"مهسا جعفری","reason":"آزار و اذیت یا پیام نامناسب","description":"بعد از رد درخواست، پیام‌های توهین‌آمیز و مکرر ارسال شده است.","status":"pending","createdAt":"2026-11-01T09:15:00.000Z","evidenceCount":2},
+    {"id":"RPT-5002","reporterId":"USR-1006","reporterName":"پارسا نادری","targetId":"USR-1003","targetName":"نیلوفر محمدی","reason":"پروفایل جعلی / عکس دیگران","description":"به نظر می‌رسد تصاویر این پروفایل متعلق به شخص دیگری است.","status":"pending","createdAt":"2026-10-31T13:00:00.000Z","evidenceCount":1},
+    {"id":"RPT-5003","reporterId":"USR-1008","reporterName":"کیان شریفی","targetId":"USR-1007","targetName":"مهسا جعفری","reason":"اسپم یا تبلیغات","description":"ارسال لینک تبلیغاتی در چند گفت‌وگوی مختلف.","status":"approved","createdAt":"2026-10-29T17:30:00.000Z","evidenceCount":0},
+    {"id":"RPT-5004","reporterId":"USR-1004","reporterName":"مازیار کریمی","targetId":"USR-1006","targetName":"پارسا نادری","reason":"سایر موارد","description":"گزارش آزمایشی برای نمایش وضعیت رد شده.","status":"rejected","createdAt":"2026-10-27T10:00:00.000Z","evidenceCount":0}
+  ],
+  "verifications": [
+    {"id":"VER-3001","userId":"USR-1002","userName":"آرمان رضایی","submittedAt":"2026-10-31T10:00:00.000Z","status":"pending","videoLabel":"ویدیوی احراز هویت ۱","durationSeconds":12,"prompt":"امروز چه تاریخی است و نام کاربری شما چیست؟","notes":"ویدیو در محیط خصوصی ذخیره شده است؛ نسخه دمو فقط فراداده را نمایش می‌دهد."},
+    {"id":"VER-3002","userId":"USR-1005","userName":"الهام موسوی","submittedAt":"2026-10-30T08:45:00.000Z","status":"pending","videoLabel":"ویدیوی احراز هویت ۲","durationSeconds":8,"prompt":"نام کاربری و عبارت نمایش‌داده‌شده را بیان کنید.","notes":"فایل ویدیویی واقعی در دیتاست نمونه وجود ندارد."},
+    {"id":"VER-3003","userId":"USR-1003","userName":"نیلوفر محمدی","submittedAt":"2026-10-20T08:00:00.000Z","status":"rejected","durationSeconds":3,"videoLabel":"ویدیوی احراز هویت قبلی","prompt":"","reviewReason":"مدت ویدیو برای بررسی کافی نبود."}
+  ],
+  "tickets": [
+    {"id":"TKT-2001","userId":"USR-1001","userName":"سارا احمدی","category":"اشتراک و پرداخت","subject":"مشکل در فعال‌سازی اشتراک VIP","status":"open","priority":"high","createdAt":"2026-10-30T11:20:00.000Z","updatedAt":"2026-11-01T12:10:00.000Z","messages":[{"id":"MSG-1","author":"user","authorName":"سارا احمدی","text":"هزینه اشتراک از حسابم کسر شده اما امکانات VIP فعال نشده است.","createdAt":"2026-10-30T11:20:00.000Z"},{"id":"MSG-2","author":"admin","authorName":"پشتیبانی FastLove","text":"سلام، پرداخت شما را بررسی می‌کنیم. لطفاً شناسه تراکنش را ارسال کنید.","createdAt":"2026-10-30T12:00:00.000Z"},{"id":"MSG-3","author":"user","authorName":"سارا احمدی","text":"شناسه تراکنش ZP-83192001 است.","createdAt":"2026-11-01T12:10:00.000Z"}],"history":[{"action":"تیکت ثبت شد","actor":"کاربر"},{"action":"پاسخ مدیر ثبت شد","actor":"پشتیبانی"}]},
+    {"id":"TKT-2002","userId":"USR-1002","userName":"آرمان رضایی","category":"پروفایل و احراز هویت","subject":"وضعیت تأیید ویدئویی","status":"open","priority":"normal","createdAt":"2026-10-29T09:10:00.000Z","updatedAt":"2026-10-29T09:10:00.000Z","messages":[{"id":"MSG-4","author":"user","authorName":"آرمان رضایی","text":"ویدیوی من چند روز است در انتظار بررسی مانده. لطفاً وضعیت را اعلام کنید.","createdAt":"2026-10-29T09:10:00.000Z"}],"history":[{"action":"تیکت ثبت شد","actor":"کاربر"}]},
+    {"id":"TKT-2003","userId":"USR-1006","userName":"پارسا نادری","category":"مشکل فنی و خطا","subject":"باز نشدن صفحه گفتگو","status":"closed","priority":"low","createdAt":"2026-10-25T16:00:00.000Z","updatedAt":"2026-10-26T08:30:00.000Z","messages":[{"id":"MSG-5","author":"user","authorName":"پارسا نادری","text":"صفحه چت باز نمی‌شود.","createdAt":"2026-10-25T16:00:00.000Z"},{"id":"MSG-6","author":"admin","authorName":"پشتیبانی FastLove","text":"با به‌روزرسانی نسخه مشکل برطرف می‌شود.","createdAt":"2026-10-26T08:00:00.000Z"}],"history":[{"action":"تیکت بسته شد","actor":"پشتیبانی"}]}
+  ],
+  "likes": [
+    {"id":"LIK-1","fromId":"USR-1001","fromName":"سارا احمدی","toId":"USR-1004","toName":"مازیار کریمی","createdAt":"2026-10-31T14:20:00.000Z","type":"outgoing"},
+    {"id":"LIK-2","fromId":"USR-1002","fromName":"آرمان رضایی","toId":"USR-1005","toName":"الهام موسوی","createdAt":"2026-10-31T12:40:00.000Z","type":"incoming"},
+    {"id":"LIK-3","fromId":"USR-1006","fromName":"پارسا نادری","toId":"USR-1001","toName":"سارا احمدی","createdAt":"2026-10-30T18:00:00.000Z","type":"outgoing"},
+    {"id":"LIK-4","fromId":"USR-1008","fromName":"کیان شریفی","toId":"USR-1003","toName":"نیلوفر محمدی","createdAt":"2026-10-30T08:25:00.000Z","type":"incoming"},
+    {"id":"LIK-5","fromId":"USR-1004","fromName":"مازیار کریمی","toId":"USR-1001","toName":"سارا احمدی","createdAt":"2026-10-29T20:10:00.000Z","type":"outgoing"}
+  ],
+  "matches": [
+    {"id":"MAT-1","userAId":"USR-1001","userAName":"سارا احمدی","userBId":"USR-1004","userBName":"مازیار کریمی","createdAt":"2026-10-30T13:15:00.000Z","status":"active"},
+    {"id":"MAT-2","userAId":"USR-1002","userAName":"آرمان رضایی","userBId":"USR-1005","userBName":"الهام موسوی","createdAt":"2026-10-28T19:00:00.000Z","status":"active"},
+    {"id":"MAT-3","userAId":"USR-1006","userAName":"پارسا نادری","userBId":"USR-1008","userBName":"کیان شریفی","createdAt":"2026-10-25T09:40:00.000Z","status":"ended"}
+  ],
+  "dates": [
+    {"id":"DAT-1","userAId":"USR-1001","userAName":"سارا احمدی","userBId":"USR-1004","userBName":"مازیار کریمی","place":"کافه ویونا، تهران","scheduledAt":"2026-11-03T16:00:00.000Z","status":"accepted","createdAt":"2026-10-30T13:30:00.000Z"},
+    {"id":"DAT-2","userAId":"USR-1002","userAName":"آرمان رضایی","userBId":"USR-1005","userBName":"الهام موسوی","place":"کافه عمارت، تبریز","scheduledAt":"2026-11-05T17:30:00.000Z","status":"pending","createdAt":"2026-10-31T11:00:00.000Z"},
+    {"id":"DAT-3","userAId":"USR-1006","userAName":"پارسا نادری","userBId":"USR-1008","userBName":"کیان شریفی","place":"پارک ملت، مشهد","scheduledAt":"2026-10-28T15:00:00.000Z","status":"completed","createdAt":"2026-10-25T10:00:00.000Z"}
+  ],
+  "packages": [
+    {"id":"pro-monthly","name":"اشتراک Pro یک‌ماهه","type":"subscription","durationDays":30,"price":390000,"currency":"IRR","active":true,"description":"۵۰ لایک روزانه و امکانات پیشرفته"},
+    {"id":"vip-monthly","name":"اشتراک VIP یک‌ماهه","type":"subscription","durationDays":30,"price":790000,"currency":"IRR","active":true,"description":"لایک نامحدود و نمایش اولویت‌دار"},
+    {"id":"credit-5","name":"۵ اعتبار پیام","type":"credit","durationDays":0,"price":125000,"currency":"IRR","active":true,"description":"شروع گفتگو با ۵ کاربر جدید"},
+    {"id":"credit-10","name":"۱۰ اعتبار پیام","type":"credit","durationDays":0,"price":220000,"currency":"IRR","active":true,"description":"شروع گفتگو با ۱۰ کاربر جدید"},
+    {"id":"credit-20","name":"۲۰ اعتبار پیام","type":"credit","durationDays":0,"price":350000,"currency":"IRR","active":false,"description":"شروع گفتگو با ۲۰ کاربر جدید"}
+  ],
+  "activity": [
+    {"id":"ACT-1","userId":"USR-1001","type":"login","title":"ورود به حساب","detail":"ورود موفق از دستگاه Android","createdAt":"2026-11-01T16:42:00.000Z"},
+    {"id":"ACT-2","userId":"USR-1001","type":"like","title":"ثبت لایک","detail":"لایک به مازیار کریمی","createdAt":"2026-10-31T14:20:00.000Z"},
+    {"id":"ACT-3","userId":"USR-1001","type":"payment","title":"پرداخت موفق","detail":"خرید اشتراک VIP یک‌ماهه","createdAt":"2026-10-28T08:30:00.000Z"},
+    {"id":"ACT-4","userId":"USR-1001","type":"ticket","title":"ثبت تیکت پشتیبانی","detail":"مشکل در فعال‌سازی اشتراک VIP","createdAt":"2026-10-30T11:20:00.000Z"},
+    {"id":"ACT-5","userId":"USR-1002","type":"verification","title":"ارسال ویدیوی احراز هویت","detail":"در انتظار بررسی مدیر","createdAt":"2026-10-31T10:00:00.000Z"},
+    {"id":"ACT-6","userId":"USR-1002","type":"match","title":"ایجاد مچ","detail":"با الهام موسوی","createdAt":"2026-10-28T19:00:00.000Z"},
+    {"id":"ACT-7","userId":"USR-1004","type":"date","title":"تأیید قرار","detail":"کافه ویونا، ۳ نوامبر","createdAt":"2026-10-30T13:30:00.000Z"},
+    {"id":"ACT-8","userId":"USR-1007","type":"report","title":"دریافت گزارش تخلف","detail":"اسپم یا تبلیغات","createdAt":"2026-10-29T17:30:00.000Z"}
+  ],
+  "audit": []
+}

@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "FastLove"
+rootProject.name = "FastLove-Android"
 include(":app")

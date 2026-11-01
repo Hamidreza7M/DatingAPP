@@ -1,0 +1,315 @@
+import http from 'node:http';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC = path.join(ROOT, 'public');
+const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
+const DB_FILE = path.join(DATA_DIR, 'db.json');
+const SEED_FILE = path.join(ROOT, 'data', 'seed.json');
+const PORT = Number(process.env.PORT || 4177);
+const IS_PROD = process.env.NODE_ENV === 'production';
+const SESSION_SECRET = process.env.SESSION_SECRET || (IS_PROD ? '' : 'local-demo-session-secret-change-me');
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || (IS_PROD ? '' : 'admin');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (IS_PROD ? '' : 'FastLove@2026');
+const SESSION_TTL = 8 * 60 * 60 * 1000;
+const sessions = new Map();
+const loginAttempts = new Map();
+
+if (IS_PROD && (!SESSION_SECRET || !ADMIN_USERNAME || !ADMIN_PASSWORD)) {
+  console.error('Production requires SESSION_SECRET, ADMIN_USERNAME and ADMIN_PASSWORD environment variables.');
+  process.exit(1);
+}
+
+await fs.mkdir(DATA_DIR, { recursive: true });
+try { await fs.access(DB_FILE); }
+catch { await fs.copyFile(SEED_FILE, DB_FILE); }
+
+let db = JSON.parse(await fs.readFile(DB_FILE, 'utf8'));
+let writeQueue = Promise.resolve();
+function persist() {
+  const snapshot = JSON.stringify(db, null, 2);
+  writeQueue = writeQueue.then(async () => {
+    const temp = `${DB_FILE}.tmp`;
+    await fs.writeFile(temp, snapshot, 'utf8');
+    await fs.rename(temp, DB_FILE);
+  });
+  return writeQueue;
+}
+function now() { return new Date().toISOString(); }
+function randomId(prefix) { return `${prefix}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`; }
+function safeEqual(a, b) {
+  const ah = crypto.createHash('sha256').update(String(a)).digest();
+  const bh = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ah, bh);
+}
+function sign(value) {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('base64url');
+}
+function parseCookies(header = '') {
+  return Object.fromEntries(header.split(';').map(x => x.trim()).filter(Boolean).map(pair => {
+    const i = pair.indexOf('=');
+    return [decodeURIComponent(pair.slice(0, i)), decodeURIComponent(pair.slice(i + 1))];
+  }));
+}
+function send(res, status, payload, headers = {}) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers });
+  res.end(JSON.stringify(payload));
+}
+function getSession(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies.fl_admin_session || '';
+  const session = sessions.get(token);
+  if (!session || session.expiresAt < Date.now()) {
+    if (token) sessions.delete(token);
+    return null;
+  }
+  return { token, ...session };
+}
+function requireAdmin(req, res) {
+  const session = getSession(req);
+  if (!session) { send(res, 401, { error: 'برای ادامه وارد پنل مدیریت شوید.' }); return null; }
+  session.expiresAt = Date.now() + SESSION_TTL;
+  sessions.set(session.token, { username: session.username, expiresAt: session.expiresAt });
+  return session;
+}
+async function readBody(req, maxBytes = 1024 * 1024) {
+  const chunks = []; let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > maxBytes) throw Object.assign(new Error('حجم درخواست بیش از حد مجاز است.'), { status: 413 });
+    chunks.push(chunk);
+  }
+  if (!chunks.length) return {};
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+  catch { throw Object.assign(new Error('ساختار درخواست معتبر نیست.'), { status: 400 }); }
+}
+function audit(action, entity, entityId, details = '') {
+  db.audit.unshift({ id: randomId('AUD'), action, entity, entityId, details, actor: 'admin', createdAt: now() });
+  db.audit = db.audit.slice(0, 500);
+}
+function userById(id) { return db.users.find(u => u.id === id); }
+function fmtMonth(date) { return date.toISOString().slice(0, 7); }
+function dashboard() {
+  const successfulPayments = db.payments.filter(p => p.status === 'success');
+  const revenue = successfulPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  const activeUsers = db.users.filter(u => u.status === 'active').length;
+  const pendingReports = db.reports.filter(r => r.status === 'pending').length;
+  const pendingVerifications = db.verifications.filter(v => v.status === 'pending').length;
+  const openTickets = db.tickets.filter(t => t.status === 'open').length;
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth() - i); d.setDate(1);
+    const key = fmtMonth(d);
+    const title = new Intl.DateTimeFormat('fa-IR', { month: 'short' }).format(d);
+    const monthPayments = successfulPayments.filter(p => fmtMonth(new Date(p.createdAt)) === key);
+    months.push({ label: title, revenue: monthPayments.reduce((s, p) => s + Number(p.amount || 0), 0), payments: monthPayments.length });
+  }
+  const usersByPlan = ['Free', 'Pro', 'VIP'].map(plan => ({ label: plan, value: db.users.filter(u => u.plan === plan && u.status !== 'deleted').length }));
+  return {
+    totals: {
+      users: 12486 + db.users.length - 8,
+      activeUsers: 8214 + activeUsers - 7,
+      newUsers: 372,
+      revenue: 124800000 + revenue,
+      conversionRate: 8.4,
+      successfulPayments: successfulPayments.length,
+      pendingReports, pendingVerifications, openTickets,
+      likes: 928,
+      matches: 214,
+      dates: 86
+    },
+    revenueTrend: months,
+    usersByPlan,
+    funnel: [{ label: 'بازدید پروفایل', value: 100 }, { label: 'ثبت‌نام', value: 62 }, { label: 'تکمیل پروفایل', value: 44 }, { label: 'اولین لایک', value: 31 }, { label: 'خرید اشتراک', value: 8.4 }],
+    recentPayments: [...db.payments].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5),
+    recentActivity: [...db.activity].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6)
+  };
+}
+
+const MIME = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.svg':'image/svg+xml', '.png':'image/png', '.ico':'image/x-icon' };
+async function staticFile(req, res, pathname) {
+  const clean = decodeURIComponent(pathname.split('?')[0]);
+  const relative = clean === '/' ? 'index.html' : clean.replace(/^\/+/, '');
+  let target = path.resolve(PUBLIC, relative);
+  if (!target.startsWith(PUBLIC + path.sep) && target !== path.join(PUBLIC, 'index.html')) return send(res, 403, { error: 'Forbidden' });
+  try {
+    const stat = await fs.stat(target);
+    if (stat.isDirectory()) target = path.join(target, 'index.html');
+    const content = await fs.readFile(target);
+    res.writeHead(200, { 'Content-Type': MIME[path.extname(target)] || 'application/octet-stream', 'Cache-Control': path.extname(target) === '.html' ? 'no-cache' : 'public, max-age=3600', 'X-Content-Type-Options':'nosniff' });
+    res.end(content);
+  } catch {
+    if (!path.extname(clean)) return staticFile(req, res, '/index.html');
+    send(res, 404, { error: 'فایل پیدا نشد.' });
+  }
+}
+
+const server = http.createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const pathname = url.pathname;
+    const method = req.method || 'GET';
+    if (!pathname.startsWith('/api/')) return staticFile(req, res, pathname);
+    if (method !== 'GET' && req.headers.origin) {
+      const expectedOrigin = process.env.PUBLIC_ORIGIN || `http://${req.headers.host}`;
+      if (req.headers.origin !== expectedOrigin) return send(res, 403, { error: 'درخواست از مبدأ نامعتبر پذیرفته نشد.' });
+    }
+
+    if (pathname === '/api/health' && method === 'GET') return send(res, 200, { ok: true, mode: IS_PROD ? 'production' : 'demo' });
+    if (pathname === '/api/auth/login' && method === 'POST') {
+      const ip = req.socket.remoteAddress || 'unknown';
+      const attempts = loginAttempts.get(ip) || { count: 0, since: Date.now() };
+      if (Date.now() - attempts.since > 10 * 60 * 1000) { attempts.count = 0; attempts.since = Date.now(); }
+      if (attempts.count >= 8) return send(res, 429, { error: 'تعداد تلاش‌های ورود زیاد است. ۱۰ دقیقه دیگر دوباره تلاش کنید.' });
+      const body = await readBody(req);
+      if (!safeEqual(body.username || '', ADMIN_USERNAME) || !safeEqual(body.password || '', ADMIN_PASSWORD)) {
+        attempts.count++; loginAttempts.set(ip, attempts);
+        return send(res, 401, { error: 'نام کاربری یا رمز عبور صحیح نیست.' });
+      }
+      loginAttempts.delete(ip);
+      const token = crypto.randomBytes(32).toString('base64url');
+      sessions.set(token, { username: ADMIN_USERNAME, expiresAt: Date.now() + SESSION_TTL });
+      const cookie = `fl_admin_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL / 1000}${IS_PROD ? '; Secure' : ''}`;
+      return send(res, 200, { admin: { username: ADMIN_USERNAME } }, { 'Set-Cookie': cookie });
+    }
+    if (pathname === '/api/auth/logout' && method === 'POST') {
+      const session = getSession(req); if (session) sessions.delete(session.token);
+      return send(res, 200, { ok: true }, { 'Set-Cookie': `fl_admin_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${IS_PROD ? '; Secure' : ''}` });
+    }
+    if (pathname === '/api/auth/me' && method === 'GET') {
+      const session = getSession(req);
+      return session ? send(res, 200, { admin: { username: session.username } }) : send(res, 401, { error: 'نیاز به ورود' });
+    }
+
+    const session = requireAdmin(req, res); if (!session) return;
+    if (pathname === '/api/dashboard' && method === 'GET') return send(res, 200, dashboard());
+
+    if (pathname === '/api/users' && method === 'GET') {
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+      const status = url.searchParams.get('status') || 'all';
+      const plan = url.searchParams.get('plan') || 'all';
+      let users = [...db.users];
+      if (q) users = users.filter(u => [u.name,u.phone,u.email,u.id,u.city].some(v => String(v || '').toLowerCase().includes(q)));
+      if (status !== 'all') users = users.filter(u => u.status === status);
+      if (plan !== 'all') users = users.filter(u => u.plan === plan);
+      return send(res, 200, { users: users.sort((a,b) => b.joinedAt.localeCompare(a.joinedAt)) });
+    }
+    let match = pathname.match(/^\/api\/users\/([^/]+)$/);
+    if (match && method === 'GET') {
+      const user = userById(match[1]); if (!user) return send(res, 404, { error: 'کاربر پیدا نشد.' });
+      const userId = user.id;
+      return send(res, 200, {
+        user,
+        payments: db.payments.filter(x => x.userId === userId),
+        reports: db.reports.filter(x => x.reporterId === userId || x.targetId === userId),
+        tickets: db.tickets.filter(x => x.userId === userId),
+        likes: db.likes.filter(x => x.fromId === userId || x.toId === userId),
+        matches: db.matches.filter(x => x.userAId === userId || x.userBId === userId),
+        dates: db.dates.filter(x => x.userAId === userId || x.userBId === userId),
+        activity: db.activity.filter(x => x.userId === userId),
+        verifications: db.verifications.filter(x => x.userId === userId)
+      });
+    }
+    if (match && method === 'DELETE') {
+      const user = userById(match[1]); if (!user) return send(res, 404, { error: 'کاربر پیدا نشد.' });
+      user.status = 'deleted'; user.deletedAt = now(); user.online = false;
+      audit('حذف نرم حساب کاربری', 'user', user.id, user.name);
+      await persist(); return send(res, 200, { user });
+    }
+
+    if (pathname === '/api/payments' && method === 'GET') {
+      const q = (url.searchParams.get('q') || '').toLowerCase();
+      const status = url.searchParams.get('status') || 'all';
+      let payments = [...db.payments];
+      if (q) payments = payments.filter(p => [p.id,p.userName,p.userId,p.transactionId,p.packageTitle].some(v => String(v || '').toLowerCase().includes(q)));
+      if (status !== 'all') payments = payments.filter(p => p.status === status);
+      return send(res, 200, { payments: payments.sort((a,b) => b.createdAt.localeCompare(a.createdAt)) });
+    }
+    match = pathname.match(/^\/api\/payments\/([^/]+)$/);
+    if (match && method === 'GET') {
+      const payment = db.payments.find(p => p.id === match[1]);
+      return payment ? send(res, 200, { payment, user: userById(payment.userId) || null }) : send(res, 404, { error: 'پرداخت پیدا نشد.' });
+    }
+
+    if (pathname === '/api/reports' && method === 'GET') return send(res, 200, { reports: [...db.reports].sort((a,b) => b.createdAt.localeCompare(a.createdAt)) });
+    match = pathname.match(/^\/api\/reports\/([^/]+)$/);
+    if (match && method === 'PATCH') {
+      const body = await readBody(req); const item = db.reports.find(x => x.id === match[1]);
+      if (!item) return send(res, 404, { error: 'گزارش پیدا نشد.' });
+      if (!['approved','rejected','pending'].includes(body.status)) return send(res, 400, { error: 'وضعیت نامعتبر است.' });
+      item.status = body.status; item.reviewedAt = now(); item.reviewNote = String(body.note || '').slice(0, 1000);
+      audit('بررسی گزارش تخلف', 'report', item.id, body.status);
+      await persist(); return send(res, 200, { report: item });
+    }
+
+    if (pathname === '/api/verifications' && method === 'GET') return send(res, 200, { verifications: [...db.verifications].sort((a,b) => b.submittedAt.localeCompare(a.submittedAt)) });
+    match = pathname.match(/^\/api\/verifications\/([^/]+)$/);
+    if (match && method === 'PATCH') {
+      const body = await readBody(req); const item = db.verifications.find(x => x.id === match[1]);
+      if (!item) return send(res, 404, { error: 'درخواست احراز هویت پیدا نشد.' });
+      if (!['verified','rejected','pending'].includes(body.status)) return send(res, 400, { error: 'وضعیت نامعتبر است.' });
+      item.status = body.status; item.reviewedAt = now(); item.reviewReason = String(body.reason || '').slice(0, 1000);
+      const user = userById(item.userId); if (user) user.verification = body.status;
+      audit('بررسی احراز هویت ویدئویی', 'verification', item.id, body.status);
+      await persist(); return send(res, 200, { verification: item });
+    }
+
+    if (pathname === '/api/tickets' && method === 'GET') {
+      const q = (url.searchParams.get('q') || '').toLowerCase(); const status = url.searchParams.get('status') || 'all';
+      let tickets = [...db.tickets];
+      if (q) tickets = tickets.filter(t => [t.id,t.userName,t.subject,t.category].some(v => String(v || '').toLowerCase().includes(q)));
+      if (status !== 'all') tickets = tickets.filter(t => t.status === status);
+      return send(res, 200, { tickets: tickets.sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)) });
+    }
+    match = pathname.match(/^\/api\/tickets\/([^/]+)\/reply$/);
+    if (match && method === 'POST') {
+      const body = await readBody(req); const ticket = db.tickets.find(t => t.id === match[1]);
+      if (!ticket) return send(res, 404, { error: 'تیکت پیدا نشد.' });
+      if (ticket.status === 'closed') return send(res, 409, { error: 'تیکت بسته است؛ ابتدا آن را باز کنید.' });
+      const message = String(body.text || '').trim();
+      if (!message) return send(res, 400, { error: 'متن پاسخ اجباری است.' });
+      const createdAt = now();
+      ticket.messages.push({ id: randomId('MSG'), author: 'admin', authorName: 'پشتیبانی FastLove', text: message.slice(0, 5000), createdAt });
+      ticket.updatedAt = createdAt; ticket.history.push({ action: 'پاسخ مدیر ثبت شد', actor: 'پشتیبانی', createdAt });
+      audit('پاسخ به تیکت', 'ticket', ticket.id);
+      await persist(); return send(res, 200, { ticket });
+    }
+    match = pathname.match(/^\/api\/tickets\/([^/]+)\/status$/);
+    if (match && method === 'PATCH') {
+      const body = await readBody(req); const ticket = db.tickets.find(t => t.id === match[1]);
+      if (!ticket) return send(res, 404, { error: 'تیکت پیدا نشد.' });
+      if (!['open','closed'].includes(body.status)) return send(res, 400, { error: 'وضعیت نامعتبر است.' });
+      ticket.status = body.status; ticket.updatedAt = now(); ticket.history.push({ action: body.status === 'closed' ? 'تیکت بسته شد' : 'تیکت دوباره باز شد', actor: 'پشتیبانی', createdAt: ticket.updatedAt });
+      audit(body.status === 'closed' ? 'بستن تیکت' : 'بازکردن مجدد تیکت', 'ticket', ticket.id);
+      await persist(); return send(res, 200, { ticket });
+    }
+
+    if (pathname === '/api/likes' && method === 'GET') return send(res, 200, { likes: [...db.likes].sort((a,b) => b.createdAt.localeCompare(a.createdAt)) });
+    if (pathname === '/api/matches' && method === 'GET') return send(res, 200, { matches: [...db.matches].sort((a,b) => b.createdAt.localeCompare(a.createdAt)) });
+    if (pathname === '/api/dates' && method === 'GET') return send(res, 200, { dates: [...db.dates].sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt)) });
+    if (pathname === '/api/packages' && method === 'GET') return send(res, 200, { packages: db.packages });
+    match = pathname.match(/^\/api\/packages\/([^/]+)$/);
+    if (match && method === 'PATCH') {
+      const body = await readBody(req); const item = db.packages.find(p => p.id === match[1]);
+      if (!item) return send(res, 404, { error: 'بسته پیدا نشد.' });
+      const price = Number(body.price);
+      if (!Number.isSafeInteger(price) || price < 0 || price > 100000000000) return send(res, 400, { error: 'قیمت باید یک عدد صحیح معتبر باشد.' });
+      item.price = price; if (typeof body.active === 'boolean') item.active = body.active;
+      item.updatedAt = now(); audit('ویرایش قیمت بسته', 'package', item.id, String(price));
+      await persist(); return send(res, 200, { package: item });
+    }
+    if (pathname === '/api/audit' && method === 'GET') return send(res, 200, { audit: db.audit.slice(0, 100) });
+    return send(res, 404, { error: 'مسیر API پیدا نشد.' });
+  } catch (error) {
+    console.error(error);
+    send(res, error.status || 500, { error: error.message || 'خطای داخلی سرور.' });
+  }
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`FastLove Admin is running at http://localhost:${PORT}`);
+  if (!IS_PROD) console.log('DEMO credentials: admin / FastLove@2026 (development only)');
+});

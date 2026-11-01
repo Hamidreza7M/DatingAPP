@@ -1,0 +1,16 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+
+# Node
+node_modules/
+apps/admin-web/data/db.json
+apps/admin-web/.env
+apps/admin-web/dist/
+
+# OS
+.DS_Store
+Thumbs.db

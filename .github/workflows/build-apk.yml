@@ -1,12 +1,17 @@
-name: Build FastLove APK
+name: Build FastLove Android APK
 on:
   workflow_dispatch:
   push:
     branches: [ "main", "master" ]
-
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/build-apk.yml"
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/android
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -25,5 +30,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fastlove-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
