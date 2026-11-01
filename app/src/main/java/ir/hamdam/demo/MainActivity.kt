@@ -268,6 +268,52 @@ data class PaymentRecord(
     val durationDays: Int = 0
 )
 
+
+enum class SupportTicketCategory(val title: String) {
+    ACCOUNT("حساب کاربری و ورود"),
+    PROFILE("پروفایل و احراز هویت"),
+    SAFETY("امنیت و گزارش تخلف"),
+    SUBSCRIPTION("اشتراک و پرداخت"),
+    CHAT("گفتگو و پیام‌ها"),
+    TECHNICAL("مشکل فنی و خطا"),
+    OTHER("سایر موارد")
+}
+
+enum class SupportTicketAuthor { USER, ADMIN }
+
+data class SupportTicketMessage(
+    val id: String = UUID.randomUUID().toString(),
+    val author: SupportTicketAuthor,
+    val text: String,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+    val attachmentUri: String? = null
+)
+
+data class SupportTicketHistory(
+    val id: String = UUID.randomUUID().toString(),
+    val action: String,
+    val actor: String,
+    val createdAtMillis: Long = System.currentTimeMillis()
+)
+
+data class SupportTicket(
+    val id: String,
+    val ownerPhone: String,
+    val ownerName: String,
+    val category: SupportTicketCategory,
+    val createdAtMillis: Long,
+    val updatedAtMillis: Long,
+    val isClosed: Boolean = false,
+    val messages: List<SupportTicketMessage> = emptyList(),
+    val history: List<SupportTicketHistory> = emptyList()
+)
+
+// This PIN is only for the offline demo admin inbox. Replace it with server-side
+// authentication before publishing a multi-user production app.
+private const val SUPPORT_ADMIN_DEMO_PIN = "2468"
+private const val SUPPORT_TICKETS_PREF_KEY = "supportTickets"
+private const val RATING_PROMPT_ACTION_THRESHOLD = 8
+
 private fun formatDatePersian(timestampMillis: Long): String =
     persianDigits(SimpleDateFormat("yyyy/MM/dd", Locale.US).format(Date(timestampMillis)))
 
@@ -546,6 +592,20 @@ private fun loadPaymentHistory(ctx: Context): List<PaymentRecord> {
 private fun savePaymentHistory(ctx: Context, records: List<PaymentRecord>) {
     prefs(ctx).edit().putString("paymentHistory", gson.toJson(records)).apply()
 }
+
+
+private fun loadSupportTickets(ctx: Context): List<SupportTicket> {
+    val json = prefs(ctx).getString(SUPPORT_TICKETS_PREF_KEY, "[]") ?: "[]"
+    return try {
+        gson.fromJson(json, object : TypeToken<List<SupportTicket>>() {}.type) ?: emptyList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun saveSupportTickets(ctx: Context, tickets: List<SupportTicket>) {
+    prefs(ctx).edit().putString(SUPPORT_TICKETS_PREF_KEY, gson.toJson(tickets)).apply()
+}
 private fun loadIntList(ctx: Context, key: String): List<Int> {
     val json = prefs(ctx).getString(key, "[]") ?: "[]"
     return try {
@@ -571,6 +631,12 @@ private fun storeUriInAppFiles(context: Context, source: Uri, bucket: String): S
             mime.contains("video/3gpp", true) -> ".3gp"
             mime.contains("video/webm", true) -> ".webm"
             mime.startsWith("video/") -> ".mp4"
+            mime.contains("pdf", true) -> ".pdf"
+            mime.contains("msword", true) -> ".doc"
+            mime.contains("wordprocessingml", true) -> ".docx"
+            mime.startsWith("text/plain") -> ".txt"
+            mime.contains("spreadsheet", true) -> ".xlsx"
+            mime.contains("presentation", true) -> ".pptx"
             bucket.contains("photo") || bucket.contains("image") -> ".jpg"
             else -> ".bin"
         }
@@ -663,14 +729,45 @@ private fun deleteChatMessages(context: Context, personId: Int) {
     prefs(context).edit().remove("chat_$personId").apply()
 }
 
-private fun clearSession(ctx: Context) {
-    prefs(ctx).edit().clear().apply()
+private fun clearSession(ctx: Context, deletedUserPhone: String? = null) {
+    val current = prefs(ctx)
+    // Keep other users' support history across logout. On account deletion, remove that
+    // account's own tickets and copied attachments from private app storage.
+    val allTickets = loadSupportTickets(ctx)
+    val removedTickets = if (deletedUserPhone.isNullOrBlank()) emptyList() else allTickets.filter { it.ownerPhone == deletedUserPhone }
+    val retainedTickets = if (deletedUserPhone.isNullOrBlank()) allTickets else allTickets.filterNot { it.ownerPhone == deletedUserPhone }
+    if (removedTickets.isNotEmpty()) {
+        val supportRoot = File(ctx.filesDir, "media/support_attachments").canonicalFile
+        removedTickets.flatMap { it.messages }.mapNotNull { message ->
+            message.attachmentUri?.let { runCatching { Uri.parse(it).path?.let(::File) }.getOrNull() }
+        }.forEach { file ->
+            runCatching {
+                if (file.exists() && file.canonicalPath.startsWith(supportRoot.canonicalPath + File.separator)) file.delete()
+            }
+        }
+    }
+    val retainedCount = current.getInt("meaningfulActionCount", 0)
+    val retainedPromptShown = current.getBoolean("ratingPromptShown", false)
+    val retainedRated = current.getBoolean("hasSubmittedAppRating", false)
+    val retainedStars = current.getInt("appRatingStars", 0)
+    val retainedComment = current.getString("appRatingComment", "") ?: ""
+    val retainedRatingAt = current.getLong("appRatingSubmittedAt", 0L)
+    current.edit().clear()
+        .putString(SUPPORT_TICKETS_PREF_KEY, gson.toJson(retainedTickets))
+        .putInt("meaningfulActionCount", retainedCount)
+        .putBoolean("ratingPromptShown", retainedPromptShown)
+        .putBoolean("hasSubmittedAppRating", retainedRated)
+        .putInt("appRatingStars", retainedStars)
+        .putString("appRatingComment", retainedComment)
+        .putLong("appRatingSubmittedAt", retainedRatingAt)
+        .apply()
 }
 
 // ─── Entry ────────────────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContent { FastLoveApp() }
     }
 }
@@ -694,6 +791,13 @@ private fun FastLoveApp() {
     var planExpiresAtMillis by remember { mutableStateOf(loadPlanExpiry(context)) }
     val paymentHistory = remember { mutableStateListOf<PaymentRecord>().also { it.addAll(loadPaymentHistory(context)) } }
     var paidMessageCredits by remember { mutableIntStateOf(prefs(context).getInt("messageCredits", 0)) }
+    val supportTickets = remember {
+        mutableStateListOf<SupportTicket>().also { it.addAll(loadSupportTickets(context)) }
+    }
+    var showSupportPage by remember { mutableStateOf(false) }
+    var meaningfulActionCount by remember { mutableIntStateOf(prefs(context).getInt("meaningfulActionCount", 0)) }
+    var showAppRatingPrompt by remember { mutableStateOf(false) }
+    var hasSubmittedAppRating by remember { mutableStateOf(prefs(context).getBoolean("hasSubmittedAppRating", false)) }
 
     var tab by remember { mutableIntStateOf(0) }
     var discoverIndex by remember { mutableIntStateOf(0) }
@@ -764,6 +868,17 @@ private fun FastLoveApp() {
         )
     }
 
+
+    fun recordMeaningfulAction() {
+        if (hasSubmittedAppRating || prefs(context).getBoolean("ratingPromptShown", false)) return
+        meaningfulActionCount += 1
+        prefs(context).edit().putInt("meaningfulActionCount", meaningfulActionCount).apply()
+        if (meaningfulActionCount >= RATING_PROMPT_ACTION_THRESHOLD) {
+            prefs(context).edit().putBoolean("ratingPromptShown", true).apply()
+            showAppRatingPrompt = true
+        }
+    }
+
     LaunchedEffect(
         currentUser.verificationStatus,
         currentUser.verificationVideoUri,
@@ -813,6 +928,7 @@ private fun FastLoveApp() {
             matchedPeople.add(p)
             showMatchPopup = p
         }
+        recordMeaningfulAction()
         // Write the interaction immediately as well as through the complete session snapshot.
         prefs(context).edit()
             .putString("likedIds", gson.toJson(likedPeople.map { it.id }.distinct()))
@@ -827,6 +943,7 @@ private fun FastLoveApp() {
         likedPeople.removeAll { it.id == p.id }
         matchedPeople.removeAll { it.id == p.id }
         paidDirectChatIds.removeAll { it == p.id }
+        recordMeaningfulAction()
         persist()
     }
 
@@ -884,7 +1001,8 @@ private fun FastLoveApp() {
         }
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-            Surface(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = DarkBg) {
+            Surface(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(), color = DarkBg) {
+                Box(Modifier.fillMaxSize()) {
                 when {
                     !isLoggedIn -> AuthFlow(
                         onSuccess = { phone, register, enteredReferralCode ->
@@ -937,6 +1055,50 @@ private fun FastLoveApp() {
                             tab = 0
                             persist()
                         }
+                    )
+                    showSupportPage -> SupportCenterScreen(
+                        userPhone = currentUser.phone,
+                        userName = currentUser.name,
+                        tickets = supportTickets.toList(),
+                        onCreateTicket = { ticket ->
+                            supportTickets.add(0, ticket)
+                            saveSupportTickets(context, supportTickets.toList())
+                        },
+                        onReplyTicket = { ticketId, reply ->
+                            val index = supportTickets.indexOfFirst { it.id == ticketId }
+                            if (index >= 0) {
+                                val old = supportTickets[index]
+                                val isAdminReply = reply.author == SupportTicketAuthor.ADMIN
+                                supportTickets[index] = old.copy(
+                                    updatedAtMillis = reply.createdAtMillis,
+                                    messages = old.messages + reply,
+                                    history = old.history + SupportTicketHistory(
+                                        action = if (isAdminReply) "پاسخ پشتیبانی ثبت شد" else "پاسخ کاربر ثبت شد",
+                                        actor = if (isAdminReply) "پشتیبانی" else old.ownerName,
+                                        createdAtMillis = reply.createdAtMillis
+                                    )
+                                )
+                                saveSupportTickets(context, supportTickets.toList())
+                            }
+                        },
+                        onCloseTicket = { ticketId, closedByAdmin ->
+                            val index = supportTickets.indexOfFirst { it.id == ticketId }
+                            if (index >= 0) {
+                                val old = supportTickets[index]
+                                val changedAt = System.currentTimeMillis()
+                                supportTickets[index] = old.copy(
+                                    isClosed = true,
+                                    updatedAtMillis = changedAt,
+                                    history = old.history + SupportTicketHistory(
+                                        action = "تیکت بسته شد",
+                                        actor = if (closedByAdmin) "پشتیبانی" else old.ownerName,
+                                        createdAtMillis = changedAt
+                                    )
+                                )
+                                saveSupportTickets(context, supportTickets.toList())
+                            }
+                        },
+                        onBack = { showSupportPage = false }
                     )
                     showProfileVerification -> ProfileVerificationScreen(
                         user = currentUser,
@@ -1029,6 +1191,7 @@ private fun FastLoveApp() {
                         onSave = { updated ->
                             currentUser = updated
                             showEditProfile = false
+                            recordMeaningfulAction()
                             persist()
                         },
                         onBack = { showEditProfile = false }
@@ -1060,7 +1223,11 @@ private fun FastLoveApp() {
                     showDeleteRequest -> DeleteAccountDialog(
                         onConfirm = {
                             showDeleteRequest = false
-                            clearSession(context)
+                            val deletedPhone = currentUser.phone
+                            supportTickets.removeAll { it.ownerPhone == deletedPhone }
+                            saveSupportTickets(context, supportTickets.toList())
+                            clearSession(context, deletedUserPhone = deletedPhone)
+                            showSupportPage = false
                             isLoggedIn = false
                             hasProfile = false
                             currentUser = UserProfile()
@@ -1310,9 +1477,11 @@ private fun FastLoveApp() {
                                         onPaymentHistory = { showPaymentHistoryPage = true },
                                         onPrivacySettings = { showPrivacySettingsPage = true },
                                         onScheduledDates = { showScheduledDatesPage = true },
+                                        onSupport = { showSupportPage = true },
                                         onShowBlocked = { showBlockedList = true },
                                         onLogout = {
                                             clearSession(context)
+                                            showSupportPage = false
                                             isLoggedIn = false
                                             hasProfile = false
                                             currentUser = UserProfile()
@@ -1371,9 +1540,596 @@ private fun FastLoveApp() {
                         }
                     }
                 }
+                if (showAppRatingPrompt) AppRatingDialog(
+                    onDismiss = { showAppRatingPrompt = false },
+                    onSubmit = { stars, comment ->
+                        prefs(context).edit()
+                            .putInt("appRatingStars", stars)
+                            .putString("appRatingComment", comment)
+                            .putLong("appRatingSubmittedAt", System.currentTimeMillis())
+                            .putBoolean("hasSubmittedAppRating", true)
+                            .apply()
+                        hasSubmittedAppRating = true
+                        showAppRatingPrompt = false
+                        android.widget.Toast.makeText(context, "ممنون از اینکه نظرت را ثبت کردی 💜", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                )
+                }
             }
         }
     }
+}
+
+
+// ─── Support Center ───────────────────────────────────────────────────────────
+@Composable
+private fun SupportCenterScreen(
+    userPhone: String,
+    userName: String,
+    tickets: List<SupportTicket>,
+    onCreateTicket: (SupportTicket) -> Unit,
+    onReplyTicket: (String, SupportTicketMessage) -> Unit,
+    onCloseTicket: (String, Boolean) -> Unit,
+    onBack: () -> Unit
+) {
+    var adminMode by remember { mutableStateOf(false) }
+    var showAdminLogin by remember { mutableStateOf(false) }
+    var adminPin by remember { mutableStateOf("") }
+    var adminError by remember { mutableStateOf("") }
+    var showCreate by remember { mutableStateOf(false) }
+    var selectedTicketId by remember { mutableStateOf<String?>(null) }
+
+    BackHandler {
+        when {
+            showAdminLogin -> { showAdminLogin = false; adminPin = ""; adminError = "" }
+            selectedTicketId != null -> selectedTicketId = null
+            showCreate -> showCreate = false
+            adminMode -> adminMode = false
+            else -> onBack()
+        }
+    }
+
+    val visibleTickets = remember(tickets, userPhone, adminMode) {
+        (if (adminMode) tickets else tickets.filter { it.ownerPhone == userPhone })
+            .sortedByDescending { it.updatedAtMillis }
+    }
+    val selectedTicket = visibleTickets.firstOrNull { it.id == selectedTicketId }
+
+    Column(Modifier.fillMaxSize().background(DarkBg)) {
+        Row(
+            Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 8.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = {
+                when {
+                    selectedTicketId != null -> selectedTicketId = null
+                    showCreate -> showCreate = false
+                    adminMode -> adminMode = false
+                    else -> onBack()
+                }
+            }) { Icon(Icons.Default.ArrowBack, null, tint = TextWhite) }
+            Column(Modifier.weight(1f)) {
+                Text(
+                    when {
+                        selectedTicket != null -> "تیکت ${selectedTicket.category.title}"
+                        showCreate -> "ثبت تیکت جدید"
+                        adminMode -> "پنل مدیریت پشتیبانی"
+                        else -> "پشتیبانی و تیکت‌ها"
+                    },
+                    color = TextWhite, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn
+                )
+                Text(
+                    when {
+                        adminMode -> "صندوق تیکت‌های همین دستگاه · حالت آزمایشی"
+                        selectedTicket != null -> "تاریخچه گفتگو و وضعیت درخواست"
+                        showCreate -> "موضوع را انتخاب و مشکل را شرح بده"
+                        else -> "ثبت درخواست و پیگیری پاسخ پشتیبانی"
+                    },
+                    color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn
+                )
+            }
+            if (!showCreate && selectedTicketId == null) {
+                TextButton(onClick = {
+                    if (adminMode) adminMode = false else { showAdminLogin = true; adminError = "" }
+                }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 4.dp)) {
+                    Icon(if (adminMode) Icons.Default.Logout else Icons.Default.AdminPanelSettings, null, tint = BrandViolet, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (adminMode) "خروج مدیر" else "مدیر", color = BrandViolet, fontSize = 10.sp, fontFamily = Vazirmatn)
+                }
+            }
+        }
+
+        when {
+            showCreate -> SupportTicketCreateScreen(
+                ownerPhone = userPhone,
+                ownerName = userName,
+                onSubmit = { ticket -> onCreateTicket(ticket); showCreate = false },
+                onCancel = { showCreate = false }
+            )
+            selectedTicket != null -> SupportTicketDetailScreen(
+                ticket = selectedTicket,
+                isAdmin = adminMode,
+                onReply = { message -> onReplyTicket(selectedTicket.id, message) },
+                onClose = { onCloseTicket(selectedTicket.id, adminMode); selectedTicketId = null }
+            )
+            else -> {
+                Column(Modifier.fillMaxSize()) {
+                    if (adminMode) {
+                        Card(
+                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                            colors = CardDefaults.cardColors(containerColor = BrandViolet.copy(alpha = 0.13f)),
+                            border = BorderStroke(1.dp, BrandViolet.copy(alpha = 0.35f)),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(
+                                "این پنل فقط برای آزمایش محلی است. تیکت‌ها بین دستگاه‌ها همگام‌سازی نمی‌شوند.",
+                                Modifier.padding(12.dp), color = TextGray, fontSize = 10.sp, lineHeight = 18.sp, fontFamily = Vazirmatn
+                            )
+                        }
+                    } else {
+                        Card(
+                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                            colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                            border = BorderStroke(1.dp, TinderPink.copy(alpha = 0.18f)),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.SupportAgent, null, tint = TinderPink, modifier = Modifier.size(29.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text("در کنار تو هستیم", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                                    Text("موضوع را انتخاب کن و جزئیات را برای تیم پشتیبانی بنویس.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                                    Text("نسخه آزمایشی: تیکت‌ها روی همین دستگاه ذخیره می‌شوند.", color = TinderOrange, fontSize = 8.sp, fontFamily = Vazirmatn)
+                                }
+                            }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (adminMode) "همه درخواست‌ها" else "درخواست‌های من", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+                        Spacer(Modifier.weight(1f))
+                        Text("${persianDigits(visibleTickets.size.toString())} تیکت", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                    }
+                    if (visibleTickets.isEmpty()) {
+                        Column(
+                            Modifier.weight(1f).fillMaxWidth().padding(28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(Modifier.size(76.dp).clip(CircleShape).background(BrandViolet.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Inbox, null, tint = BrandViolet, modifier = Modifier.size(35.dp))
+                            }
+                            Spacer(Modifier.height(14.dp))
+                            Text(if (adminMode) "تیکتی برای بررسی وجود ندارد" else "هنوز تیکتی ثبت نکرده‌ای", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = Vazirmatn)
+                            Text(if (adminMode) "درخواست‌های کاربران در این قسمت نمایش داده می‌شوند." else "در صورت نیاز، درخواستت را ثبت کن تا بتوانی پاسخ‌ها را همین‌جا پیگیری کنی.", color = TextMuted, fontSize = 10.sp, lineHeight = 18.sp, textAlign = TextAlign.Center, fontFamily = Vazirmatn)
+                        }
+                    } else {
+                        LazyColumn(
+                            Modifier.weight(1f).fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(9.dp)
+                        ) {
+                            items(visibleTickets, key = { it.id }) { ticket ->
+                                SupportTicketCard(ticket = ticket, showOwner = adminMode, onClick = { selectedTicketId = ticket.id })
+                            }
+                        }
+                    }
+                    if (!adminMode) {
+                        Button(
+                            onClick = { showCreate = true },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(50.dp),
+                            shape = RoundedCornerShape(15.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = TinderPink)
+                        ) {
+                            Icon(Icons.Default.Add, null)
+                            Spacer(Modifier.width(7.dp))
+                            Text("ثبت تیکت پشتیبانی", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAdminLogin) {
+        AlertDialog(
+            onDismissRequest = { showAdminLogin = false; adminPin = ""; adminError = "" },
+            title = { Text("ورود به پنل مدیر", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(Modifier.imePadding()) {
+                    Text("رمز پنل آزمایشی را وارد کن.", color = TextGray, fontSize = 11.sp, fontFamily = Vazirmatn)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = adminPin,
+                        onValueChange = { adminPin = it.filter(Char::isDigit).take(8); adminError = "" },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("رمز مدیر", fontFamily = Vazirmatn) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                        shape = RoundedCornerShape(12.dp), colors = fieldColors()
+                    )
+                    if (adminError.isNotBlank()) Text(adminError, color = Color(0xFFFF879D), fontSize = 10.sp, fontFamily = Vazirmatn)
+                    Text("این ورود محلی، جایگزین احراز هویت امن سمت سرور نیست.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 7.dp))
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (adminPin == SUPPORT_ADMIN_DEMO_PIN) {
+                        adminMode = true; showAdminLogin = false; adminPin = ""; adminError = ""
+                    } else adminError = "رمز واردشده صحیح نیست."
+                }, colors = ButtonDefaults.buttonColors(containerColor = BrandViolet)) {
+                    Text("ورود", fontFamily = Vazirmatn)
+                }
+            },
+            dismissButton = { TextButton(onClick = { showAdminLogin = false; adminPin = "" }) { Text("انصراف", color = TextGray, fontFamily = Vazirmatn) } },
+            containerColor = DarkSurface
+        )
+    }
+}
+
+@Composable
+private fun SupportTicketCard(ticket: SupportTicket, showOwner: Boolean, onClick: () -> Unit) {
+    val lastMessage = ticket.messages.lastOrNull()
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        border = BorderStroke(1.dp, if (ticket.isClosed) DarkCard else TinderPink.copy(alpha = 0.18f))
+    ) {
+        Column(Modifier.fillMaxWidth().padding(13.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(BrandViolet.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.ConfirmationNumber, null, tint = BrandViolet, modifier = Modifier.size(19.dp))
+                }
+                Spacer(Modifier.width(9.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(ticket.category.title, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Text("ثبت ${formatDateTimePersian(ticket.createdAtMillis)}", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                }
+                Surface(shape = RoundedCornerShape(20.dp), color = if (ticket.isClosed) DarkCard else SuccessGreen.copy(alpha = 0.13f)) {
+                    Text(if (ticket.isClosed) "بسته" else "باز", modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp), color = if (ticket.isClosed) TextMuted else SuccessGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = Vazirmatn)
+                }
+            }
+            if (showOwner) {
+                Spacer(Modifier.height(7.dp))
+                Text("${ticket.ownerName.ifBlank { "کاربر" }} · ${ticket.ownerPhone}", color = BrandViolet, fontSize = 9.sp, fontFamily = Vazirmatn)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(lastMessage?.text.orEmpty(), color = TextGray, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp, fontFamily = Vazirmatn)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ChatBubbleOutline, null, tint = TextMuted, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("${persianDigits(ticket.messages.size.toString())} پیام", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                Spacer(Modifier.weight(1f))
+                Text("آخرین تغییر: ${formatDateTimePersian(ticket.updatedAtMillis)}", color = TextMuted, fontSize = 8.sp, fontFamily = Vazirmatn)
+                Icon(Icons.Default.ChevronLeft, null, tint = TinderPink, modifier = Modifier.size(18.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupportTicketCreateScreen(
+    ownerPhone: String,
+    ownerName: String,
+    onSubmit: (SupportTicket) -> Unit,
+    onCancel: () -> Unit
+) {
+    val context = LocalContext.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var selectedCategory by remember { mutableStateOf(SupportTicketCategory.ACCOUNT) }
+    var description by remember { mutableStateOf("") }
+    var attachmentUri by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf("") }
+    val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            val local = storeUriInAppFiles(context, uri, "support_attachments")
+            if (local == null) {
+                error = "فایل انتخاب‌شده قابل ذخیره نیست."
+            } else {
+                val file = Uri.parse(local).path?.let(::File)
+                if (file != null && file.length() > 10L * 1024L * 1024L) {
+                    file.delete()
+                    error = "حجم فایل پیوست نباید بیشتر از ۱۰ مگابایت باشد."
+                } else {
+                    attachmentUri = local
+                    error = ""
+                }
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Text("دسته‌بندی درخواست", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+            Text("یکی از موضوع‌های زیر را انتخاب کن.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 3.dp, bottom = 9.dp))
+            SupportTicketCategory.values().toList().chunked(2).forEach { rowItems ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowItems.forEach { category ->
+                        val selected = selectedCategory == category
+                        Surface(
+                            onClick = { selectedCategory = category },
+                            modifier = Modifier.weight(1f).padding(bottom = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selected) TinderPink.copy(alpha = 0.15f) else DarkSurface,
+                            border = BorderStroke(1.dp, if (selected) TinderPink else DarkCard)
+                        ) {
+                            Row(Modifier.padding(horizontal = 9.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(if (selected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked, null, tint = if (selected) TinderPink else TextMuted, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(category.title, color = if (selected) TextWhite else TextGray, fontSize = 9.sp, fontFamily = Vazirmatn, maxLines = 2)
+                            }
+                        }
+                    }
+                    if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("شرح درخواست", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, fontFamily = Vazirmatn)
+            Text("توضیحات را کامل بنویس تا بهتر راهنمایی‌ات کنیم. این بخش اجباری است.", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 3.dp, bottom = 8.dp))
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it; if (error.isNotBlank()) error = "" },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp),
+                placeholder = { Text("مشکل یا درخواستت را اینجا بنویس…", fontFamily = Vazirmatn, fontSize = 11.sp) },
+                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
+                shape = RoundedCornerShape(14.dp), colors = fieldColors(), maxLines = 7
+            )
+            Spacer(Modifier.height(13.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("پیوست فایل (اختیاری)", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, fontFamily = Vazirmatn)
+                    Text("تصویر یا سند · حداکثر ۱۰ مگابایت", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+                }
+                OutlinedButton(onClick = { attachmentPicker.launch(arrayOf("*/*")) }, shape = RoundedCornerShape(11.dp), border = BorderStroke(1.dp, BrandViolet)) {
+                    Icon(Icons.Default.AttachFile, null, tint = BrandViolet, modifier = Modifier.size(16.dp))
+                    Text("انتخاب فایل", color = TextWhite, fontFamily = Vazirmatn, fontSize = 10.sp)
+                }
+            }
+            if (attachmentUri != null) {
+                val fileName = Uri.parse(attachmentUri).path?.let(::File)?.name ?: "فایل پیوست"
+                Surface(Modifier.fillMaxWidth().padding(top = 8.dp), color = DarkSurface, shape = RoundedCornerShape(10.dp)) {
+                    Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.InsertDriveFile, null, tint = SuccessGreen, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text(fileName, color = TextGray, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
+                        IconButton(onClick = { attachmentUri = null }, modifier = Modifier.size(28.dp)) { Icon(Icons.Default.Close, null, tint = TinderPink, modifier = Modifier.size(16.dp)) }
+                    }
+                }
+            }
+            if (error.isNotBlank()) Text(error, color = Color(0xFFFF879D), fontSize = 10.sp, fontFamily = Vazirmatn, modifier = Modifier.padding(top = 8.dp))
+            Spacer(Modifier.height(18.dp))
+        }
+        Row(Modifier.fillMaxWidth().background(DarkSurface).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(13.dp), border = BorderStroke(1.dp, DarkCard)) {
+                Text("انصراف", color = TextGray, fontFamily = Vazirmatn)
+            }
+            Button(
+                onClick = {
+                    if (description.isBlank()) error = "نوشتن شرح درخواست الزامی است."
+                    else {
+                        keyboard?.hide()
+                        val now = System.currentTimeMillis()
+                        val firstMessage = SupportTicketMessage(author = SupportTicketAuthor.USER, text = description.trim(), createdAtMillis = now, attachmentUri = attachmentUri)
+                        onSubmit(
+                            SupportTicket(
+                                id = UUID.randomUUID().toString(), ownerPhone = ownerPhone, ownerName = ownerName,
+                                category = selectedCategory, createdAtMillis = now, updatedAtMillis = now,
+                                messages = listOf(firstMessage),
+                                history = listOf(SupportTicketHistory(action = "تیکت ثبت شد", actor = ownerName.ifBlank { "کاربر" }, createdAtMillis = now))
+                            )
+                        )
+                    }
+                },
+                modifier = Modifier.weight(1.3f).height(48.dp),
+                shape = RoundedCornerShape(13.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = TinderPink)
+            ) {
+                Icon(Icons.Default.Send, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("ارسال تیکت", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupportTicketDetailScreen(
+    ticket: SupportTicket,
+    isAdmin: Boolean,
+    onReply: (SupportTicketMessage) -> Unit,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var replyText by remember(ticket.id) { mutableStateOf("") }
+    var showCloseConfirm by remember { mutableStateOf(false) }
+
+    fun openAttachment(uriString: String) {
+        val file = Uri.parse(uriString).path?.let(::File)
+        if (file == null || !file.exists()) {
+            android.widget.Toast.makeText(context, "فایل پیوست پیدا نشد.", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        runCatching {
+            val contentUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase(Locale.US)) ?: "*/*"
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, "باز کردن پیوست"))
+        }.onFailure {
+            android.widget.Toast.makeText(context, "برنامه‌ای برای باز کردن این فایل پیدا نشد.", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = RoundedCornerShape(20.dp), color = if (ticket.isClosed) DarkCard else SuccessGreen.copy(alpha = 0.12f)) {
+                Text(if (ticket.isClosed) "بسته شده" else "در انتظار پاسخ", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = if (ticket.isClosed) TextMuted else SuccessGreen, fontSize = 9.sp, fontFamily = Vazirmatn)
+            }
+            Spacer(Modifier.weight(1f))
+            Text("${ticket.messages.size} پیام · ${formatDateTimePersian(ticket.createdAtMillis)}", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+        }
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 13.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            item(key = "ticket-timeline") {
+                Card(colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(13.dp), border = BorderStroke(1.dp, DarkCard)) {
+                    Column(Modifier.fillMaxWidth().padding(11.dp)) {
+                        Text("تاریخچه تغییرات", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 10.sp, fontFamily = Vazirmatn)
+                        Spacer(Modifier.height(6.dp))
+                        ticket.history.sortedBy { it.createdAtMillis }.forEach { event ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.History, null, tint = BrandViolet, modifier = Modifier.size(13.dp).padding(top = 1.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("${event.action} · ${event.actor}", color = TextGray, fontSize = 9.sp, fontFamily = Vazirmatn)
+                                    Text(formatDateTimePersian(event.createdAtMillis), color = TextMuted, fontSize = 8.sp, fontFamily = Vazirmatn)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            items(ticket.messages, key = { it.id }) { message ->
+                val fromAdmin = message.author == SupportTicketAuthor.ADMIN
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (fromAdmin) Arrangement.End else Arrangement.Start) {
+                    Column(Modifier.widthIn(max = 310.dp)) {
+                        Text(
+                            if (fromAdmin) "پشتیبانی FastLove" else if (isAdmin) ticket.ownerName.ifBlank { "کاربر" } else "شما",
+                            color = if (fromAdmin) BrandViolet else TinderPink, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 3.dp), fontFamily = Vazirmatn
+                        )
+                        Surface(
+                            color = if (fromAdmin) Color(0xFF24203A) else DarkSurface,
+                            shape = RoundedCornerShape(15.dp),
+                            border = BorderStroke(1.dp, if (fromAdmin) BrandViolet.copy(alpha = 0.28f) else DarkCard)
+                        ) {
+                            Column(Modifier.padding(11.dp)) {
+                                Text(message.text, color = TextWhite, fontSize = 11.sp, lineHeight = 19.sp, fontFamily = Vazirmatn)
+                                if (!message.attachmentUri.isNullOrBlank()) {
+                                    val name = Uri.parse(message.attachmentUri).path?.let(::File)?.name ?: "فایل پیوست"
+                                    TextButton(onClick = { openAttachment(message.attachmentUri) }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 3.dp)) {
+                                        Icon(Icons.Default.AttachFile, null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(name, color = SuccessGreen, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontFamily = Vazirmatn)
+                                    }
+                                }
+                                Text(formatDateTimePersian(message.createdAtMillis), color = TextMuted, fontSize = 8.sp, modifier = Modifier.align(Alignment.End), fontFamily = Vazirmatn)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (ticket.isClosed) {
+            Card(Modifier.fillMaxWidth().padding(12.dp), colors = CardDefaults.cardColors(containerColor = DarkSurface), shape = RoundedCornerShape(13.dp)) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Lock, null, tint = TextMuted, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("این تیکت بسته شده و امکان ارسال پیام جدید ندارد.", color = TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                }
+            }
+        } else {
+            Row(Modifier.fillMaxWidth().background(DarkSurface).padding(horizontal = 9.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom) {
+                OutlinedTextField(
+                    value = replyText,
+                    onValueChange = { replyText = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text(if (isAdmin) "پاسخ برای کاربر بنویس…" else "پاسخ خودت را بنویس…", fontSize = 10.sp, fontFamily = Vazirmatn) },
+                    keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = {
+                        if (replyText.isNotBlank()) {
+                            onReply(SupportTicketMessage(author = if (isAdmin) SupportTicketAuthor.ADMIN else SupportTicketAuthor.USER, text = replyText.trim()))
+                            replyText = ""
+                            keyboard?.hide()
+                        }
+                    }),
+                    shape = RoundedCornerShape(13.dp), colors = fieldColors(), maxLines = 4
+                )
+                Spacer(Modifier.width(7.dp))
+                FilledIconButton(
+                    onClick = {
+                        if (replyText.isNotBlank()) {
+                            onReply(SupportTicketMessage(author = if (isAdmin) SupportTicketAuthor.ADMIN else SupportTicketAuthor.USER, text = replyText.trim()))
+                            replyText = ""
+                            keyboard?.hide()
+                        }
+                    },
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = TinderPink)
+                ) { Icon(Icons.Default.Send, null, tint = TextWhite) }
+            }
+            TextButton(onClick = { showCloseConfirm = true }, modifier = Modifier.align(Alignment.End).padding(end = 8.dp, bottom = 3.dp)) {
+                Icon(Icons.Default.CheckCircle, null, tint = TextMuted, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("بستن تیکت", color = TextMuted, fontSize = 9.sp, fontFamily = Vazirmatn)
+            }
+        }
+    }
+
+    if (showCloseConfirm) AlertDialog(
+        onDismissRequest = { showCloseConfirm = false },
+        title = { Text("بستن تیکت؟", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold) },
+        text = { Text("پس از بستن، پیام جدیدی در این تیکت ارسال نمی‌شود.", color = TextGray, fontSize = 11.sp, fontFamily = Vazirmatn) },
+        confirmButton = {
+            Button(onClick = { showCloseConfirm = false; onClose() }, colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
+                Text("بله، ببند", fontFamily = Vazirmatn)
+            }
+        },
+        dismissButton = { TextButton(onClick = { showCloseConfirm = false }) { Text("انصراف", color = TextGray, fontFamily = Vazirmatn) } },
+        containerColor = DarkSurface
+    )
+}
+
+@Composable
+private fun AppRatingDialog(onDismiss: () -> Unit, onSubmit: (Int, String) -> Unit) {
+    var selectedStars by remember { mutableIntStateOf(0) }
+    var comment by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Favorite, null, tint = TinderPink, modifier = Modifier.size(27.dp)) },
+        title = { Text("از تجربه FastLove راضی هستی؟", color = TextWhite, fontFamily = Vazirmatn, fontWeight = FontWeight.Bold, fontSize = 15.sp) },
+        text = {
+            Column(Modifier.fillMaxWidth().imePadding(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("امتیازت به بهتر شدن برنامه کمک می‌کند. در نسخه آزمایشی، ثبت به‌صورت محلی انجام می‌شود.", color = TextGray, fontSize = 10.sp, textAlign = TextAlign.Center, fontFamily = Vazirmatn)
+                Spacer(Modifier.height(13.dp))
+                Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    (1..5).forEach { star ->
+                        IconButton(onClick = { selectedStars = star; error = "" }, modifier = Modifier.size(42.dp)) {
+                            Icon(if (star <= selectedStars) Icons.Default.Star else Icons.Default.StarBorder, null, tint = if (star <= selectedStars) TinderOrange else TextMuted, modifier = Modifier.size(30.dp))
+                        }
+                    }
+                }
+                Text(if (selectedStars == 0) "انتخاب امتیاز از ۱ تا ۵" else "${persianDigits(selectedStars.toString())} از ۵ ستاره", color = if (selectedStars > 0) TinderOrange else TextMuted, fontSize = 10.sp, fontFamily = Vazirmatn)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = comment, onValueChange = { comment = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 82.dp),
+                    placeholder = { Text("نظر یا پیشنهادت (اختیاری)", fontSize = 10.sp, fontFamily = Vazirmatn) },
+                    keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
+                    shape = RoundedCornerShape(12.dp), colors = fieldColors(), maxLines = 4
+                )
+                if (error.isNotBlank()) Text(error, color = Color(0xFFFF879D), fontSize = 9.sp, fontFamily = Vazirmatn)
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (selectedStars == 0) error = "لطفاً ابتدا تعداد ستاره‌ها را انتخاب کن."
+                else { keyboard?.hide(); onSubmit(selectedStars, comment.trim()) }
+            }, colors = ButtonDefaults.buttonColors(containerColor = TinderPink)) {
+                Text("ثبت امتیاز", fontFamily = Vazirmatn, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("بعداً", color = TextGray, fontFamily = Vazirmatn) } },
+        containerColor = DarkSurface
+    )
 }
 
 // ─── Match Popup ──────────────────────────────────────────────────────────────
@@ -2207,6 +2963,8 @@ private fun AuthFlow(onSuccess: (String, Boolean, String) -> Unit) {
                                         label = { Text("کد معرف (اختیاری)", fontFamily = Vazirmatn) },
                                         placeholder = { Text("مثلاً FL12AB34CD", fontFamily = Vazirmatn) },
                                         singleLine = true,
+                                        keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
+                                        keyboardActions = KeyboardActions(onDone = { authKeyboard?.hide() }),
                                         shape = RoundedCornerShape(18.dp),
                                         colors = fieldColors(),
                                         leadingIcon = { Icon(Icons.Default.CardGiftcard, null, tint = BrandViolet) }
@@ -2696,7 +3454,14 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
                 }
                 3 -> {
                     SectionLabel("درباره من")
-                    OutlinedTextField(value = about, onValueChange = { about = it }, modifier = Modifier.fillMaxWidth().height(140.dp), placeholder = { Text("اهل کافه و کتابم...", fontFamily = Vazirmatn) }, shape = RoundedCornerShape(14.dp), colors = fieldColors())
+                    OutlinedTextField(
+                        value = about, onValueChange = { about = it },
+                        modifier = Modifier.fillMaxWidth().height(140.dp),
+                        placeholder = { Text("اهل کافه و کتابم...", fontFamily = Vazirmatn) },
+                        keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { setupKeyboard?.hide() }),
+                        shape = RoundedCornerShape(14.dp), colors = fieldColors()
+                    )
                     Spacer(Modifier.height(16.dp))
                     VoiceIntroEditor(path = voiceIntro, onPathChange = { voiceIntro = it })
                     Spacer(Modifier.height(18.dp))
@@ -2866,6 +3631,7 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
     var showCityPicker by remember { mutableStateOf(false) }
     var showJobPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val editKeyboard = LocalSoftwareKeyboardController.current
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
     fun createImageUri(ctx: Context): Uri {
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -2973,7 +3739,7 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
             if (showPhotoSheet) ModernPhotoPickerSheet(onGallery = { ensurePermissionsAndPick(false) }, onCamera = { ensurePermissionsAndPick(true) }, onDismiss = { showPhotoSheet = false })
             Spacer(Modifier.height(12.dp))
             SectionLabel("درباره من")
-            OutlinedTextField(value = about, onValueChange = { about = it }, modifier = Modifier.fillMaxWidth().height(120.dp), shape = RoundedCornerShape(14.dp), colors = fieldColors())
+            OutlinedTextField(value = about, onValueChange = { about = it }, modifier = Modifier.fillMaxWidth().height(120.dp), keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences, imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { editKeyboard?.hide() }), shape = RoundedCornerShape(14.dp), colors = fieldColors())
             Spacer(Modifier.height(14.dp))
             VoiceIntroEditor(path = voiceIntro, onPathChange = { voiceIntro = it })
             Spacer(Modifier.height(18.dp))
@@ -2985,6 +3751,7 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
                 singleLine = true, label = { Text("اینستاگرام", fontFamily = Vazirmatn) },
                 placeholder = { Text("username یا لینک پروفایل", fontFamily = Vazirmatn) },
                 leadingIcon = { Icon(Icons.Default.CameraAlt, null, tint = TinderPink) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                 shape = RoundedCornerShape(14.dp), colors = fieldColors()
             )
             Spacer(Modifier.height(8.dp))
@@ -2993,6 +3760,8 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
                 singleLine = true, label = { Text("اسپاتیفای", fontFamily = Vazirmatn) },
                 placeholder = { Text("username یا لینک پروفایل", fontFamily = Vazirmatn) },
                 leadingIcon = { Icon(Icons.Default.MusicNote, null, tint = SuccessGreen) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { editKeyboard?.hide() }),
                 shape = RoundedCornerShape(14.dp), colors = fieldColors()
             )
             Spacer(Modifier.height(16.dp))
@@ -5428,7 +6197,18 @@ private fun ChatScreen(person: Person, canUnmatch: Boolean, canSeeLikes: Boolean
             }) {
                 Icon(if (isRecording) Icons.Default.Stop else Icons.Default.Mic, "ضبط پیام صوتی", tint = if (isRecording) TinderPink else TextGray)
             }
-            OutlinedTextField(value = input, onValueChange = { input = it }, modifier = Modifier.weight(1f), placeholder = { Text(if (isRecording) "در حال ضبط... برای پایان، توقف را بزن" else "پیام بنویس...", fontFamily = Vazirmatn) }, shape = RoundedCornerShape(24.dp), colors = fieldColors(), maxLines = 4, enabled = !isRecording)
+            OutlinedTextField(
+                value = input,
+                onValueChange = { input = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(if (isRecording) "در حال ضبط... برای پایان، توقف را بزن" else "پیام بنویس...", fontFamily = Vazirmatn) },
+                shape = RoundedCornerShape(24.dp),
+                colors = fieldColors(),
+                maxLines = 4,
+                enabled = !isRecording,
+                keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { keyboard?.hide() })
+            )
             Spacer(Modifier.width(8.dp))
             FilledIconButton(onClick = {
                 if (input.isNotBlank() && !isRecording) {
@@ -6338,6 +7118,7 @@ private fun MyProfileScreen(
     onPaymentHistory: () -> Unit,
     onPrivacySettings: () -> Unit,
     onScheduledDates: () -> Unit,
+    onSupport: () -> Unit,
     onShowBlocked: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -6558,6 +7339,8 @@ private fun MyProfileScreen(
         ) {
             Column {
                 ProfileActionRow(Icons.Default.Security, "حریم خصوصی", BrandViolet, onPrivacySettings)
+                HorizontalDivider(color = DarkCard)
+                ProfileActionRow(Icons.Default.HelpOutline, "پشتیبانی و تیکت‌ها", TinderPink, onSupport)
                 HorizontalDivider(color = DarkCard)
                 ProfileActionRow(Icons.Default.EventAvailable, "دیت‌های برنامه‌ریزی‌شده · ${persianDigits(upcomingDates.size.toString())}", SuccessGreen, onScheduledDates)
                 HorizontalDivider(color = DarkCard)

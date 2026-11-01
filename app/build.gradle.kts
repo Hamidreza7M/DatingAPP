@@ -12,8 +12,8 @@ android {
         applicationId = "ir.fastlove.demo"
         minSdk = 24
         targetSdk = 35
-        versionCode = 30
-        versionName = "2.22.0"
+        versionCode = 31
+        versionName = "2.23.0"
     }
 
     compileOptions {
