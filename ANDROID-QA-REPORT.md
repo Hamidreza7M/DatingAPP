@@ -63,3 +63,43 @@ apps/android/scripts/write-ci-summary.py
 apps/android/README.md
 README.md
 ```
+
+## Follow-up: بررسی اجرای CI ارسالی کاربر و اصلاح Lint
+
+**تاریخ بررسی:** 2026-11-02  
+**منبع:** لاگ GitHub Actions ارسال‌شده در گفتگو (`gradle ... testDebugUnitTest lintDebug assembleDebug jacocoTestReport`)
+
+### نتیجه اجرای CI ارسالی
+
+| Task | نتیجه از روی لاگ | توضیح |
+|---|---|---|
+| `compileDebugKotlin` | PASS | کامپایل Kotlin انجام شد؛ فقط هشدارهای deprecation ثبت شد. |
+| `testDebugUnitTest` | PASS | Task اجرا شد و در لاگ خطایی برای آن گزارش نشده است. |
+| `jacocoTestReport` | PASS | Task گزارش Coverage کامل شد. |
+| `assembleDebug` | PASS | Task ساخت و بسته‌بندی Debug APK کامل شد. |
+| `lintDebug` | FAIL | دو Error و سیزده Warning گزارش شد. |
+| کل فرمان CI | FAIL | به‌دلیل شکست `lintDebug` با Exit Code 1 تمام شد. |
+| Emulator instrumentation | اجرا نشد/به مرحله آن نرسید | مرحله بعدی Workflow به‌صورت پیش‌فرض پس از شکست مرحله قبل اجرا نمی‌شود. |
+| انتشار Artifact APK | انجام نشد | مرحله Upload APK شرط `if: success()` دارد؛ با شکست Lint آپلود نمی‌شود، هرچند `assembleDebug` کامل شده است. |
+
+پیام توقف Daemon در ابتدای لاگ، مانع ادامه Build نشده است؛ Kotlin compile daemon آماده شده و Taskهای بعدی اجرا شده‌اند. همچنین پیام Strip نشدن چند کتابخانه Native و هشدارهای API منسوخ‌شده، در این لاگ عامل توقف Build نبوده‌اند.
+
+### اصلاح اعمال‌شده
+
+در `apps/android/app/src/main/java/ir/hamdam/demo/MainActivity.kt` و در مسیر شروع ضبط ویدیوی تأیید پروفایل:
+
+- مجوز `CAMERA` درست پیش از `prepareRecording` دوباره بررسی می‌شود.
+- مجوز `RECORD_AUDIO` درست پیش از فعال‌کردن صدای ضبط بررسی می‌شود.
+- اگر هر مجوز در زمان باز بودن صفحه لغو شده باشد، فراخوانی CameraX انجام نمی‌شود و پیام قابل‌فهم نمایش داده می‌شود.
+- مسیر ضبط فقط در شاخه‌ای اجرا می‌شود که هر دو مجوز موجود باشند.
+
+لاگ ارسالی فقط جزئیات اولین خطای Lint را چاپ کرده و وجود دو Error را اعلام می‌کند؛ بنابراین جزئیات خطای دوم در فایل ارسالی قابل مشاهده نیست. عبارت گزارش‌شده شامل دو API مجوزدار CameraX است و کنترل مستقیم هر دو مجوز برای رفع این دسته خطاها افزوده شده است.
+
+### اعتبارسنجی پس از اصلاح
+
+در محیط فعلی، `gradle` و Android SDK نصب/پیکربندی نشده‌اند؛ در نتیجه اجرای مجدد Android Lint و Gradle پس از این Patch ممکن نبود. تست‌های JVM مستقل موجود دوباره اجرا شدند:
+
+- ۱۴ متد تست `AppRulesTest`: PASS با Harness محلی سبک (این اجرا معادل اجرای Gradle روی Android نیست).
+- ۱۰ assertion مستقل `AppRules`: PASS.
+
+**وضعیت نهایی این اصلاح:** Patch در سورس اعمال شده، اما PASS شدن `lintDebug` هنوز با Build جدید GitHub Actions تأیید نشده است. این مورد باید در اجرای CI بعدی بررسی شود. گزارش ۱۳ Warning نیز هنوز به‌صورت کامل رفع نشده؛ بخش مهمی از آن‌ها APIهای منسوخ‌شده Android/Compose هستند و بهتر است در تغییرات جداگانه به‌روزرسانی شوند.

@@ -7011,26 +7011,36 @@ private fun VerificationCameraCaptureScreen(
                         onError(cameraError)
                     } else if (!isRecording) {
                         try {
-                            val output = createPrivateVerificationVideoFile(context)
-                            val options = FileOutputOptions.Builder(output).build()
-                            val pending = capture.output.prepareRecording(context, options).withAudioEnabled()
-                            activeRecording = pending.start(mainExecutor) { event ->
-                                when (event) {
-                                    is VideoRecordEvent.Start -> isRecording = true
-                                    is VideoRecordEvent.Finalize -> {
-                                        isRecording = false
-                                        activeRecording = null
-                                        if (userCancelled) {
-                                            output.delete()
-                                        } else if (!event.hasError() && output.exists() && output.length() > 0L) {
-                                            onCaptured(Uri.fromFile(output).toString())
-                                        } else {
-                                            output.delete()
-                                            cameraError = "ذخیره ویدیو با خطا روبه‌رو شد؛ دوباره ضبط کن."
-                                            onError(cameraError)
+                            // Permissions can be revoked while this screen is open, so
+                            // re-check them immediately before invoking CameraX APIs.
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                                cameraError = "دسترسی دوربین لغو شده است؛ دوباره مجوز دوربین را فعال کن."
+                                onError(cameraError)
+                            } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                                cameraError = "دسترسی میکروفون لغو شده است؛ برای ضبط ویدیو با صدا، مجوز میکروفون را فعال کن."
+                                onError(cameraError)
+                            } else {
+                                val output = createPrivateVerificationVideoFile(context)
+                                val options = FileOutputOptions.Builder(output).build()
+                                val pending = capture.output.prepareRecording(context, options).withAudioEnabled()
+                                activeRecording = pending.start(mainExecutor) { event ->
+                                    when (event) {
+                                        is VideoRecordEvent.Start -> isRecording = true
+                                        is VideoRecordEvent.Finalize -> {
+                                            isRecording = false
+                                            activeRecording = null
+                                            if (userCancelled) {
+                                                output.delete()
+                                            } else if (!event.hasError() && output.exists() && output.length() > 0L) {
+                                                onCaptured(Uri.fromFile(output).toString())
+                                            } else {
+                                                output.delete()
+                                                cameraError = "ذخیره ویدیو با خطا روبه‌رو شد؛ دوباره ضبط کن."
+                                                onError(cameraError)
+                                            }
                                         }
+                                        else -> Unit
                                     }
-                                    else -> Unit
                                 }
                             }
                         } catch (t: Throwable) {
