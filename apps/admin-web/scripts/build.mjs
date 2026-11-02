@@ -1,0 +1,10 @@
+import { cp, mkdir, rm } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const dist = path.join(root, 'dist');
+await rm(dist, { recursive: true, force: true });
+await mkdir(dist, { recursive: true });
+await cp(path.join(root, 'public'), dist, { recursive: true });
+console.log('Static admin client copied to apps/admin-web/dist.');
+console.log('Demo notice: the bundled Node JSON API is local-demo-only and refuses NODE_ENV=production. A real backend is required before public deployment.');

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#101426" />
+  <meta name="description" content="پنل مدیریت FastLove" />
+  <title>پنل مدیریت | FastLove</title>
+  <link rel="stylesheet" href="/styles.css?v=1.0.5" />
+  <script type="module" src="/app.js?v=1.0.5"></script>
+</head>
+<body>
+  <div id="loginView" class="login-screen" hidden>
+    <div class="login-visual">
+      <div class="login-orb orb-one"></div><div class="login-orb orb-two"></div>
+      <div class="login-brand"><span class="brand-mark">♥</span><span>Fast<span>Love</span></span></div>
+      <div class="login-copy">
+        <span class="eyebrow">ADMIN CONTROL CENTER</span>
+        <h1>مدیریت هوشمند<br/>ارتباطات انسانی</h1>
+        <p>یک نگاه جامع به کاربران، تعامل‌ها، درآمد و سلامت محصول.</p>
+      </div>
+      <div class="login-foot">FASTLOVE · MANAGEMENT PORTAL</div>
+    </div>
+    <div class="login-form-wrap">
+      <form id="loginForm" class="login-card">
+        <div class="mobile-brand"><span class="brand-mark">♥</span><b>FastLove</b></div>
+        <div class="login-title">خوش برگشتی</div>
+        <p class="muted">برای ورود به پنل مدیریت، اطلاعات حساب خود را وارد کن.</p>
+        <label class="field-label" for="username">نام کاربری</label>
+        <div class="input-shell"><span class="input-icon">♙</span><input id="username" name="username" autocomplete="username" required placeholder="نام کاربری مدیر" /></div>
+        <label class="field-label" for="password">رمز عبور</label>
+        <div class="input-shell"><span class="input-icon">♢</span><input id="password" name="password" type="password" autocomplete="current-password" required placeholder="رمز عبور" /><button class="eye-button" type="button" data-action="toggle-password" aria-label="نمایش رمز عبور">◉</button></div>
+        <div id="loginError" class="form-error" role="alert"></div>
+        <button class="primary-button login-submit" type="submit"><span>ورود به پنل</span><span>←</span></button>
+        <div class="login-safe"><span>♧</span> ارتباط امن و دسترسی محدود مدیران</div>
+        <div class="login-demo" id="demoCredentials" hidden>حساب دمو: <b>admin</b> / <b>123456</b></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="appView" class="app-shell" hidden>
+    <aside class="sidebar" id="sidebar">
+      <div class="side-brand"><span class="brand-mark">♥</span><div><b>FastLove</b><small>ADMIN CONSOLE</small></div></div>
+      <div class="workspace-pill"><span class="status-dot"></span><span>محیط مدیریت</span><span class="chevron">⌄</span></div>
+      <nav class="side-nav" aria-label="منوی اصلی">
+        <div class="nav-caption">نمای کلی</div>
+        <button class="nav-link active" data-page="dashboard"><span class="nav-icon">▦</span><span>داشبورد BI</span></button>
+        <div class="nav-caption">مدیریت کاربران</div>
+        <button class="nav-link" data-page="users"><span class="nav-icon">♙</span><span>کاربران</span></button>
+        <button class="nav-link" data-page="referrals"><span class="nav-icon">⌁</span><span>گزارش کدهای معرف</span></button>
+        <button class="nav-link" data-page="payments"><span class="nav-icon">▤</span><span>پرداخت‌ها</span></button>
+        <button class="nav-link" data-page="reports"><span class="nav-icon">⚑</span><span>گزارش تخلف</span><span class="nav-count warning" id="reportsBadge">2</span></button>
+        <button class="nav-link" data-page="verification"><span class="nav-icon">◉</span><span>احراز هویت ویدئویی</span><span class="nav-count warning" id="verificationBadge">2</span></button>
+        <div class="nav-caption">تعاملات محصول</div>
+        <button class="nav-link" data-page="chats"><span class="nav-icon">▤</span><span>گفت‌وگوی کاربران</span></button>
+        <button class="nav-link" data-page="engagement"><span class="nav-icon">♡</span><span>لایک، مچ و دیت</span></button>
+        <button class="nav-link" data-page="tickets"><span class="nav-icon">▣</span><span>تیکت‌های پشتیبانی</span><span class="nav-count" id="ticketsBadge">2</span></button>
+        <div class="nav-caption">سوابق و تنظیمات</div>
+        <button class="nav-link" data-page="deletedUsers"><span class="nav-icon">▧</span><span>بایگانی کاربران حذف‌شده</span></button>
+        <div class="nav-caption">درآمد و راهنما</div>
+        <button class="nav-link" data-page="packages"><span class="nav-icon">◇</span><span>بسته‌ها و قیمت‌گذاری</span></button>
+        <button class="nav-link" data-page="help"><span class="nav-icon">✧</span><span>راهنمای پنل</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="admin-mini"><div class="avatar avatar-admin">A</div><div class="admin-meta"><b id="adminName">مدیر سیستم</b><small>دسترسی مدیر</small></div><button class="logout-mini" data-action="logout" title="خروج">⇥</button></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="topbar-start"><button class="mobile-menu" data-action="toggle-sidebar" aria-label="باز کردن منو">☰</button><div class="breadcrumb"><span>FastLove</span><i>/</i><b id="pageTitle">داشبورد BI</b></div></div>
+        <div class="topbar-end">
+          <div class="environment-chip"><span></span> محیط نمونه</div>
+          <div class="top-date" id="todayLabel"></div>
+          <button class="icon-button" data-action="refresh" title="بروزرسانی">↻</button>
+          <div class="top-admin"><div class="avatar avatar-admin">A</div><div><b id="topAdminName">مدیر سیستم</b><small>Administrator</small></div></div>
+        </div>
+      </header>
+      <section class="page-container" id="pageContainer" tabindex="-1"></section>
+      <footer class="app-footer"><span>© 2026 FastLove</span><span>نسخه پنل 1.0.5 <i></i> ساخته‌شده برای مدیریت امن محصول</span></footer>
+    </main>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

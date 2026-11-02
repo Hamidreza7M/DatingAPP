@@ -1,0 +1,31 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+
+# Node
+node_modules/
+apps/admin-web/data/db.json
+apps/admin-web/.env
+apps/admin-web/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+apps/android/ci-report/
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pem
+
+# Generated local CI evidence and Python caches
+.ci-evidence/
+**/__pycache__/
+*.pyc
