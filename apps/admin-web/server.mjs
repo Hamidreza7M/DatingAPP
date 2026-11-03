@@ -10,23 +10,16 @@ const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SEED_FILE = path.join(ROOT, 'data', 'seed.json');
 const PORT = Number(process.env.PORT || 4177);
-const HOST = process.env.HOST || '127.0.0.1';
 const IS_PROD = process.env.NODE_ENV === 'production';
-const IS_LOOPBACK_HOST = ['127.0.0.1', '::1', 'localhost'].includes(HOST.toLowerCase());
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
-const SESSION_TTL = 30 * 60 * 1000;
+const SESSION_SECRET = process.env.SESSION_SECRET || (IS_PROD ? '' : 'local-demo-session-secret-change-me');
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || (IS_PROD ? '' : 'admin');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (IS_PROD ? '' : '123456');
+const SESSION_TTL = 8 * 60 * 60 * 1000;
 const sessions = new Map();
 const loginAttempts = new Map();
 
-// This server is a local demo API backed by a JSON file, not a production backend.
-// Fail closed instead of accidentally exposing demo credentials/data on the Internet.
-if (IS_PROD) {
-  console.error('FastLove demo server cannot run with NODE_ENV=production. Replace this JSON demo API with the production backend before deployment.');
-  process.exit(1);
-}
-if (!IS_LOOPBACK_HOST && process.env.ALLOW_INSECURE_DEMO_REMOTE !== 'true') {
-  console.error('Remote demo binding is disabled. Use HOST=127.0.0.1 or explicitly set ALLOW_INSECURE_DEMO_REMOTE=true on an isolated trusted network.');
+if (IS_PROD && (!SESSION_SECRET || !ADMIN_USERNAME || !ADMIN_PASSWORD)) {
+  console.error('Production requires SESSION_SECRET, ADMIN_USERNAME and ADMIN_PASSWORD environment variables.');
   process.exit(1);
 }
 
@@ -86,30 +79,17 @@ function safeEqual(a, b) {
   const bh = crypto.createHash('sha256').update(String(b)).digest();
   return crypto.timingSafeEqual(ah, bh);
 }
-function parseCookies(header = '') {
-  const cookies = {};
-  for (const pair of header.split(';').map(value => value.trim()).filter(Boolean)) {
-    const i = pair.indexOf('=');
-    if (i <= 0) continue;
-    try {
-      cookies[decodeURIComponent(pair.slice(0, i))] = decodeURIComponent(pair.slice(i + 1));
-    } catch {
-      // Ignore malformed cookie pairs instead of turning them into a server error.
-    }
-  }
-  return cookies;
+function sign(value) {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('base64url');
 }
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'no-referrer',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Resource-Policy': 'same-origin',
-  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self'"
-};
+function parseCookies(header = '') {
+  return Object.fromEntries(header.split(';').map(x => x.trim()).filter(Boolean).map(pair => {
+    const i = pair.indexOf('=');
+    return [decodeURIComponent(pair.slice(0, i)), decodeURIComponent(pair.slice(i + 1))];
+  }));
+}
 function send(res, status, payload, headers = {}) {
-  res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers });
   res.end(JSON.stringify(payload));
 }
 function getSession(req) {
@@ -199,7 +179,7 @@ function dashboard() {
   };
 }
 
-const MIME = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.woff2':'font/woff2', '.svg':'image/svg+xml', '.png':'image/png', '.ico':'image/x-icon' };
+const MIME = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.svg':'image/svg+xml', '.png':'image/png', '.ico':'image/x-icon' };
 async function staticFile(req, res, pathname) {
   const clean = decodeURIComponent(pathname.split('?')[0]);
   const relative = clean === '/' ? 'index.html' : clean.replace(/^\/+/, '');
@@ -212,7 +192,7 @@ async function staticFile(req, res, pathname) {
     // Admin assets must not remain stale after a deployment: an old app.js can keep the login screen visible even after a successful server-side fix.
     const assetType = path.extname(target);
     const cachePolicy = ['.html', '.js', '.css'].includes(assetType) ? 'no-store, no-cache, must-revalidate' : 'public, max-age=3600';
-    res.writeHead(200, { ...SECURITY_HEADERS, 'Content-Type': MIME[assetType] || 'application/octet-stream', 'Cache-Control': cachePolicy, 'Pragma': 'no-cache' });
+    res.writeHead(200, { 'Content-Type': MIME[assetType] || 'application/octet-stream', 'Cache-Control': cachePolicy, 'Pragma': 'no-cache', 'X-Content-Type-Options':'nosniff' });
     res.end(content);
   } catch {
     if (!path.extname(clean)) return staticFile(req, res, '/index.html');
@@ -226,15 +206,9 @@ const server = http.createServer(async (req, res) => {
     const pathname = url.pathname;
     const method = req.method || 'GET';
     if (!pathname.startsWith('/api/')) return staticFile(req, res, pathname);
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    if (method !== 'GET' && req.headers.origin) {
       const expectedOrigin = process.env.PUBLIC_ORIGIN || `http://${req.headers.host}`;
-      if (!req.headers.origin || req.headers.origin !== expectedOrigin) {
-        return send(res, 403, { error: 'درخواست تغییردهنده وضعیت باید از مبدأ معتبر پنل ارسال شود.' });
-      }
-      const hasRequestBody = Number(req.headers['content-length'] || 0) > 0 || Boolean(req.headers['transfer-encoding']);
-      if (hasRequestBody && (req.headers['content-type'] || '').split(';')[0].trim().toLowerCase() !== 'application/json') {
-        return send(res, 415, { error: 'نوع محتوای درخواست باید application/json باشد.' });
-      }
+      if (req.headers.origin !== expectedOrigin) return send(res, 403, { error: 'درخواست از مبدأ نامعتبر پذیرفته نشد.' });
     }
 
     if (pathname === '/api/health' && method === 'GET') return send(res, 200, { ok: true, mode: IS_PROD ? 'production' : 'demo' });
@@ -452,12 +426,12 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/audit' && method === 'GET') return send(res, 200, { audit: db.audit.slice(0, 100) });
     return send(res, 404, { error: 'مسیر API پیدا نشد.' });
   } catch (error) {
-      console.error('[demo-api] request failed:', error?.message || 'unknown error');
-    send(res, error.status || 500, { error: error.status ? error.message : 'خطای داخلی سرور.' });
+    console.error(error);
+    send(res, error.status || 500, { error: error.message || 'خطای داخلی سرور.' });
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`FastLove Admin demo is running at http://${HOST}:${PORT}`);
-  console.log(`DEMO credentials: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD} (local demo only; never use with real data)`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`FastLove Admin is running at http://localhost:${PORT}`);
+  if (!IS_PROD) console.log(`DEMO credentials: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD} (development only)`);
 });

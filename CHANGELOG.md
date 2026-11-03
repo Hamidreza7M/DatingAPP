@@ -1,11 +1,5 @@
 # FastLove Admin changelog
 
-## 1.0.5 — 2026-11-02
-
-- Replaced the Admin Web interface font with the supplied Bonyade Koodak FaNum family, bundled locally as WOFF2 weights 100–900.
-- Added the `font/woff2` response MIME type and versioned Admin Web asset URLs.
-- Android source files and Android font resources were not changed.
-
 ## 1.0.4 — 2026-11-01
 
 - Added a referral report that groups registered members under the owner of each referral code.
