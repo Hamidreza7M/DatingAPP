@@ -109,26 +109,11 @@ jobs:
           disable-animations: true
           disable-spellchecker: true
           disable-linux-hw-accel: false
-          script: |
-            set -Eeuo pipefail
-            cd apps/android
-            mkdir -p ci-report/logs
-
-            # Run only the instrumentation tests in the UI gate. Unit-test
-            # coverage is already generated in the separate COVERAGE stage.
-            # Keep the test exit code while collecting emulator diagnostics.
-            set +e
-            gradle --no-daemon --stacktrace --console=plain connectedDebugAndroidTest 2>&1 | tee ci-report/logs/instrumented-ui-tests.log
-            ui_status=${PIPESTATUS[0]}
-            set -e
-
-            if [ "$ui_status" -ne 0 ]; then
-              echo "UI instrumentation tests failed (exit ${ui_status}); collecting emulator diagnostics."
-              adb logcat -d -v threadtime > ci-report/logs/ui-logcat-on-failure.log 2>&1 || true
-              adb shell dumpsys activity activities > ci-report/logs/ui-activities-on-failure.txt 2>&1 || true
-              adb shell dumpsys package ir.fastlove.demo > ci-report/logs/ui-package-on-failure.txt 2>&1 || true
-              exit "$ui_status"
-            fi
+          # This action runs each script line with `sh -c`, not Bash. Keep the
+          # script as one shell command and avoid Bash-only options such as pipefail.
+          working-directory: apps/android
+          script: >-
+            mkdir -p ci-report/logs && gradle --no-daemon --stacktrace --console=plain connectedDebugAndroidTest createDebugAndroidTestCoverageReport > ci-report/logs/instrumented-ui-tests.log 2>&1; status=$?; if [ -f ci-report/logs/instrumented-ui-tests.log ]; then cat ci-report/logs/instrumented-ui-tests.log; fi; exit "$status"
 
       - name: Create detailed build and test report
         id: report
