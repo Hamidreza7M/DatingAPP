@@ -34,9 +34,7 @@ function toast(message, type = 'success') {
   setTimeout(() => el.remove(), 3600);
 }
 async function api(path, options = {}) {
-  const method = options.method || 'GET';
-  const isMutation = !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
-  const config = { method, credentials: 'same-origin', headers: { ...(isMutation || options.body ? { 'Content-Type':'application/json' } : {}), ...(options.headers || {}) } };
+  const config = { method: options.method || 'GET', credentials: 'same-origin', headers: { ...(options.body ? { 'Content-Type':'application/json' } : {}), ...(options.headers || {}) } };
   if (options.body) config.body = JSON.stringify(options.body);
   let response;
   try {

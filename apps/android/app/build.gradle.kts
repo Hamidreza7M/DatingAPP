@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "ir.hamdam.demo"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "ir.fastlove.demo"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 32
         versionName = "2.23.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -23,15 +23,6 @@ android {
         getByName("debug") {
             enableUnitTestCoverage = true
             enableAndroidTestCoverage = true
-        }
-        getByName("release") {
-            isDebuggable = false
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
     }
 

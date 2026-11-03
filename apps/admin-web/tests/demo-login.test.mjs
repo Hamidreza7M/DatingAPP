@@ -40,14 +40,14 @@ test('demo credentials admin / 123456 work without environment overrides', async
 
     const login = await fetch(`${base}/api/auth/login`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', Origin:base },
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ username: 'admin', password: '123456' })
     });
     assert.equal(login.status, 200, 'default demo credentials must authenticate');
     assert.match(login.headers.get('set-cookie') || '', /fl_admin_session=/);
 
     const me = await fetch(`${base}/api/auth/me`, {
-      headers: { Cookie: login.headers.get('set-cookie').split(';')[0], Origin:base }
+      headers: { Cookie: login.headers.get('set-cookie').split(';')[0] }
     });
     assert.equal(me.status, 200);
     assert.equal((await me.json()).admin.username, 'admin');

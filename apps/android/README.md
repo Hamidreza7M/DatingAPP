@@ -19,7 +19,7 @@ app/src/main/java/ir/hamdam/demo/AppRules.kt
 
 ### اجرای محلی
 
-با Java 17، Android SDK (API 36)، و Gradle 8.11.1 نصب‌شده:
+با Java 17، Android SDK (API 35)، و Gradle 8.9 نصب‌شده:
 
 ```bash
 # تست‌های سریع JVM
@@ -47,7 +47,7 @@ npm run android:verify
 
 ### اجرای خودکار و دریافت گزارش پس از هر Build در GitHub Actions
 
-Workflow فایل `.github/workflows/build-apk.yml` با هر Push به `main`/`master` و هر Pull Request دارای تغییر در `apps/android/**` اجرا می‌شود؛ اجرای دستی نیز از `workflow_dispatch` ممکن است. مراحل آن عبارت‌اند از Unit Test، Lint، JaCoCo، Build APK و تست Smoke روی Emulator با Android API 36؛ Coverage تست دستگاه نیز با Task رسمی Android Gradle Plugin تولید می‌شود.
+Workflow فایل `.github/workflows/build-apk.yml` با هر Push به `main`/`master` و هر Pull Request دارای تغییر در `apps/android/**` اجرا می‌شود؛ اجرای دستی نیز از `workflow_dispatch` ممکن است. مراحل آن عبارت‌اند از Unit Test، Lint، JaCoCo، Build APK و تست Smoke روی Emulator با Android API 35؛ Coverage تست دستگاه نیز با Task رسمی Android Gradle Plugin تولید می‌شود.
 
 در انتهای هر اجرا:
 
@@ -87,7 +87,7 @@ Workflow فایل `.github/workflows/build-apk.yml` با هر Push به `main`/`
 - برای تست همین نسخه: از پروفایل وارد «پشتیبانی و تیکت‌ها» شو، یک تیکت بساز و سپس از دکمه «مدیر» در بالای صفحه با رمز `123456` وارد صندوق مدیر شو؛ پاسخ مدیر را می‌توانی در همان گوشی در صفحه تیکت ببینی. برای پاسخ کاربر، از حالت مدیر خارج شو و با همان حساب به تیکت برگرد.
 - امتیاز و نظر نیز در این نسخه محلی ذخیره می‌شوند و به داشبورد یا سرویس تحلیل ارسال نمی‌شوند.
 - `versionCode` برابر ۳۲ و `versionName` برابر `2.23.1` است.
-- در محیط آماده‌سازی این ZIP، Gradle و Android SDK نصب نیستند؛ بنابراین ساخت APK و تست روی شبیه‌ساز/گوشی اجرا نشده است. گردش‌کار GitHub Actions پروژه می‌تواند با Gradle 8.11.1 و Java 17 دستور `assembleDebug` را اجرا کند.
+- در محیط آماده‌سازی این ZIP، Gradle و Android SDK نصب نیستند؛ بنابراین ساخت APK و تست روی شبیه‌ساز/گوشی اجرا نشده است. گردش‌کار GitHub Actions پروژه می‌تواند با Gradle 8.9 و Java 17 دستور `assembleDebug` را اجرا کند.
 
 ---
 
@@ -304,14 +304,3 @@ Workflow فایل `.github/workflows/build-apk.yml` با هر Push به `main`/`
 
 - رفع خطای Kotlin در `AnalogTimePicker`: مقادیر `dx` و `dy` از نوع `Dp` بودند و پسوند `.dp` دوباره به آن‌ها اعمال می‌شد. در محاسبهٔ موقعیت برچسب‌های ساعت، از همان مقادیر `Dp` استفاده می‌شود.
 - `versionName` به `2.18.1` و `versionCode` به `25` افزایش یافت.
-
-
-## امنیت نسخه دمو (افزوده‌شده)
-
-- `targetSdk` و `compileSdk` روی API 36 تنظیم شده‌اند؛ برای Google Play از ۳۱ اوت ۲۰۲۶ نسخه‌های جدید و به‌روزرسانی‌ها باید API 36 یا بالاتر را هدف بگیرند.
-- Cleartext HTTP با Manifest و Network Security Config مسدود شده و فقط ریشه‌های اعتماد سیستمی پذیرفته می‌شوند.
-- Backup ابری و انتقال دستگاه برای داده‌های برنامه صراحتاً غیرفعال است.
-- مسیرهای FileProvider به پوشه‌های موردنیاز دوربین و پیوست‌های پشتیبانی محدود شده‌اند.
-- در Release، R8 و Resource Shrinking فعال است؛ قواعد نگهداری مدل‌های Gson در `app/proguard-rules.pro` قرار دارند.
-- فایل Release این مخزن هنوز با کلید امضای انتشار امضا نمی‌شود؛ کلید باید خارج از مخزن و از طریق Secret امن CI مدیریت شود.
-- اطلاعات پروفایل، پیام و فایل‌ها همچنان در فضای خصوصی اپ و SharedPreferences دمو ذخیره می‌شوند و لایه رمزنگاری اختصاصی با Keystore در این نسخه وجود ندارد؛ بنابراین داده واقعی/حساس وارد نکنید.
