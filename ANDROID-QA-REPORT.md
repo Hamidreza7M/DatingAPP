@@ -10,7 +10,7 @@
 2. افزودن ۱۴ تست JUnit برای فیلتر پروفایل، امتیاز سازگاری، ارقام فارسی/عربی، تقویم جلالی، URL شبکه‌های اجتماعی و تشخیص موضوع گفتگو.
 3. افزودن یک Compose Instrumentation Smoke Test برای بررسی نمایش صفحه شروع در اجرای اول.
 4. افزودن JaCoCo XML/HTML، Android Lint، گزارش JUnit و خلاصه خودکار CI.
-5. اصلاح Workflow اندروید برای اجرا روی Push به `main`/`master` و Pull Requestهای مرتبط، همراه با Emulator API 35 و ذخیره گزارش و APK به‌صورت Artifact.
+5. اصلاح Workflow اندروید برای اجرا روی Push به `main`/`master` و Pull Requestهای مرتبط، همراه با Emulator API 36 و ذخیره گزارش و APK به‌صورت Artifact.
 
 ## نتایج اجرا در محیط فعلی
 
@@ -35,7 +35,7 @@
 Workflow: `.github/workflows/build-apk.yml`
 
 - Trigger: Push به `main` یا `master`، Pull Request با تغییر Android، یا اجرای دستی.
-- مراحل: `testDebugUnitTest`، `lintDebug`، `assembleDebug`، `jacocoTestReport`، `connectedDebugAndroidTest` و `createDebugAndroidTestCoverageReport` روی Emulator API 35.
+- مراحل: `testDebugUnitTest`، `lintDebug`، `assembleDebug`، `jacocoTestReport`، `connectedDebugAndroidTest` و `createDebugAndroidTestCoverageReport` روی Emulator API 36.
 - گزارش‌های تست، Lint، JaCoCo، Coverage دستگاه و Instrumentation با Artifact به نام `fastlove-android-reports-<run number>` ذخیره می‌شوند.
 - خلاصه تعداد تست‌ها و Coverage به GitHub Actions Summary اضافه می‌شود.
 - APK دیباگ با Artifact به نام `fastlove-debug-apk-<run number>` تنها در صورت عبور مراحل اجباری آپلود می‌شود.

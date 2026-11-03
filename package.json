@@ -1,7 +1,7 @@
 {
   "name": "fastlove-monorepo",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "FastLove multi-platform product repository",
   "scripts": {
     "admin:dev": "npm --prefix apps/admin-web run dev",
@@ -11,7 +11,9 @@
     "android:test": "cd apps/android && gradle --no-daemon testDebugUnitTest",
     "android:device-test": "cd apps/android && gradle --no-daemon connectedDebugAndroidTest",
     "android:verify": "cd apps/android && gradle --no-daemon testDebugUnitTest lintDebug assembleDebug jacocoTestReport",
-    "admin:test": "npm --prefix apps/admin-web test"
+    "admin:test": "npm --prefix apps/admin-web test",
+    "security:check": "node scripts/security-check.mjs",
+    "security:verify": "npm run security:check && npm run admin:test && npm run admin:build"
   },
   "engines": {
     "node": ">=20"

@@ -1,0 +1,95 @@
+
+> fastlove-monorepo@1.0.4 security:verify
+> npm run security:check && npm run admin:test && npm run admin:build
+
+
+> fastlove-monorepo@1.0.4 security:check
+> node scripts/security-check.mjs
+
+✓ AND-001 PASS: Android cleartext networking disabled — Manifest and Network Security Config explicitly prohibit cleartext HTTP.
+✓ AND-002 PASS: Android system trust anchors only — Custom user-added CA certificates are not trusted by the app network policy.
+✓ AND-003 PASS: Android backup disabled and data domains excluded — Manifest references backup policies and backup/device-transfer exclusions cover app-local data and SharedPreferences.
+✓ AND-004 PASS: Android target API 36 — Required target API for new Google Play submissions as of 31 Aug 2026.
+✓ AND-005 PASS: Android Gradle Plugin supports API 36 — AGP must be at least 8.9.1 to compile/target API 36.
+✓ AND-006 PASS: Android release minification and resource shrinking — R8 and resource shrinking are enabled for release builds.
+✓ AND-007 PASS: Android Gson model keep rules exist — Names and fields for local Gson-reflection models are retained.
+✓ AND-008 PASS: FileProvider is not exported and paths are narrow — The provider only exposes camera capture, app pictures and support attachments.
+✓ WEB-001 PASS: Demo server defaults to loopback and opt-in remote binding — Network-visible demo mode requires an explicit unsafe override.
+✓ WEB-002 PASS: Production execution is blocked for JSON demo API — The demo JSON API refuses production mode.
+✓ WEB-003 PASS: HTTP security headers configured — CSP, anti-framing, MIME sniffing, referrer and permissions policy headers are set.
+✓ WEB-004 PASS: Unsafe API requests require same-origin JSON — State-changing API requests are checked for Origin and JSON content type.
+✓ WEB-005 PASS: Admin browser client sends JSON content type for mutations — Browser requests include JSON content type for state-changing calls.
+✓ OPS-001 PASS: Environment files and signing material ignored by Git — Local secrets and Android signing files are ignored.
+i SCOPE-001 INFO: PWA not implemented in uploaded source — true
+i SCOPE-002 INFO: No production backend/API implementation — services/api contains design notes only; Android stores demo state locally and admin uses local JSON seed data.
+i SCOPE-003 INFO: Local Android data remains in app-private SharedPreferences/files — No app-level Keystore encryption layer is present. The app sandbox and backups are protected, but do not enter real user or dating data into this demo.
+i SCOPE-004 INFO: Demo credentials remain intentionally public — admin / 123456 is retained for local demo usability; loopback binding and production-mode refusal are enforced.
+
+Security static checks: 14 PASS, 0 FAIL, 4 INFO
+
+> fastlove-monorepo@1.0.4 admin:test
+> npm --prefix apps/admin-web test
+
+
+> @fastlove/admin-web@1.0.4 test
+> node --test tests/*.test.mjs
+
+TAP version 13
+# Subtest: admin API: auth, read routes and management actions
+ok 1 - admin API: auth, read routes and management actions
+  ---
+  duration_ms: 399.724503
+  type: 'test'
+  ...
+# Subtest: demo credentials admin / 123456 work without environment overrides
+ok 2 - demo credentials admin / 123456 work without environment overrides
+  ---
+  duration_ms: 254.878902
+  type: 'test'
+  ...
+# Subtest: demo server refuses production mode and non-loopback binding by default
+ok 3 - demo server refuses production mode and non-loopback binding by default
+  ---
+  duration_ms: 107.038979
+  type: 'test'
+  ...
+# Subtest: demo HTTP responses have security headers and unsafe requests enforce same-origin JSON
+ok 4 - demo HTTP responses have security headers and unsafe requests enforce same-origin JSON
+  ---
+  duration_ms: 299.665472
+  type: 'test'
+  ...
+# Subtest: admin UI hides inactive views and provides online/offline user filtering
+ok 5 - admin UI hides inactive views and provides online/offline user filtering
+  ---
+  duration_ms: 4.415626
+  type: 'test'
+  ...
+# Subtest: admin web assets are versioned and cannot be served stale from browser cache
+ok 6 - admin web assets are versioned and cannot be served stale from browser cache
+  ---
+  duration_ms: 2.106781
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1305.059267
+
+> fastlove-monorepo@1.0.4 admin:build
+> npm --prefix apps/admin-web run build
+
+
+> @fastlove/admin-web@1.0.4 build
+> node scripts/build.mjs
+
+Static admin client copied to apps/admin-web/dist.
+Demo notice: the bundled Node JSON API is local-demo-only and refuses NODE_ENV=production. A real backend is required before public deployment.
+.github/workflows/security.yml: YAML PASS
+.github/workflows/build-apk.yml: YAML PASS
+Android XML parse: PASS (8 files)

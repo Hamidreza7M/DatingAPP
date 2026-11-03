@@ -1,0 +1,244 @@
+name: FastLove Security Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-security:
+    name: Admin Web security checks
+    runs-on: ubuntu-latest
+    outputs:
+      static: ${{ steps.static.outcome }}
+      tests: ${{ steps.tests.outcome }}
+      build: ${{ steps.build.outcome }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Static security requirements check
+        id: static
+        continue-on-error: true
+        run: npm run security:check
+      - name: Admin API integration and security tests
+        id: tests
+        continue-on-error: true
+        run: npm run admin:test
+      - name: Build Admin Web
+        id: build
+        continue-on-error: true
+        run: npm run admin:build
+
+  android-security:
+    name: Android tests, lint and hardened Release build
+    runs-on: ubuntu-latest
+    outputs:
+      unit: ${{ steps.unit.outcome }}
+      lint: ${{ steps.lint.outcome }}
+      release: ${{ steps.release.outcome }}
+      coverage: ${{ steps.coverage.outcome }}
+      xml: ${{ steps.xml.outcome }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Android manifest and XML resources
+        id: xml
+        run: |
+          python3 - <<'PYXML'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files = list(Path('apps/android/app/src').rglob('*.xml'))
+          if not files:
+              raise SystemExit('No Android XML files found')
+          for file in files:
+              ET.parse(file)
+          print(f'Validated {len(files)} Android XML files')
+          PYXML
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android API 36 platform and build tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Android JVM unit tests
+        id: unit
+        continue-on-error: true
+        working-directory: apps/android
+        run: gradle --no-daemon --stacktrace --console=plain testDebugUnitTest
+      - name: Android Lint (Release variant)
+        id: lint
+        continue-on-error: true
+        working-directory: apps/android
+        run: gradle --no-daemon --stacktrace --console=plain lintRelease
+      - name: Build hardened Release variant (unsigned; signing is a separate gated step)
+        id: release
+        continue-on-error: true
+        working-directory: apps/android
+        run: gradle --no-daemon --stacktrace --console=plain assembleRelease
+      - name: Generate JaCoCo unit-test coverage
+        id: coverage
+        if: always()
+        continue-on-error: true
+        working-directory: apps/android
+        run: gradle --no-daemon --stacktrace --console=plain jacocoTestReport
+      - name: Upload Android verification outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastlove-android-security-outputs
+          path: |
+            apps/android/app/build/reports/
+            apps/android/app/build/test-results/
+            apps/android/app/build/outputs/apk/release/
+          if-no-files-found: warn
+          retention-days: 30
+
+  secret-scan:
+    name: Repository secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql-sast:
+    name: CodeQL SAST (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: java-kotlin
+            build-mode: manual
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended,security-and-quality
+      - name: Set up Java 17 for Android analysis
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK for CodeQL build
+        if: matrix.language == 'java-kotlin'
+        uses: android-actions/setup-android@v3
+      - name: Install Android API 36 for CodeQL build
+        if: matrix.language == 'java-kotlin'
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Set up Gradle for Android analysis
+        if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Build Android sources for CodeQL
+        if: matrix.language == 'java-kotlin'
+        working-directory: apps/android
+        run: gradle --no-daemon --stacktrace --console=plain :app:assembleDebug
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
+
+  osv-dependency-scan:
+    name: OSV dependency vulnerability scan
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.6.0
+    with:
+      scan-args: |-
+        --recursive
+        ./
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+  security-report:
+    name: Aggregate security report
+    if: always()
+    needs: [web-security, android-security, secret-scan, codeql-sast, osv-dependency-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate pipeline report
+        env:
+          WEB_STATIC: ${{ needs.web-security.outputs.static }}
+          WEB_TESTS: ${{ needs.web-security.outputs.tests }}
+          WEB_BUILD: ${{ needs.web-security.outputs.build }}
+          GITLEAKS: ${{ needs.secret-scan.result }}
+          CODEQL: ${{ needs.codeql-sast.result }}
+          OSV_SCAN: ${{ needs.osv-dependency-scan.result }}
+          ANDROID_UNIT: ${{ needs.android-security.outputs.unit }}
+          ANDROID_LINT: ${{ needs.android-security.outputs.lint }}
+          ANDROID_RELEASE: ${{ needs.android-security.outputs.release }}
+          ANDROID_COVERAGE: ${{ needs.android-security.outputs.coverage }}
+          ANDROID_XML: ${{ needs.android-security.outputs.xml }}
+        run: node scripts/write-security-report.mjs
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fastlove-security-review-report
+          path: SECURITY-REVIEW-REPORT.md
+          if-no-files-found: error
+          retention-days: 90
+
+  enforce-security-gate:
+    name: Enforce security gate
+    if: always()
+    needs: [web-security, android-security, secret-scan, codeql-sast, osv-dependency-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when any required stage did not pass
+        env:
+          WEB_STATIC: ${{ needs.web-security.outputs.static }}
+          WEB_TESTS: ${{ needs.web-security.outputs.tests }}
+          WEB_BUILD: ${{ needs.web-security.outputs.build }}
+          ANDROID_UNIT: ${{ needs.android-security.outputs.unit }}
+          ANDROID_LINT: ${{ needs.android-security.outputs.lint }}
+          ANDROID_RELEASE: ${{ needs.android-security.outputs.release }}
+          ANDROID_COVERAGE: ${{ needs.android-security.outputs.coverage }}
+          ANDROID_XML: ${{ needs.android-security.outputs.xml }}
+          GITLEAKS: ${{ needs.secret-scan.result }}
+          CODEQL: ${{ needs.codeql-sast.result }}
+          OSV_SCAN: ${{ needs.osv-dependency-scan.result }}
+        run: |
+          failed=0
+          for stage in WEB_STATIC WEB_TESTS WEB_BUILD ANDROID_XML ANDROID_UNIT ANDROID_LINT ANDROID_RELEASE ANDROID_COVERAGE GITLEAKS CODEQL OSV_SCAN; do
+            value="${!stage}"
+            echo "$stage: ${value:-unknown}"
+            if [ "$value" != "success" ]; then failed=1; fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "Security gate failed. Inspect the FastLove security report artifact."
+            exit 1
+          fi

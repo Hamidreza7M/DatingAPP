@@ -3078,7 +3078,8 @@ private fun ProfileSetupScreen(phone: String, onBack: () -> Unit, onComplete: (U
 
     fun createImageUri(ctx: Context): Uri {
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val storageDir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: ctx.cacheDir
+        val storageDir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+            ?: File(ctx.cacheDir, "camera_capture").apply { mkdirs() }
         val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
         return FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
     }
@@ -3630,7 +3631,8 @@ private fun EditProfileScreen(user: UserProfile, onSave: (UserProfile) -> Unit, 
     var cameraUri by remember { mutableStateOf<Uri?>(null) }
     fun createImageUri(ctx: Context): Uri {
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val storageDir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES) ?: ctx.cacheDir
+        val storageDir = ctx.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+            ?: File(ctx.cacheDir, "camera_capture").apply { mkdirs() }
         val file = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
         return FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", file)
     }

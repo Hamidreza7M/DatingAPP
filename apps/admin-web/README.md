@@ -36,22 +36,24 @@ npm run dev
 npm run admin:build
 ```
 
-خروجی کلاینت استاتیک در `apps/admin-web/dist/` قرار می‌گیرد. API سرور با دستور `npm run admin:start` اجرا می‌شود. در این نسخه API و کلاینت توسط یک Node server در یک مبدأ ارائه می‌شوند؛ می‌توان آن‌ها را در محیط استقرار جدا کرد، به شرط اینکه آدرس API و تنظیمات کوکی/مبدأ به‌درستی پیکربندی شوند.
+خروجی کلاینت استاتیک در `apps/admin-web/dist/` قرار می‌گیرد. API سرور با دستور `npm run admin:start` اجرا می‌شود. در این نسخه API و کلاینت توسط یک Node server در یک مبدأ ارائه می‌شوند؛ این پیاده‌سازی صرفاً برای دمو و اجرای محلی است.
 
-## تنظیمات Production
+## مرز امنیتی نسخه دمو (مهم)
 
-متغیرهای زیر را در محیط امن سرور تنظیم کنید (فایل `.env` در مخزن قرار ندهید):
+این سرور فقط یک API آزمایشی Node.js با دیتابیس JSON محلی و حساب ادمین نمایشی است؛ **بک‌اند Production نیست** و نباید روی اینترنت یا برای داده واقعی اجرا شود.
 
-```dotenv
-NODE_ENV=production
-PORT=4177
-PUBLIC_ORIGIN=https://admin.example.com
-ADMIN_USERNAME=your-admin-user
-ADMIN_PASSWORD=your-long-unique-password
-SESSION_SECRET=your-random-secret-at-least-32-bytes
-```
+- به‌صورت پیش‌فرض فقط روی `127.0.0.1` گوش می‌دهد.
+- اجرای آن با `NODE_ENV=production` عمداً متوقف می‌شود.
+- Bind روی IP عمومی فقط با `ALLOW_INSECURE_DEMO_REMOTE=true` ممکن است؛ این گزینه صرفاً برای شبکه آزمایشگاهی ایزوله است و نباید در محیط عمومی فعال شود.
+- درخواست‌های تغییردهنده داده باید `Origin` هم‌دامنه و `Content-Type: application/json` داشته باشند.
+- نشست دمو در حافظه نگهداری می‌شود و با Restart سرور از بین می‌رود.
+- ورود آزمایشی `admin / 123456` عمومی و ثابت است؛ هیچ‌گاه آن را به حساب واقعی تبدیل نکنید.
 
-در Production کوکی نشست `HttpOnly`, `SameSite=Strict` و `Secure` است؛ HTTPS اجباری است. نشست‌ها در حافظه سرور نگهداری می‌شوند و با Restart سرور منقضی خواهند شد.
+برای محصول واقعی باید API مرکزی مستقل با احراز هویت استاندارد، MFA ادمین، مدیریت نشست پایدار، RBAC/ABAC سمت سرور، دیتابیس امن، مهاجرت داده، مدیریت Secret/KMS، ثبت رخداد مقاوم در برابر دست‌کاری و تست نفوذ مستقل توسعه داده شود. قبل از آماده‌شدن آن بک‌اند، اجرای عمومی این نسخه ممنوع است.
+
+## تنظیمات اجرای محلی
+
+فایل `.env.example` صرفاً متغیرهای اختیاری محیط دمو را نشان می‌دهد. هیچ Secret تولیدی در مخزن نگهداری نکنید.
 
 ## محدوده قابلیت‌ها
 
@@ -81,7 +83,7 @@ SESSION_SECRET=your-random-secret-at-least-32-bytes
 4. ویدئوها و پیوست‌ها در Object Storage خصوصی با URL کوتاه‌عمر نگهداری شوند؛ این نسخه فایل ویدئویی واقعی ارائه نمی‌کند.
 5. درگاه پرداخت فقط قیمت ثبت‌شده در سمت سرور را مبنا قرار دهد؛ تعریف و تغییر بسته‌ها در این نسخه هنوز به جریان خرید اندروید متصل نیست.
 6. API ثبت‌نام موبایل باید کد واردشده را در فیلد `referredByCode` ثبت کند و هنگام برنامه‌ریزی دیت، `location` واقعی را ذخیره کند. داده‌های فعلی این دو بخش صرفاً نمونه‌اند.
-6. ذخیره‌سازی JSON دمو با PostgreSQL و نشست حافظه‌ای با Session Store پایدار جایگزین شود.
+7. API JSON دمو با بک‌اند مرکزی و PostgreSQL و نشست حافظه‌ای با Session Store پایدار جایگزین شود.
 
 
 ## وضعیت کاربران آنلاین در نسخه دمو
@@ -92,21 +94,18 @@ SESSION_SECRET=your-random-secret-at-least-32-bytes
 
 سرور را متوقف کنید و `apps/admin-web/data/db.json` را حذف کنید. در اجرای بعدی، دیتابیس دمو از `data/seed.json` دوباره ساخته می‌شود.
 
-## Docker (مناسب برای استقرار مستقل)
+## Docker (دمو آزمایشگاهی، نه Production)
 
-از همین پوشه:
+این سرور در Docker به‌صورت پیش‌فرض Bind عمومی را مسدود می‌کند. فقط برای شبکه آزمایشگاهی ایزوله و با آگاهی از حساب ثابت دمو می‌توان آن را به‌صورت opt-in اجرا کرد؛ هرگز پورت را به اینترنت منتشر نکنید.
 
 ```bash
-docker build -t fastlove-admin .
-docker run -d --name fastlove-admin \
-  -p 4177:4177 \
-  -e ADMIN_USERNAME='your-admin-user' \
-  -e ADMIN_PASSWORD='a-long-unique-password' \
-  -e SESSION_SECRET='a-random-secret-with-at-least-32-bytes' \
-  -e PUBLIC_ORIGIN='https://admin.example.com' \
+docker build -t fastlove-admin-demo .
+docker run --rm --name fastlove-admin-demo \
+  -p 127.0.0.1:4177:4177 \
+  -e ALLOW_INSECURE_DEMO_REMOTE=true \
   -e DATA_DIR=/var/lib/fastlove/data \
   -v fastlove-admin-data:/var/lib/fastlove/data \
-  fastlove-admin
+  fastlove-admin-demo
 ```
 
-Volume باعث ماندگاری دیتای دمو JSON پس از تعویض کانتینر می‌شود. برای Production پایدار و چندنمونه‌ای، این JSON store باید با PostgreSQL و session store مشترک جایگزین شود.
+Volume باعث ماندگاری دیتای دمو JSON پس از تعویض کانتینر می‌شود. برای Production باید سرویس بک‌اند واقعی طراحی و پیاده‌سازی شود.

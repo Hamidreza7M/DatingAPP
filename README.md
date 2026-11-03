@@ -42,7 +42,7 @@ npm run admin:dev
 - Username: `admin`
 - Password: `123456`
 
-این حساب فقط برای توسعه محلی است. برای Production متغیرهای امن را طبق `apps/admin-web/.env.example` به محیط سرور تزریق کنید.
+این حساب فقط برای توسعه محلی است. سرور JSON دمو عمداً در Production اجرا نمی‌شود؛ برای انتشار عمومی باید بک‌اند واقعی مطابق `SECURITY-REQUIREMENTS.md` پیاده‌سازی شود.
 
 ### Build مستقل پنل
 
@@ -54,7 +54,7 @@ npm run admin:build
 
 ## ساخت، تست و گزارش Android
 
-پروژه اندروید اکنون در `apps/android/` قرار دارد. برای Build و تست به Java 17، Android SDK (API 35) و Gradle 8.9 نیاز است:
+پروژه اندروید اکنون در `apps/android/` قرار دارد. برای Build و تست به Java 17، Android SDK (API 36)، Android Gradle Plugin 8.9.1 و Gradle 8.11.1 نیاز است:
 
 ```bash
 npm run android:build       # ساخت APK دیباگ
@@ -66,6 +66,18 @@ npm run android:device-test # تست UI روی Emulator متصل
 Workflow اندروید در `.github/workflows/build-apk.yml` روی Pull Request و Push به شاخه‌های اصلی اجرا می‌شود. گزارش‌های JUnit، JaCoCo، Lint و Instrumentation به‌صورت Artifact در هر اجرای موفق/ناموفق ذخیره می‌شوند؛ خلاصه نتایج نیز در Summary همان Workflow قرار می‌گیرد. APK فقط در صورت عبور Quality Gate آپلود می‌شود. جزئیات تست‌ها و مسیر گزارش‌ها در `apps/android/README.md` آمده است.
 
 گردش‌کار GitHub Actions اندروید فقط با تغییرات `apps/android/**` اجرا می‌شود؛ پنل مدیریت Workflow مجزای خود را دارد.
+
+### پایپ‌لاین امنیتی
+
+Workflow امنیتی `.github/workflows/security.yml` روی Push، Pull Request و اجرای دستی فعال است و کنترل‌های امنیتی پیکربندی، تست‌های API پنل، Build وب، تست/Lint/Release اندروید، اعتبارسنجی منابع XML، Gitleaks، CodeQL و OSV را اجرا می‌کند. گزارش تجمیعی امنیت به‌صورت Artifact ذخیره می‌شود و شکست هر کنترل الزامی، Security Gate را Fail می‌کند.
+
+برای اجرای کنترل‌های قابل اجرا در محیط محلی (بدون نیاز به Gradle/Android SDK):
+
+```bash
+npm run security:verify
+```
+
+این فرمان کنترل‌های ایستای تنظیمات، تست‌های Node پنل و Build وب را اجرا می‌کند؛ مراحل Android، اسکن‌های GitHub و تست Emulator فقط در CI اجرا می‌شوند. جزئیات کنترل‌ها و موانع انتشار در `SECURITY-REQUIREMENTS.md` و `SECURITY-REVIEW-REPORT.md` ثبت شده‌اند.
 
 ## اصل معماری
 
@@ -81,4 +93,13 @@ Android فعلی نسخه دمو و محلی است و داده‌ها در Shar
 
 ## استقرار مستقل Admin Web
 
-پنل مدیریت یک سرویس مستقل است و نیاز به Build یا انتشار Android/iOS ندارد. می‌توان آن را از مسیر `apps/admin-web` به‌صورت جداگانه Deploy کرد؛ Dockerfile و workflow مخصوص پنل در همان اپ قرار دارد. برای جزئیات: `apps/admin-web/README.md`.
+پنل مدیریت یک سرویس مستقل است و نیاز به Build یا انتشار Android/iOS ندارد. می‌توان Build کلاینت را مستقل انجام داد؛ اما سرور JSON فعلی فقط برای دمو محلی است و Dockerfile آن نیز صرفاً اجرای آزمایشگاهی را هدف می‌گیرد، نه استقرار عمومی. برای جزئیات: `apps/admin-web/README.md`.
+
+## Security review (demo scope)
+
+- Security requirements and open release blockers: [SECURITY-REQUIREMENTS.md](SECURITY-REQUIREMENTS.md)
+- Current demo review and test status: [SECURITY-REVIEW-REPORT.md](SECURITY-REVIEW-REPORT.md)
+- Run local web/static security checks: `npm run security:verify`
+- CI security pipeline: `.github/workflows/security.yml`
+
+**Do not deploy the current Admin JSON demo API publicly or enter real personal data.** The central production backend and PWA are not implemented in this repository.

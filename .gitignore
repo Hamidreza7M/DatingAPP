@@ -15,3 +15,12 @@ apps/admin-web/dist/
 .DS_Store
 Thumbs.db
 apps/android/ci-report/
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pem

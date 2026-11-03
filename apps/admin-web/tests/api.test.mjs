@@ -30,13 +30,13 @@ test('admin API: auth, read routes and management actions', async () => {
     const unauth = await fetch(`${base}/api/users`);
     assert.equal(unauth.status, 401, 'private routes must require a session');
 
-    const invalid = await fetch(`${base}/api/auth/login`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({username:'test-admin',password:'wrong'}) });
+    const invalid = await fetch(`${base}/api/auth/login`, { method:'POST', headers:{'content-type':'application/json', Origin:base}, body:JSON.stringify({username:'test-admin',password:'wrong'}) });
     assert.equal(invalid.status, 401, 'invalid credentials must be rejected');
 
-    const login = await fetch(`${base}/api/auth/login`, { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({username:'test-admin',password:'test-password'}) });
+    const login = await fetch(`${base}/api/auth/login`, { method:'POST', headers:{'content-type':'application/json', Origin:base}, body:JSON.stringify({username:'test-admin',password:'test-password'}) });
     assert.equal(login.status, 200);
     const cookie = login.headers.get('set-cookie').split(';')[0];
-    const request = (route, options={}) => fetch(`${base}${route}`, { ...options, headers:{ ...(options.body?{'content-type':'application/json'}:{}), Cookie:cookie, ...(options.headers||{}) } });
+    const request = (route, options={}) => fetch(`${base}${route}`, { ...options, headers:{ ...(options.body?{'content-type':'application/json'}:{}), ...(!['GET','HEAD','OPTIONS'].includes((options.method||'GET').toUpperCase())?{Origin:base}:{}), Cookie:cookie, ...(options.headers||{}) } });
 
     for (const route of ['/api/auth/me','/api/dashboard','/api/users','/api/referrals','/api/users/USR-1001','/api/payments','/api/payments/PAY-8001','/api/reports','/api/verifications','/api/tickets','/api/likes','/api/matches','/api/dates','/api/chats','/api/chats/CHAT-9001','/api/packages','/api/audit']) {
       const response = await request(route);

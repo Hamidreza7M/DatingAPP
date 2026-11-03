@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,7 +28,26 @@ test('admin web assets are versioned and cannot be served stale from browser cac
     readFile(path.join(ROOT, 'public/index.html'), 'utf8'),
     readFile(path.join(ROOT, 'server.mjs'), 'utf8')
   ]);
-  assert.match(html, /styles\.css\?v=1\.0\.4/);
-  assert.match(html, /app\.js\?v=1\.0\.4/);
+  assert.match(html, /styles\.css\?v=1\.0\.5/);
+  assert.match(html, /app\.js\?v=1\.0\.5/);
   assert.match(server, /no-store, no-cache, must-revalidate/);
+});
+
+
+test('Admin Web uses the bundled Bonyade Koodak FaNum font without changing Android assets', async () => {
+  const css = await readFile(path.join(ROOT, 'public/styles.css'), 'utf8');
+  const html = await readFile(path.join(ROOT, 'public/index.html'), 'utf8');
+  assert.match(css, /font-family:\"Bonyade Koodak\",Tahoma,Arial,sans-serif/);
+  assert.match(css, /font-display:swap/);
+  assert.match(css, /BonyadeKoodakFaNum-Regular\.woff2/);
+  assert.match(css, /BonyadeKoodakFaNum-Bold\.woff2/);
+  assert.match(html, /styles\.css\?v=1\.0\.5/);
+});
+
+
+test('Admin Web serves all bundled WOFF2 weights with the correct font MIME type', async () => {
+  const server = await readFile(path.join(ROOT, 'server.mjs'), 'utf8');
+  const weights = ['Thin', 'ExtraLight', 'Light', 'Regular', 'Medium', 'Bold', 'ExtraBold', 'Black'];
+  await Promise.all(weights.map(weight => access(path.join(ROOT, 'public/fonts', `BonyadeKoodakFaNum-${weight}.woff2`))));
+  assert.match(server, /\.woff2['\"]\s*:\s*['\"]font\/woff2/);
 });
