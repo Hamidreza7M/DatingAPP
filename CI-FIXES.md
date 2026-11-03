@@ -11,3 +11,10 @@
 
 ## Validation note
 These are workflow-level reliability/policy changes. Actual GitHub-hosted emulator execution and Trivy database/scanner execution must be verified by running the workflows in GitHub Actions.
+
+## Android UI smoke-test stability (2026-11-03)
+
+- Disabled Compose test-clock auto-advance in `MainActivitySmokeTest`. The first-run authentication screen contains intentional infinite decorative animations; freezing the test clock prevents idling synchronization from waiting for those animations to finish.
+- Kept assertions against the actual first-launch Persian auth-screen content, including the registration action.
+- Separated `connectedDebugAndroidTest` from `createDebugAndroidTestCoverageReport`. The independent COVERAGE stage remains responsible for JaCoCo unit-test coverage; a secondary device-coverage report can no longer mark the UI test stage as failed.
+- Added emulator logcat, activity, and package diagnostics to the Android CI artifact when instrumentation tests fail. The UI stage still fails when the instrumentation test itself fails.
