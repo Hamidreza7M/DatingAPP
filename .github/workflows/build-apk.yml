@@ -97,13 +97,18 @@ jobs:
         continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
-          api-level: 35
+          # API 34 is sufficient for this app (compile/target SDK remain 35) and
+          # is generally more reliable on hosted Linux runners than API 35 images.
+          api-level: 34
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-boot-timeout: 600
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back emulated
+          disk-size: 6G
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           disable-animations: true
+          disable-spellchecker: true
+          disable-linux-hw-accel: false
           script: |
             set -o pipefail
             cd apps/android
