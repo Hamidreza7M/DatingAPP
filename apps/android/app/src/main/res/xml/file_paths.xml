@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <cache-path name="cache" path="." />
-    <external-cache-path name="external_cache" path="." />
+    <cache-path name="camera-captures" path="camera_capture/" />
     <external-files-path name="pictures" path="Pictures/" />
-    <files-path name="files" path="." />
+    <files-path name="support-attachments" path="media/support_attachments/" />
 </paths>

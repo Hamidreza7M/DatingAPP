@@ -88,8 +88,17 @@ function parseCookies(header = '') {
     return [decodeURIComponent(pair.slice(0, i)), decodeURIComponent(pair.slice(i + 1))];
   }));
 }
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:; connect-src 'self'",
+  ...(IS_PROD ? { 'Strict-Transport-Security': 'max-age=31536000' } : {})
+};
 function send(res, status, payload, headers = {}) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS, ...headers });
   res.end(JSON.stringify(payload));
 }
 function getSession(req) {
@@ -192,7 +201,7 @@ async function staticFile(req, res, pathname) {
     // Admin assets must not remain stale after a deployment: an old app.js can keep the login screen visible even after a successful server-side fix.
     const assetType = path.extname(target);
     const cachePolicy = ['.html', '.js', '.css'].includes(assetType) ? 'no-store, no-cache, must-revalidate' : 'public, max-age=3600';
-    res.writeHead(200, { 'Content-Type': MIME[assetType] || 'application/octet-stream', 'Cache-Control': cachePolicy, 'Pragma': 'no-cache', 'X-Content-Type-Options':'nosniff' });
+    res.writeHead(200, { 'Content-Type': MIME[assetType] || 'application/octet-stream', 'Cache-Control': cachePolicy, 'Pragma': 'no-cache', ...SECURITY_HEADERS });
     res.end(content);
   } catch {
     if (!path.extname(clean)) return staticFile(req, res, '/index.html');

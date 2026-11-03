@@ -1,0 +1,245 @@
+name: FastLove Security Pipeline
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "31 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  admin-security-tests:
+    name: Admin API security and regression tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Run Admin API and security tests
+        run: npm run admin:test
+      - name: Verify Admin production build
+        run: npm run admin:build
+
+  codeql:
+    name: CodeQL SAST (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+            needs-android: true
+          - language: javascript-typescript
+            build-mode: none
+            needs-android: false
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        if: matrix.needs-android
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # v4 does not request the removed Google SDK package named 'tools'.
+      - name: Set up Android SDK
+        if: matrix.needs-android
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android 35 SDK components
+        if: matrix.needs-android
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        if: matrix.needs-android
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.9"
+          cache-provider: basic
+
+      - name: Check Android manifest and FileProvider restrictions
+        if: matrix.needs-android
+        run: python3 apps/android/scripts/security_manifest_check.py
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Build Android app for Kotlin analysis
+        if: matrix.needs-android
+        working-directory: apps/android
+        run: gradle --no-daemon --stacktrace --console=plain assembleDebug
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  secret-scan:
+    name: Gitleaks secret scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Scan repository history for secrets
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+
+  filesystem-security:
+    name: Trivy dependency, secret and configuration scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+      - name: Install Android 35 SDK components
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.9"
+          cache-provider: basic
+      - name: Resolve and lock Android dependency versions for scanning
+        working-directory: apps/android
+        run: gradle --no-daemon --write-locks :app:dependencies
+      - name: Scan filesystem
+        id: trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        continue-on-error: true
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivy-flags: --include-dev-deps
+          exit-code: "1"
+      - name: Upload Trivy report
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: fastlove-trivy-sarif-${{ github.run_number }}
+          path: trivy-results.sarif
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Enforce Trivy result
+        if: always()
+        env:
+          SCAN_OUTCOME: ${{ steps.trivy.outcome }}
+        run: |
+          echo "Trivy outcome: ${SCAN_OUTCOME}"
+          if [ "${SCAN_OUTCOME}" != "success" ]; then
+            echo "Trivy reported a scanner error or HIGH/CRITICAL finding. Review the SARIF artifact."
+            exit 1
+          fi
+
+  dependency-review:
+    name: Pull request dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+
+  admin-dast:
+    name: OWASP ZAP baseline scan (Admin Web)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Start production-configured admin server
+        working-directory: apps/admin-web
+        env:
+          NODE_ENV: production
+          PORT: "4177"
+          PUBLIC_ORIGIN: http://127.0.0.1:4177
+          ADMIN_USERNAME: security-scan-admin
+        run: |
+          # Generate one-run credentials; this isolated local target is not production.
+          export ADMIN_PASSWORD="$(openssl rand -hex 32)"
+          export SESSION_SECRET="$(openssl rand -hex 32)"
+          npm run start > /tmp/fastlove-admin.log 2>&1 &
+          echo $! > /tmp/fastlove-admin.pid
+          for i in $(seq 1 40); do
+            if curl --silent --fail http://127.0.0.1:4177/api/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/fastlove-admin.log
+          exit 1
+      - name: Run OWASP ZAP baseline scan
+        id: zap
+        continue-on-error: true
+        run: |
+          mkdir -p zap-output
+          cp .zap/baseline.conf zap-output/baseline.conf
+          chmod 666 zap-output/baseline.conf
+          chmod 777 zap-output
+          docker run --rm --network host \
+            -v "$PWD/zap-output:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://127.0.0.1:4177 -m 5 -I -c baseline.conf \
+            -J zap-report.json -r zap-report.html
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fastlove-zap-report-${{ github.run_number }}
+          path: |
+            zap-output/zap-report.json
+            zap-output/zap-report.html
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Enforce ZAP result
+        if: always()
+        env:
+          SCAN_OUTCOME: ${{ steps.zap.outcome }}
+        run: |
+          echo "ZAP outcome: ${SCAN_OUTCOME}"
+          if [ "${SCAN_OUTCOME}" != "success" ]; then
+            echo "OWASP ZAP reported a failure. Review its report artifact."
+            exit 1
+          fi

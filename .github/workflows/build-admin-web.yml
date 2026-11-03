@@ -12,15 +12,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - name: Run admin regression and security tests
+        run: npm run admin:test
       - name: Build admin client
         run: npm run admin:build
       - name: Upload standalone admin client
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fastlove-admin-web-dist
           path: apps/admin-web/dist/

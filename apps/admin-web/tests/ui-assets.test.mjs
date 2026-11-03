@@ -17,6 +17,7 @@ test('admin UI hides inactive views and provides online/offline user filtering',
   assert.match(js, /function showApp\(admin\)[\s\S]*?\$\('#loginView'\)\.hidden\s*=\s*true[\s\S]*?\$\('#appView'\)\.hidden\s*=\s*false/, 'successful login must hide login view and reveal app');
   assert.match(js, /id="userOnlineFilter"/, 'user list must expose online filter');
   assert.match(js, /state\.usersOnline\s*=\s*e\.target\.value/, 'online filter must update UI state');
+  assert.match(js, /function safeHttpsUrl\([\s\S]*?url\.protocol === 'https:'[\s\S]*?catch/, 'external media and profile links must reject non-HTTPS URLs');
   assert.match(html, /data-page="referrals"/, 'referral report must be reachable from the sidebar');
   assert.match(js, /data-form=\"create-package\"/, 'admin can create dynamic packages from the UI');
   assert.match(js, /date-detail/, 'planned dates expose a detail action');

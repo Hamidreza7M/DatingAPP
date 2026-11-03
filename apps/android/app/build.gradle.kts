@@ -6,6 +6,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 android {
     namespace = "ir.hamdam.demo"
     compileSdk = 35
