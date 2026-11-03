@@ -145,7 +145,7 @@ jobs:
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          trivy-flags: --include-dev-deps
+          trivy-config: .github/trivy.yaml
           exit-code: "1"
       - name: Upload Trivy report
         if: always() && hashFiles('trivy-results.sarif') != ''
@@ -162,13 +162,15 @@ jobs:
         run: |
           echo "Trivy outcome: ${SCAN_OUTCOME}"
           if [ "${SCAN_OUTCOME}" != "success" ]; then
-            echo "Trivy reported a scanner error or HIGH/CRITICAL finding. Review the SARIF artifact."
+            echo "Trivy returned a non-zero result. Review the scanner log and SARIF artifact to distinguish scanner errors from HIGH/CRITICAL findings."
             exit 1
           fi
 
   dependency-review:
-    name: Pull request dependency review
-    if: github.event_name == 'pull_request'
+    name: Pull request dependency review (optional)
+    # Enable this repository variable only after Dependency Graph is enabled
+    # under Settings > Security > Code security and analysis.
+    if: github.event_name == 'pull_request' && vars.ENABLE_DEPENDENCY_REVIEW == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

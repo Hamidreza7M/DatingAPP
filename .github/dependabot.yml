@@ -1,14 +1,52 @@
 version: 2
 updates:
+  # Keep GitHub Actions maintenance to one grouped PR for routine updates.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      actions-minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+
+  # Do not create routine Gradle version-bump PRs. Dependabot security updates
+  # remain enabled and are grouped separately so urgent fixes are still raised.
   - package-ecosystem: gradle
     directory: /apps/android
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      gradle-security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # Group routine Admin Web dependency updates instead of opening one PR per package.
   - package-ecosystem: npm
     directory: /apps/admin-web
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      admin-npm-minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major

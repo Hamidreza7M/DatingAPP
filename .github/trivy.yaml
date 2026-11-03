@@ -1,0 +1,3 @@
+# Include non-production configurations such as Gradle test dependencies.
+pkg:
+  include-dev-deps: true
