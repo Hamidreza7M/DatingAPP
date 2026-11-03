@@ -1,6 +1,6 @@
 # FastLove — Security Review & Pipeline Report
 
-- **Generated:** 2026-11-02T08:10:25.873Z
+- **Generated:** 2026-11-02T07:43:20.977Z
 - **Scope:** uploaded demo source snapshot; Android app and Admin Web demo
 - **Backend:** no production backend exists; Admin API is a local JSON demo server
 - **PWA:** not implemented in this source snapshot
@@ -13,14 +13,13 @@
 | Web static security checks | **PASS** |
 | Admin API integration/security tests | **PASS** |
 | Admin web build | **PASS** |
-| Gitleaks secret scan | **NOT RUN** |
-| CodeQL SAST (JavaScript + Kotlin) | **NOT RUN** |
-| OSV dependency vulnerability scan | **NOT RUN** |
-| Android JVM unit tests | **NOT RUN** |
-| Android Lint | **NOT RUN** |
-| Android Release build (R8) | **NOT RUN** |
-| Android JaCoCo report | **NOT RUN** |
-| Android instrumented UI tests | **NOT RUN** |
+| Gitleaks secret scan | **NOT RUN — GitHub Actions only** |
+| CodeQL SAST (JavaScript + Kotlin) | **NOT RUN — GitHub Actions only** |
+| OSV dependency vulnerability scan | **NOT RUN — GitHub Actions only** |
+| Android JVM unit tests | **NOT RUN — Gradle/Android SDK unavailable** |
+| Android Lint | **NOT RUN — Gradle/Android SDK unavailable** |
+| Android Release build (R8) | **NOT RUN — Gradle/Android SDK unavailable** |
+| Android JaCoCo report | **NOT RUN — Gradle/Android SDK unavailable** |
 | Android XML resource/manifest parse | **PASS** |
 
 ## Static security requirements
@@ -46,7 +45,7 @@
 
 ## Admin Web/API runtime tests
 
-**Local result: 8 PASS, 0 FAIL.**
+**Local result: 6 PASS, 0 FAIL.**
 
 | # | Test | Result |
 |---:|---|---|
@@ -56,8 +55,6 @@
 | 4 | Security headers, path traversal, Origin, JSON, sessions, logout and login rate limiting | PASS |
 | 5 | Admin UI hides inactive views and supports online/offline filtering | PASS |
 | 6 | Admin assets are versioned and not served stale from browser cache | PASS |
-| 7 | Admin Web uses the bundled Bonyade Koodak FaNum font without changing Android assets | PASS |
-| 8 | All bundled WOFF2 weights are present and served with the font/woff2 MIME type | PASS |
 
 ## Changes applied in this review
 
@@ -67,28 +64,6 @@
 4. State-changing Admin API requests now require same-origin `Origin` and JSON request bodies when a body is present. Session cookie remains HttpOnly and SameSite=Strict; sessions expire after 30 minutes and are invalidated on logout.
 5. Android now targets API 36, disables cleartext traffic, trusts only system CAs, disables backup/device transfer, narrows FileProvider paths, and enables R8/resource shrinking for Release.
 6. Added CI controls for CodeQL SAST, OSV dependency scanning and Gitleaks, plus Android Release/Lint/unit/coverage stages.
-
-## Historical Android QA evidence (previous run)
-
-The separately maintained ANDROID-QA-REPORT.md records a prior GitHub Actions run. This historical result is not the result of the current pipeline execution.
-
-| Check | Historical result |
-|---|---|
-| AppRules Kotlin compile/smoke harness | PASS — 10 assertions |
-| AppRulesTest source via local Kotlin harness | PASS — 14 test methods (not Gradle) |
-| testDebugUnitTest | PASS |
-| jacocoTestReport | PASS |
-| assembleDebug | PASS |
-| lintDebug | FAIL — 2 errors and 13 warnings |
-| connectedDebugAndroidTest | NOT RUN — prior workflow did not reach this stage |
-| Debug APK artifact publication | NOT PUBLISHED — quality gate failed on Lint |
-| Post-patch Gradle/Lint revalidation | NOT RUN — Gradle/Android SDK unavailable in local environment |
-
-## Admin Web font regression checks
-
-- Bonyade Koodak FaNum is bundled locally as eight WOFF2 weights.
-- Runtime font request was verified in the font-update run: HTTP 200 with Content-Type font/woff2.
-- The font change was restricted to Admin Web; Android font resources were not changed.
 
 ## Findings / release blockers
 
@@ -105,14 +80,14 @@ The separately maintained ANDROID-QA-REPORT.md records a prior GitHub Actions ru
 ## Local verification summary
 
 - Static security configuration checks: **14 PASS, 0 FAIL, 4 informational scope notes**.
-- Admin web/API tests: **8 PASS, 0 FAIL** (including negative security tests and font asset regression tests).
+- Admin web/API tests: **6 PASS, 0 FAIL** (including negative security tests).
 - Admin web build: **PASS**.
 - Android manifest and XML resource parsing: **PASS (8 files)**. This validates XML well-formedness only; it does not replace Android Lint or an Android build.
 - GitHub Actions workflow files: **YAML syntax PASS** (local parser); remote Actions execution has not been triggered from this environment.
 
 ## Test limitations
 
-Android Gradle tasks, Android Emulator instrumentation, Gitleaks, CodeQL and OSV were not run locally. The environment has no installed Gradle CLI or Android SDK. Android Gradle/Lint/Release/XML, Emulator instrumentation and repository secret/SAST/dependency scans are configured in the security workflow. Their results must be confirmed in the resulting workflow runs. Any stage marked `NOT RUN` is not a pass. A successful Admin demo test does not certify the future backend, Android binary, PWA or production deployment.
+Android Gradle tasks, the separate Android Emulator instrumentation workflow, Gitleaks, CodeQL and OSV were not run locally. The environment has no installed Gradle CLI or Android SDK. Android Gradle/Lint/Release/XML and the repository secret/SAST/dependency scans are configured in the new security workflow; Android Emulator instrumentation remains in the separate Android build workflow. Their results must be confirmed in the resulting workflow runs. Any stage marked `NOT RUN` is not a pass. A successful Admin demo test does not certify the future backend, Android binary, PWA or production deployment.
 
 ## Release decision
 

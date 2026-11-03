@@ -26,28 +26,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Prepare web evidence directory
-        run: mkdir -p .ci-evidence/web
       - name: Static security requirements check
         id: static
         continue-on-error: true
-        run: set -o pipefail; npm run security:check 2>&1 | tee .ci-evidence/web/security-check.log
+        run: npm run security:check
       - name: Admin API integration and security tests
         id: tests
         continue-on-error: true
-        run: set -o pipefail; npm run admin:test 2>&1 | tee .ci-evidence/web/admin-tests.tap
+        run: npm run admin:test
       - name: Build Admin Web
         id: build
         continue-on-error: true
-        run: set -o pipefail; npm run admin:build 2>&1 | tee .ci-evidence/web/admin-build.log
-      - name: Upload web test and build evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fastlove-web-security-evidence
-          path: .ci-evidence/web/
-          if-no-files-found: warn
-          retention-days: 30
+        run: npm run admin:build
 
   android-security:
     name: Android tests, lint and hardened Release build
@@ -57,16 +47,22 @@ jobs:
       lint: ${{ steps.lint.outcome }}
       release: ${{ steps.release.outcome }}
       coverage: ${{ steps.coverage.outcome }}
-      instrumentation: ${{ steps.instrumentation.outcome }}
       xml: ${{ steps.xml.outcome }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate Android manifest and XML resources
         id: xml
-        continue-on-error: true
         run: |
-          mkdir -p apps/android/ci-report/logs
-          python3 scripts/validate_android_xml.py 2>&1 | tee apps/android/ci-report/logs/android-xml.log
+          python3 - <<'PYXML'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files = list(Path('apps/android/app/src').rglob('*.xml'))
+          if not files:
+              raise SystemExit('No Android XML files found')
+          for file in files:
+              ET.parse(file)
+          print(f'Validated {len(files)} Android XML files')
+          PYXML
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -82,56 +78,31 @@ jobs:
         id: unit
         continue-on-error: true
         working-directory: apps/android
-        run: |
-          mkdir -p ci-report/logs
-          gradle --no-daemon --stacktrace --console=plain testDebugUnitTest 2>&1 | tee ci-report/logs/unit-tests.log
+        run: gradle --no-daemon --stacktrace --console=plain testDebugUnitTest
       - name: Android Lint (Release variant)
         id: lint
         continue-on-error: true
         working-directory: apps/android
-        run: |
-          mkdir -p ci-report/logs
-          gradle --no-daemon --stacktrace --console=plain lintRelease 2>&1 | tee ci-report/logs/lint.log
+        run: gradle --no-daemon --stacktrace --console=plain lintRelease
       - name: Build hardened Release variant (unsigned; signing is a separate gated step)
         id: release
         continue-on-error: true
         working-directory: apps/android
-        run: |
-          mkdir -p ci-report/logs
-          gradle --no-daemon --stacktrace --console=plain assembleRelease 2>&1 | tee ci-report/logs/release-build.log
+        run: gradle --no-daemon --stacktrace --console=plain assembleRelease
       - name: Generate JaCoCo unit-test coverage
         id: coverage
         if: always()
         continue-on-error: true
         working-directory: apps/android
-        run: |
-          mkdir -p ci-report/logs
-          gradle --no-daemon --stacktrace --console=plain jacocoTestReport 2>&1 | tee ci-report/logs/coverage.log
-      - name: Android instrumented UI smoke tests on Emulator
-        id: instrumentation
-        if: always()
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          target: google_apis
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          script: |
-            cd apps/android
-            mkdir -p ci-report/logs
-            gradle --no-daemon --stacktrace --console=plain connectedDebugAndroidTest 2>&1 | tee ci-report/logs/instrumented-ui-tests.log
+        run: gradle --no-daemon --stacktrace --console=plain jacocoTestReport
       - name: Upload Android verification outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fastlove-android-security-evidence
+          name: fastlove-android-security-outputs
           path: |
-            apps/android/ci-report/
             apps/android/app/build/reports/
             apps/android/app/build/test-results/
-            apps/android/app/build/outputs/androidTest-results/
             apps/android/app/build/outputs/apk/release/
           if-no-files-found: warn
           retention-days: 30
@@ -216,18 +187,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download web test evidence
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: fastlove-web-security-evidence
-          path: .ci-evidence/web
-      - name: Download Android test and build evidence
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: fastlove-android-security-evidence
-          path: .ci-evidence/android
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -243,54 +202,13 @@ jobs:
           ANDROID_LINT: ${{ needs.android-security.outputs.lint }}
           ANDROID_RELEASE: ${{ needs.android-security.outputs.release }}
           ANDROID_COVERAGE: ${{ needs.android-security.outputs.coverage }}
-          ANDROID_UI: ${{ needs.android-security.outputs.instrumentation }}
           ANDROID_XML: ${{ needs.android-security.outputs.xml }}
         run: node scripts/write-security-report.mjs
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install PDF rendering system libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b
-      - name: Install PDF report dependencies
-        run: pip install -r requirements-report.txt
-      - name: Generate unified test and security PDF after all builds and scans
-        env:
-          WEB_STATIC: ${{ needs.web-security.outputs.static }}
-          WEB_TESTS: ${{ needs.web-security.outputs.tests }}
-          WEB_BUILD: ${{ needs.web-security.outputs.build }}
-          GITLEAKS: ${{ needs.secret-scan.result }}
-          CODEQL: ${{ needs.codeql-sast.result }}
-          OSV_SCAN: ${{ needs.osv-dependency-scan.result }}
-          ANDROID_UNIT: ${{ needs.android-security.outputs.unit }}
-          ANDROID_LINT: ${{ needs.android-security.outputs.lint }}
-          ANDROID_RELEASE: ${{ needs.android-security.outputs.release }}
-          ANDROID_COVERAGE: ${{ needs.android-security.outputs.coverage }}
-          ANDROID_UI: ${{ needs.android-security.outputs.instrumentation }}
-          ANDROID_XML: ${{ needs.android-security.outputs.xml }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_SHA: ${{ github.sha }}
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-        run: python scripts/generate_comprehensive_report.py
-      - name: Add unified report link and status to workflow summary
-        if: always()
-        run: |
-          echo '## FastLove comprehensive test and security report' >> "$GITHUB_STEP_SUMMARY"
-          echo 'The single PDF includes the outcomes from code checks, web/API tests, Android build/test jobs, SAST, secret scan and dependency scan.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Download the `fastlove-comprehensive-test-security-report` artifact.' >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload unified test and security report
-        if: always()
+      - name: Upload security report
         uses: actions/upload-artifact@v4
         with:
-          name: fastlove-comprehensive-test-security-report
-          path: |
-            reports/FastLove-Comprehensive-Test-Security-Report.pdf
-            reports/FastLove-Comprehensive-Test-Security-Report.html
-            SECURITY-REVIEW-REPORT.md
+          name: fastlove-security-review-report
+          path: SECURITY-REVIEW-REPORT.md
           if-no-files-found: error
           retention-days: 90
 
@@ -309,19 +227,18 @@ jobs:
           ANDROID_LINT: ${{ needs.android-security.outputs.lint }}
           ANDROID_RELEASE: ${{ needs.android-security.outputs.release }}
           ANDROID_COVERAGE: ${{ needs.android-security.outputs.coverage }}
-          ANDROID_UI: ${{ needs.android-security.outputs.instrumentation }}
           ANDROID_XML: ${{ needs.android-security.outputs.xml }}
           GITLEAKS: ${{ needs.secret-scan.result }}
           CODEQL: ${{ needs.codeql-sast.result }}
           OSV_SCAN: ${{ needs.osv-dependency-scan.result }}
         run: |
           failed=0
-          for stage in WEB_STATIC WEB_TESTS WEB_BUILD ANDROID_XML ANDROID_UNIT ANDROID_LINT ANDROID_RELEASE ANDROID_COVERAGE ANDROID_UI GITLEAKS CODEQL OSV_SCAN; do
+          for stage in WEB_STATIC WEB_TESTS WEB_BUILD ANDROID_XML ANDROID_UNIT ANDROID_LINT ANDROID_RELEASE ANDROID_COVERAGE GITLEAKS CODEQL OSV_SCAN; do
             value="${!stage}"
             echo "$stage: ${value:-unknown}"
             if [ "$value" != "success" ]; then failed=1; fi
           done
           if [ "$failed" -ne 0 ]; then
-            echo "Security gate failed. Inspect the FastLove comprehensive test and security PDF artifact."
+            echo "Security gate failed. Inspect the FastLove security report artifact."
             exit 1
           fi

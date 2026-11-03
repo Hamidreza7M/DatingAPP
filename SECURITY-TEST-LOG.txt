@@ -1,7 +1,11 @@
-FastLove local security verification log
-Generated: 2026-11-02T08:10:25.847Z
 
-===== Static security checks | PASS | exit=0 =====
+> fastlove-monorepo@1.0.4 security:verify
+> npm run security:check && npm run admin:test && npm run admin:build
+
+
+> fastlove-monorepo@1.0.4 security:check
+> node scripts/security-check.mjs
+
 ✓ AND-001 PASS: Android cleartext networking disabled — Manifest and Network Security Config explicitly prohibit cleartext HTTP.
 ✓ AND-002 PASS: Android system trust anchors only — Custom user-added CA certificates are not trusted by the app network policy.
 ✓ AND-003 PASS: Android backup disabled and data domains excluded — Manifest references backup policies and backup/device-transfer exclusions cover app-local data and SharedPreferences.
@@ -23,81 +27,69 @@ i SCOPE-004 INFO: Demo credentials remain intentionally public — admin / 12345
 
 Security static checks: 14 PASS, 0 FAIL, 4 INFO
 
-===== Admin Web/API tests | PASS | exit=0 =====
+> fastlove-monorepo@1.0.4 admin:test
+> npm --prefix apps/admin-web test
 
-> @fastlove/admin-web@1.0.5 test
+
+> @fastlove/admin-web@1.0.4 test
 > node --test tests/*.test.mjs
 
 TAP version 13
 # Subtest: admin API: auth, read routes and management actions
 ok 1 - admin API: auth, read routes and management actions
   ---
-  duration_ms: 357.154292
+  duration_ms: 399.724503
   type: 'test'
   ...
 # Subtest: demo credentials admin / 123456 work without environment overrides
 ok 2 - demo credentials admin / 123456 work without environment overrides
   ---
-  duration_ms: 249.723012
+  duration_ms: 254.878902
   type: 'test'
   ...
 # Subtest: demo server refuses production mode and non-loopback binding by default
 ok 3 - demo server refuses production mode and non-loopback binding by default
   ---
-  duration_ms: 119.551843
+  duration_ms: 107.038979
   type: 'test'
   ...
 # Subtest: demo HTTP responses have security headers and unsafe requests enforce same-origin JSON
 ok 4 - demo HTTP responses have security headers and unsafe requests enforce same-origin JSON
   ---
-  duration_ms: 288.608502
+  duration_ms: 299.665472
   type: 'test'
   ...
 # Subtest: admin UI hides inactive views and provides online/offline user filtering
 ok 5 - admin UI hides inactive views and provides online/offline user filtering
   ---
-  duration_ms: 5.23325
+  duration_ms: 4.415626
   type: 'test'
   ...
 # Subtest: admin web assets are versioned and cannot be served stale from browser cache
 ok 6 - admin web assets are versioned and cannot be served stale from browser cache
   ---
-  duration_ms: 2.490099
+  duration_ms: 2.106781
   type: 'test'
   ...
-# Subtest: Admin Web uses the bundled Bonyade Koodak FaNum font without changing Android assets
-ok 7 - Admin Web uses the bundled Bonyade Koodak FaNum font without changing Android assets
-  ---
-  duration_ms: 2.268574
-  type: 'test'
-  ...
-# Subtest: Admin Web serves all bundled WOFF2 weights with the correct font MIME type
-ok 8 - Admin Web serves all bundled WOFF2 weights with the correct font MIME type
-  ---
-  duration_ms: 1.200292
-  type: 'test'
-  ...
-1..8
-# tests 8
+1..6
+# tests 6
 # suites 0
-# pass 8
+# pass 6
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1225.984615
+# duration_ms 1305.059267
 
-===== Admin Web build | PASS | exit=0 =====
-
-> fastlove-monorepo@1.0.5 admin:build
+> fastlove-monorepo@1.0.4 admin:build
 > npm --prefix apps/admin-web run build
 
 
-> @fastlove/admin-web@1.0.5 build
+> @fastlove/admin-web@1.0.4 build
 > node scripts/build.mjs
 
 Static admin client copied to apps/admin-web/dist.
 Demo notice: the bundled Node JSON API is local-demo-only and refuses NODE_ENV=production. A real backend is required before public deployment.
-
-===== Android XML validation | PASS | exit=0 =====
-PASS: Android XML parsing succeeded for 8 files
+.github/workflows/security.yml: YAML PASS
+.github/workflows/build-apk.yml: YAML PASS
+Android XML parse: PASS (8 files)

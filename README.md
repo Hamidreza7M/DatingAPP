@@ -69,16 +69,15 @@ Workflow اندروید در `.github/workflows/build-apk.yml` روی Pull Reque
 
 ### پایپ‌لاین امنیتی
 
-Workflow امنیتی `.github/workflows/security.yml` روی Push، Pull Request و اجرای دستی فعال است و کنترل‌های امنیتی پیکربندی، تست‌های API پنل، Build وب، تست/Lint/Release اندروید، اعتبارسنجی منابع XML، Gitleaks، CodeQL و OSV را اجرا می‌کند. پس از پایان همه Jobهای Build و تست، یک گزارش واحد PDF از نتایج کد، تست‌ها و کنترل‌های امنیتی تولید و به‌صورت Artifact با نام `fastlove-comprehensive-test-security-report` منتشر می‌شود. فایل Markdown و لاگ‌های خام برای بررسی فنی نیز حفظ می‌شوند؛ شکست هر کنترل الزامی، Security Gate را Fail می‌کند.
+Workflow امنیتی `.github/workflows/security.yml` روی Push، Pull Request و اجرای دستی فعال است و کنترل‌های امنیتی پیکربندی، تست‌های API پنل، Build وب، تست/Lint/Release اندروید، اعتبارسنجی منابع XML، Gitleaks، CodeQL و OSV را اجرا می‌کند. گزارش تجمیعی امنیت به‌صورت Artifact ذخیره می‌شود و شکست هر کنترل الزامی، Security Gate را Fail می‌کند.
 
-برای اجرای کنترل‌های قابل اجرا در محیط محلی (بدون نیاز به Gradle/Android SDK)، ابتدا وابستگی PDF را نصب کنید:
+برای اجرای کنترل‌های قابل اجرا در محیط محلی (بدون نیاز به Gradle/Android SDK):
 
 ```bash
-python -m pip install -r requirements-report.txt
 npm run security:verify
 ```
 
-این فرمان کنترل‌های ایستای امنیتی، تست‌های Node پنل، Build وب و اعتبارسنجی XML اندروید را اجرا می‌کند و در پایان Markdown و PDF تجمیعی می‌سازد. خروجی PDF در مسیر `reports/FastLove-Comprehensive-Test-Security-Report.pdf` قرار می‌گیرد. تست‌های Gradle اندروید، Lint، Release، Coverage و اسکن‌های Gitleaks/CodeQL/OSV فقط در GitHub Actions اجرا می‌شوند و تا قبل از اجرای CI در گزارش با وضعیت `NOT RUN` نمایش داده می‌شوند. جزئیات کنترل‌ها و موانع انتشار در `SECURITY-REQUIREMENTS.md` و `SECURITY-REVIEW-REPORT.md` ثبت شده‌اند.
+این فرمان کنترل‌های ایستای تنظیمات، تست‌های Node پنل و Build وب را اجرا می‌کند؛ مراحل Android، اسکن‌های GitHub و تست Emulator فقط در CI اجرا می‌شوند. جزئیات کنترل‌ها و موانع انتشار در `SECURITY-REQUIREMENTS.md` و `SECURITY-REVIEW-REPORT.md` ثبت شده‌اند.
 
 ## اصل معماری
 
@@ -100,8 +99,7 @@ Android فعلی نسخه دمو و محلی است و داده‌ها در Shar
 
 - Security requirements and open release blockers: [SECURITY-REQUIREMENTS.md](SECURITY-REQUIREMENTS.md)
 - Current demo review and test status: [SECURITY-REVIEW-REPORT.md](SECURITY-REVIEW-REPORT.md)
-- Unified PDF: [FastLove Comprehensive Test & Security Report](reports/FastLove-Comprehensive-Test-Security-Report.pdf)
-- Run local web/static security checks and generate the PDF: `npm run security:verify`
-- CI security pipeline (PDF generated after all builds/scans): `.github/workflows/security.yml`
+- Run local web/static security checks: `npm run security:verify`
+- CI security pipeline: `.github/workflows/security.yml`
 
 **Do not deploy the current Admin JSON demo API publicly or enter real personal data.** The central production backend and PWA are not implemented in this repository.

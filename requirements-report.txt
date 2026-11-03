@@ -1,2 +1,0 @@
-# HTML-to-PDF renderer used by the unified CI report.
-weasyprint==68.0

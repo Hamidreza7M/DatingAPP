@@ -13,8 +13,7 @@
     "android:verify": "cd apps/android && gradle --no-daemon testDebugUnitTest lintDebug assembleDebug jacocoTestReport",
     "admin:test": "npm --prefix apps/admin-web test",
     "security:check": "node scripts/security-check.mjs",
-    "security:verify": "node scripts/run_local_security_pipeline.mjs",
-    "android:xml:check": "python3 scripts/validate_android_xml.py"
+    "security:verify": "npm run security:check && npm run admin:test && npm run admin:build"
   },
   "engines": {
     "node": ">=20"

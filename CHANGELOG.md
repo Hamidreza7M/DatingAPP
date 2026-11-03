@@ -1,12 +1,5 @@
 # FastLove Admin changelog
 
-## Engineering pipeline update — 2026-11-02
-
-- Added a unified, Persian-language PDF report combining static security controls, Admin Web/API tests, Android validation/build/test outcomes, code-quality checks and security scanners.
-- The security workflow now collects Web and Android evidence and generates the PDF after all build/test/scan jobs complete.
-- `npm run security:verify` now retains detailed logs, refreshes the Markdown security report and generates `reports/FastLove-Comprehensive-Test-Security-Report.pdf` after local checks and the Admin Web build.
-- Added a reusable Android XML validation script and documentation for PDF report dependencies/output.
-
 ## 1.0.5 — 2026-11-02
 
 - Replaced the Admin Web interface font with the supplied Bonyade Koodak FaNum family, bundled locally as WOFF2 weights 100–900.
